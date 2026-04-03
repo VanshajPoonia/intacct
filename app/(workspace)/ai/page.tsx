@@ -1,5 +1,5 @@
-import { ShellStubRoute } from "@/components/layout/shell-stub-route"
+import { AIOverviewPage } from "@/components/admin/platform-module-pages"
 
 export default function AILandingPage() {
-  return <ShellStubRoute pathname="/ai" />
+  return <AIOverviewPage />
 }

@@ -1,5 +1,5 @@
-import { ShellStubRoute } from "@/components/layout/shell-stub-route"
+import { DashboardsOverviewPage } from "@/components/admin/platform-module-pages"
 
 export default function DashboardsLandingPage() {
-  return <ShellStubRoute pathname="/dashboards" />
+  return <DashboardsOverviewPage />
 }

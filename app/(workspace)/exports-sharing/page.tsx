@@ -1,5 +1,5 @@
-import { ShellStubRoute } from "@/components/layout/shell-stub-route"
+import { ExportsSharingWorkspacePage } from "@/components/admin/platform-module-pages"
 
 export default function ExportsSharingLandingPage() {
-  return <ShellStubRoute pathname="/exports-sharing" />
+  return <ExportsSharingWorkspacePage />
 }

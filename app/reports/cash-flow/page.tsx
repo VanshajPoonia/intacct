@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
 import { 
   Download, 
   Printer, 
@@ -15,6 +17,9 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  Building2,
+  Calendar,
+  X,
 } from "lucide-react"
 import { getCashFlowData, getEntities, type CashFlowData } from "@/lib/services"
 import type { Entity, DashboardFilters } from "@/lib/types"
@@ -54,6 +59,17 @@ export default function CashFlowPage() {
   const [operatingExpanded, setOperatingExpanded] = useState(true)
   const [investingExpanded, setInvestingExpanded] = useState(true)
   const [financingExpanded, setFinancingExpanded] = useState(true)
+  const [activeFilters, setActiveFilters] = useState<string[]>([])
+  
+  // Update active filters
+  useEffect(() => {
+    const filters: string[] = []
+    if (entityId !== 'e4') {
+      const entity = entities.find(e => e.id === entityId)
+      if (entity) filters.push(`Entity: ${entity.name}`)
+    }
+    setActiveFilters(filters)
+  }, [entityId, entities])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -88,6 +104,12 @@ export default function CashFlowPage() {
 
   const handlePrint = () => {
     window.print()
+  }
+
+  const clearFilter = (filter: string) => {
+    if (filter.startsWith('Entity:')) {
+      setEntityId('e4')
+    }
   }
 
   const renderChangeIndicator = (current: number, previous: number) => {
@@ -130,12 +152,12 @@ export default function CashFlowPage() {
           </div>
         </div>
 
-        {/* Filters */}
-        <Card>
+        {/* Sticky Filter Bar */}
+        <Card className="sticky top-0 z-10 shadow-sm">
           <CardContent className="py-4">
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Entity:</span>
+                <Building2 className="h-4 w-4 text-muted-foreground" />
                 <Select value={entityId} onValueChange={setEntityId}>
                   <SelectTrigger className="w-[200px]">
                     <SelectValue />
@@ -149,8 +171,11 @@ export default function CashFlowPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <Separator orientation="vertical" className="h-8" />
+
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Period:</span>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
                 <Select value={datePreset} onValueChange={setDatePreset}>
                   <SelectTrigger className="w-[160px]">
                     <SelectValue />
@@ -165,6 +190,32 @@ export default function CashFlowPage() {
                 </Select>
               </div>
             </div>
+
+            {/* Active Filter Pills */}
+            {activeFilters.length > 0 && (
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                <span className="text-xs text-muted-foreground">Active filters:</span>
+                {activeFilters.map((filter) => (
+                  <Badge key={filter} variant="secondary" className="gap-1 text-xs">
+                    {filter}
+                    <button 
+                      onClick={() => clearFilter(filter)}
+                      className="ml-1 hover:text-destructive"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 text-xs"
+                  onClick={() => setEntityId('e4')}
+                >
+                  Clear all
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 

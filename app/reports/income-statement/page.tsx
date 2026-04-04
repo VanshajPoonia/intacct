@@ -40,6 +40,7 @@ import { format, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOf
 import { getEntities, getIncomeStatementData, getDepartments, type Department } from "@/lib/services"
 import type { Entity, IncomeStatementData } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { ExportPreviewDialog, type ExportFormat, type ExportOptions } from "@/components/reports/export-preview-dialog"
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('en-US', {
@@ -207,6 +208,7 @@ export default function IncomeStatementPage() {
   const [data, setData] = useState<IncomeStatementData | null>(null)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['revenue', 'cogs', 'opex']))
   const [activeFilters, setActiveFilters] = useState<string[]>([])
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
   
   const now = new Date()
 
@@ -308,6 +310,11 @@ export default function IncomeStatementPage() {
     }
   }
 
+  const handleExport = (format: ExportFormat, options: ExportOptions) => {
+    console.log(`Exporting income statement as ${format} with options:`, options)
+    // In a real app, this would trigger the actual export
+  }
+
   const selectedEntityName = entities.find(e => e.id === selectedEntity)?.name || 'All Entities'
   const { start, end } = getDateRangeValues()
   const showComparisonColumn = comparisonMode !== 'none' && comparisonMode !== 'budget'
@@ -333,17 +340,10 @@ export default function IncomeStatementPage() {
                 <Printer className="h-4 w-4 mr-2" />
                 Print
               </Button>
-              <Select defaultValue="pdf" onValueChange={(format) => console.log(`Exporting as ${format}`)}>
-                <SelectTrigger className="w-[130px]">
-                  <Download className="h-4 w-4 mr-2" />
-                  <span>Export</span>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pdf">Export PDF</SelectItem>
-                  <SelectItem value="excel">Export Excel</SelectItem>
-                  <SelectItem value="csv">Export CSV</SelectItem>
-                </SelectContent>
-              </Select>
+              <Button variant="outline" size="sm" onClick={() => setExportDialogOpen(true)}>
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
             </div>
           </div>
 
@@ -701,6 +701,63 @@ export default function IncomeStatementPage() {
           </Card>
         </div>
       </div>
+
+      {/* Export Preview Dialog */}
+      <ExportPreviewDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        reportTitle="Income Statement"
+        reportSubtitle={`${selectedEntityName} | ${format(start, 'MMM d, yyyy')} - ${format(end, 'MMM d, yyyy')}`}
+        onExport={handleExport}
+        onPrint={() => window.print()}
+      >
+        {data && (
+          <div className="text-sm space-y-4">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2">Category</th>
+                  <th className="text-right py-2">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="font-semibold bg-muted/50">
+                  <td className="py-2">Revenue</td>
+                  <td className="text-right py-2">{formatCurrency(data.revenue.total)}</td>
+                </tr>
+                <tr>
+                  <td className="py-2">Cost of Goods Sold</td>
+                  <td className="text-right py-2">{formatCurrency(data.costOfGoodsSold.total)}</td>
+                </tr>
+                <tr className="font-semibold border-t">
+                  <td className="py-2">Gross Profit</td>
+                  <td className="text-right py-2 text-emerald-600">{formatCurrency(data.grossProfit)}</td>
+                </tr>
+                <tr>
+                  <td className="py-2">Operating Expenses</td>
+                  <td className="text-right py-2">{formatCurrency(data.operatingExpenses.total)}</td>
+                </tr>
+                <tr className="font-semibold border-t">
+                  <td className="py-2">Operating Income</td>
+                  <td className="text-right py-2 text-emerald-600">{formatCurrency(data.operatingIncome)}</td>
+                </tr>
+                <tr>
+                  <td className="py-2">Other Income (Expense)</td>
+                  <td className="text-right py-2">{formatCurrency(data.otherIncome.total)}</td>
+                </tr>
+                <tr>
+                  <td className="py-2">Income Tax Expense</td>
+                  <td className="text-right py-2">{formatCurrency(data.incomeTaxExpense)}</td>
+                </tr>
+                <tr className="font-bold border-t-2 bg-primary/5">
+                  <td className="py-3">NET INCOME</td>
+                  <td className="text-right py-3 text-emerald-600">{formatCurrency(data.netIncome)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </ExportPreviewDialog>
     </AppShell>
   )
 }

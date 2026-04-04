@@ -30,6 +30,8 @@ import {
 } from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
 import { 
   Download, 
   Printer,
@@ -37,6 +39,8 @@ import {
   CheckCircle,
   AlertCircle,
   RefreshCw,
+  Building2,
+  X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { DashboardFilters, Entity } from "@/lib/types"
@@ -78,6 +82,17 @@ export default function TrialBalancePage() {
   const [data, setData] = useState<TrialBalanceRow[]>([])
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
+  const [activeFilters, setActiveFilters] = useState<string[]>([])
+  
+  // Update active filters
+  useEffect(() => {
+    const filtersList: string[] = []
+    if (filters.entityId !== 'e1') {
+      const entity = entities.find(e => e.id === filters.entityId)
+      if (entity) filtersList.push(`Entity: ${entity.name}`)
+    }
+    setActiveFilters(filtersList)
+  }, [filters.entityId, entities])
 
   // Load entities on mount
   useEffect(() => {
@@ -117,6 +132,12 @@ export default function TrialBalancePage() {
           endDate: date,
         }
       }))
+    }
+  }
+
+  const clearFilter = (filter: string) => {
+    if (filter.startsWith('Entity:')) {
+      handleEntityChange('e1')
     }
   }
 
@@ -188,12 +209,12 @@ export default function TrialBalancePage() {
           }
         />
 
-        {/* Filters */}
-        <Card>
-          <CardContent className="pt-4">
+        {/* Sticky Filter Bar */}
+        <Card className="sticky top-0 z-10 shadow-sm">
+          <CardContent className="py-4">
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Entity:</span>
+                <Building2 className="h-4 w-4 text-muted-foreground" />
                 <Select value={filters.entityId} onValueChange={handleEntityChange}>
                   <SelectTrigger className="w-[200px] h-9">
                     <SelectValue placeholder="Select entity" />
@@ -208,8 +229,10 @@ export default function TrialBalancePage() {
                 </Select>
               </div>
 
+              <Separator orientation="vertical" className="h-8" />
+
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">As of:</span>
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -219,7 +242,6 @@ export default function TrialBalancePage() {
                         !filters.dateRange.endDate && "text-muted-foreground"
                       )}
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
                       {format(filters.dateRange.endDate, "PPP")}
                     </Button>
                   </PopoverTrigger>
@@ -238,6 +260,32 @@ export default function TrialBalancePage() {
                 <span>Last refreshed: {format(lastRefresh, 'h:mm a')}</span>
               </div>
             </div>
+
+            {/* Active Filter Pills */}
+            {activeFilters.length > 0 && (
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                <span className="text-xs text-muted-foreground">Active filters:</span>
+                {activeFilters.map((filter) => (
+                  <Badge key={filter} variant="secondary" className="gap-1 text-xs">
+                    {filter}
+                    <button 
+                      onClick={() => clearFilter(filter)}
+                      className="ml-1 hover:text-destructive"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 text-xs"
+                  onClick={() => handleEntityChange('e1')}
+                >
+                  Clear all
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 

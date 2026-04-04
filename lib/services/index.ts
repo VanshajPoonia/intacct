@@ -73,6 +73,15 @@ export const employees: Employee[] = [
   { id: 'emp4', name: 'Sarah Chen', email: 'sarah.chen@acme.com', departmentId: 'dept4', locationId: 'loc1', role: 'Controller', status: 'active' },
 ]
 
+// ============ BANK ACCOUNT SERVICES ============
+
+import type { BankAccount } from '@/lib/types'
+
+export async function getBankAccounts(): Promise<BankAccount[]> {
+  await delay(SIMULATED_DELAY)
+  return bankAccounts
+}
+
 // ============ FILTER OPTION SERVICES ============
 
 export async function getEntities(): Promise<Entity[]> {
@@ -95,14 +104,98 @@ export async function getProjects(): Promise<Project[]> {
   return projects
 }
 
-export async function getCustomers(): Promise<Customer[]> {
+export async function getCustomers(
+  search?: string,
+  status?: string[],
+  sort?: SortConfig,
+  page: number = 1,
+  pageSize: number = 10
+): Promise<PaginatedResponse<Customer>> {
   await delay(SIMULATED_DELAY)
-  return customers
+  
+  let filtered = [...customers]
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(c => status.includes(c.status))
+  }
+  
+  if (search) {
+    const s = search.toLowerCase()
+    filtered = filtered.filter(c => 
+      c.name.toLowerCase().includes(s) ||
+      c.customerId?.toLowerCase().includes(s) ||
+      c.contactEmail?.toLowerCase().includes(s)
+    )
+  }
+  
+  if (sort) {
+    filtered.sort((a, b) => {
+      const aVal = a[sort.key as keyof Customer]
+      const bVal = b[sort.key as keyof Customer]
+      if (aVal === undefined || bVal === undefined) return 0
+      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  }
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
 }
 
-export async function getVendors(): Promise<Vendor[]> {
+export async function getVendors(
+  search?: string,
+  status?: string[],
+  sort?: SortConfig,
+  page: number = 1,
+  pageSize: number = 10
+): Promise<PaginatedResponse<Vendor>> {
   await delay(SIMULATED_DELAY)
-  return vendors
+  
+  let filtered = [...vendors]
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(v => status.includes(v.status))
+  }
+  
+  if (search) {
+    const s = search.toLowerCase()
+    filtered = filtered.filter(v => 
+      v.name.toLowerCase().includes(s) ||
+      v.vendorId?.toLowerCase().includes(s) ||
+      v.contactEmail?.toLowerCase().includes(s)
+    )
+  }
+  
+  if (sort) {
+    filtered.sort((a, b) => {
+      const aVal = a[sort.key as keyof Vendor]
+      const bVal = b[sort.key as keyof Vendor]
+      if (aVal === undefined || bVal === undefined) return 0
+      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  }
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
+export async function getVendorById(id: string): Promise<Vendor | null> {
+  await delay(SIMULATED_DELAY)
+  return vendors.find(v => v.id === id) || null
+}
+
+export async function getCustomerById(id: string): Promise<Customer | null> {
+  await delay(SIMULATED_DELAY)
+  return customers.find(c => c.id === id) || null
 }
 
 export async function getEmployees(): Promise<Employee[]> {
@@ -1049,4 +1142,252 @@ export async function getAIInsights(filters: DashboardFilters): Promise<AIInsigh
   }
   
   return insights
+}
+
+// ============ FINANCIAL STATEMENT SERVICES ============
+
+export interface BalanceSheetData {
+  assets: {
+    currentAssets: {
+      cash: number
+      accountsReceivable: number
+      inventory: number
+      prepaidExpenses: number
+      other: number
+      total: number
+    }
+    nonCurrentAssets: {
+      ppe: number
+      accumulatedDepreciation: number
+      intangibles: number
+      investments: number
+      other: number
+      total: number
+    }
+    total: number
+  }
+  liabilities: {
+    currentLiabilities: {
+      accountsPayable: number
+      accruedExpenses: number
+      shortTermDebt: number
+      currentPortionLTD: number
+      other: number
+      total: number
+    }
+    nonCurrentLiabilities: {
+      longTermDebt: number
+      deferredTax: number
+      other: number
+      total: number
+    }
+    total: number
+  }
+  equity: {
+    commonStock: number
+    additionalPaidInCapital: number
+    retainedEarnings: number
+    treasuryStock: number
+    otherComprehensiveIncome: number
+    total: number
+  }
+}
+
+export async function getBalanceSheetData(filters: DashboardFilters): Promise<BalanceSheetData> {
+  await delay(SIMULATED_DELAY)
+  
+  const multiplier = filters.entityId === 'e4' ? 1 : filters.entityId === 'e1' ? 0.6 : 0.2
+  
+  const currentAssets = {
+    cash: Math.round(2450000 * multiplier),
+    accountsReceivable: Math.round(537500 * multiplier),
+    inventory: Math.round(425000 * multiplier),
+    prepaidExpenses: Math.round(85000 * multiplier),
+    other: Math.round(42000 * multiplier),
+    total: 0
+  }
+  currentAssets.total = currentAssets.cash + currentAssets.accountsReceivable + 
+    currentAssets.inventory + currentAssets.prepaidExpenses + currentAssets.other
+  
+  const nonCurrentAssets = {
+    ppe: Math.round(3200000 * multiplier),
+    accumulatedDepreciation: Math.round(850000 * multiplier),
+    intangibles: Math.round(450000 * multiplier),
+    investments: Math.round(180000 * multiplier),
+    other: Math.round(65000 * multiplier),
+    total: 0
+  }
+  nonCurrentAssets.total = nonCurrentAssets.ppe - nonCurrentAssets.accumulatedDepreciation + 
+    nonCurrentAssets.intangibles + nonCurrentAssets.investments + nonCurrentAssets.other
+  
+  const totalAssets = currentAssets.total + nonCurrentAssets.total
+  
+  const currentLiabilities = {
+    accountsPayable: Math.round(161800 * multiplier),
+    accruedExpenses: Math.round(125000 * multiplier),
+    shortTermDebt: Math.round(50000 * multiplier),
+    currentPortionLTD: Math.round(75000 * multiplier),
+    other: Math.round(35000 * multiplier),
+    total: 0
+  }
+  currentLiabilities.total = currentLiabilities.accountsPayable + currentLiabilities.accruedExpenses + 
+    currentLiabilities.shortTermDebt + currentLiabilities.currentPortionLTD + currentLiabilities.other
+  
+  const nonCurrentLiabilities = {
+    longTermDebt: Math.round(800000 * multiplier),
+    deferredTax: Math.round(120000 * multiplier),
+    other: Math.round(45000 * multiplier),
+    total: 0
+  }
+  nonCurrentLiabilities.total = nonCurrentLiabilities.longTermDebt + nonCurrentLiabilities.deferredTax + nonCurrentLiabilities.other
+  
+  const totalLiabilities = currentLiabilities.total + nonCurrentLiabilities.total
+  
+  const equity = {
+    commonStock: Math.round(500000 * multiplier),
+    additionalPaidInCapital: Math.round(1200000 * multiplier),
+    retainedEarnings: Math.round(totalAssets - totalLiabilities - 1700000 * multiplier),
+    treasuryStock: Math.round(50000 * multiplier),
+    otherComprehensiveIncome: Math.round(50000 * multiplier),
+    total: 0
+  }
+  equity.total = equity.commonStock + equity.additionalPaidInCapital + equity.retainedEarnings - equity.treasuryStock + equity.otherComprehensiveIncome
+  
+  return {
+    assets: {
+      currentAssets,
+      nonCurrentAssets,
+      total: totalAssets
+    },
+    liabilities: {
+      currentLiabilities,
+      nonCurrentLiabilities,
+      total: totalLiabilities
+    },
+    equity
+  }
+}
+
+export interface IncomeStatementData {
+  revenue: {
+    lines: { name: string; amount: number; previousAmount: number }[]
+    total: number
+    previousTotal: number
+  }
+  costOfGoodsSold: {
+    lines: { name: string; amount: number; previousAmount: number }[]
+    total: number
+    previousTotal: number
+  }
+  grossProfit: number
+  previousGrossProfit: number
+  operatingExpenses: {
+    lines: { name: string; amount: number; previousAmount: number }[]
+    total: number
+    previousTotal: number
+  }
+  operatingIncome: number
+  previousOperatingIncome: number
+  otherIncome: {
+    interestIncome: number
+    interestExpense: number
+    other: number
+    total: number
+  }
+  incomeBeforeTax: number
+  previousIncomeBeforeTax: number
+  incomeTaxExpense: number
+  netIncome: number
+  previousNetIncome: number
+}
+
+export async function getIncomeStatementData(filters: DashboardFilters): Promise<IncomeStatementData> {
+  await delay(SIMULATED_DELAY)
+  
+  const entityMultiplier = filters.entityId === 'e4' ? 1 : filters.entityId === 'e1' ? 0.6 : 0.2
+  const dateMultiplier = filters.dateRange.preset === 'this_year' ? 1 : 
+                        filters.dateRange.preset === 'this_quarter' ? 0.25 : 
+                        filters.dateRange.preset === 'this_month' ? 0.08 : 0.5
+  
+  const multiplier = entityMultiplier * dateMultiplier
+  
+  const revenue = {
+    lines: [
+      { name: 'Product Sales', amount: Math.round(4500000 * multiplier), previousAmount: Math.round(4200000 * multiplier) },
+      { name: 'Service Revenue', amount: Math.round(1200000 * multiplier), previousAmount: Math.round(1050000 * multiplier) },
+      { name: 'Subscription Revenue', amount: Math.round(350000 * multiplier), previousAmount: Math.round(280000 * multiplier) },
+      { name: 'Other Revenue', amount: Math.round(50000 * multiplier), previousAmount: Math.round(45000 * multiplier) },
+    ],
+    total: 0,
+    previousTotal: 0
+  }
+  revenue.total = revenue.lines.reduce((sum, l) => sum + l.amount, 0)
+  revenue.previousTotal = revenue.lines.reduce((sum, l) => sum + l.previousAmount, 0)
+  
+  const cogs = {
+    lines: [
+      { name: 'Direct Materials', amount: Math.round(1450000 * multiplier), previousAmount: Math.round(1380000 * multiplier) },
+      { name: 'Direct Labor', amount: Math.round(680000 * multiplier), previousAmount: Math.round(650000 * multiplier) },
+      { name: 'Manufacturing Overhead', amount: Math.round(295000 * multiplier), previousAmount: Math.round(280000 * multiplier) },
+    ],
+    total: 0,
+    previousTotal: 0
+  }
+  cogs.total = cogs.lines.reduce((sum, l) => sum + l.amount, 0)
+  cogs.previousTotal = cogs.lines.reduce((sum, l) => sum + l.previousAmount, 0)
+  
+  const grossProfit = revenue.total - cogs.total
+  const previousGrossProfit = revenue.previousTotal - cogs.previousTotal
+  
+  const opex = {
+    lines: [
+      { name: 'Salaries & Benefits', amount: Math.round(1120000 * multiplier), previousAmount: Math.round(1050000 * multiplier) },
+      { name: 'Rent & Facilities', amount: Math.round(185000 * multiplier), previousAmount: Math.round(175000 * multiplier) },
+      { name: 'Marketing & Advertising', amount: Math.round(280000 * multiplier), previousAmount: Math.round(220000 * multiplier) },
+      { name: 'Technology & Software', amount: Math.round(125000 * multiplier), previousAmount: Math.round(110000 * multiplier) },
+      { name: 'Professional Services', amount: Math.round(95000 * multiplier), previousAmount: Math.round(85000 * multiplier) },
+      { name: 'Depreciation & Amortization', amount: Math.round(145000 * multiplier), previousAmount: Math.round(140000 * multiplier) },
+      { name: 'Other Operating Expenses', amount: Math.round(85000 * multiplier), previousAmount: Math.round(78000 * multiplier) },
+    ],
+    total: 0,
+    previousTotal: 0
+  }
+  opex.total = opex.lines.reduce((sum, l) => sum + l.amount, 0)
+  opex.previousTotal = opex.lines.reduce((sum, l) => sum + l.previousAmount, 0)
+  
+  const operatingIncome = grossProfit - opex.total
+  const previousOperatingIncome = previousGrossProfit - opex.previousTotal
+  
+  const otherIncome = {
+    interestIncome: Math.round(15000 * multiplier),
+    interestExpense: Math.round(42000 * multiplier),
+    other: Math.round(8000 * multiplier),
+    total: 0
+  }
+  otherIncome.total = otherIncome.interestIncome - otherIncome.interestExpense + otherIncome.other
+  
+  const incomeBeforeTax = operatingIncome + otherIncome.total
+  const previousIncomeBeforeTax = previousOperatingIncome - 19000 * multiplier
+  
+  const taxRate = 0.25
+  const incomeTaxExpense = Math.round(incomeBeforeTax * taxRate)
+  
+  const netIncome = incomeBeforeTax - incomeTaxExpense
+  const previousNetIncome = Math.round(previousIncomeBeforeTax * (1 - taxRate))
+  
+  return {
+    revenue,
+    costOfGoodsSold: cogs,
+    grossProfit,
+    previousGrossProfit,
+    operatingExpenses: opex,
+    operatingIncome,
+    previousOperatingIncome,
+    otherIncome,
+    incomeBeforeTax,
+    previousIncomeBeforeTax,
+    incomeTaxExpense,
+    netIncome,
+    previousNetIncome
+  }
 }

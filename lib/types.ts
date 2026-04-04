@@ -378,6 +378,9 @@ export interface User {
   entityIds: string[]
 }
 
+// Financial Statement Types
+export type { BalanceSheetData, IncomeStatementData } from './services'
+
 // Notification Types
 export interface Notification {
   id: string

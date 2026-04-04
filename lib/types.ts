@@ -596,3 +596,53 @@ export interface ApiKey {
   createdBy: string
   createdAt: Date
 }
+
+// Task Types
+export interface Task {
+  id: string
+  title: string
+  description?: string
+  type: 'approval' | 'review' | 'data_entry' | 'reconciliation' | 'follow_up' | 'other'
+  priority: 'high' | 'medium' | 'low'
+  status: 'todo' | 'in_progress' | 'completed' | 'cancelled'
+  dueDate?: Date
+  assigneeId: string
+  assigneeName: string
+  relatedType?: 'bill' | 'invoice' | 'journal_entry' | 'payment' | 'receipt' | 'reconciliation'
+  relatedId?: string
+  relatedNumber?: string
+  entityId: string
+  createdBy: string
+  createdAt: Date
+  completedAt?: Date
+}
+
+// Notification Types
+export interface Notification {
+  id: string
+  type: 'approval_required' | 'approval_completed' | 'task_assigned' | 'task_due' | 'payment_received' | 'invoice_overdue' | 'sync_error' | 'system' | 'mention'
+  title: string
+  message: string
+  read: boolean
+  actionUrl?: string
+  relatedType?: string
+  relatedId?: string
+  createdAt: Date
+}
+
+// Activity Timeline Types
+export interface ActivityItem {
+  id: string
+  type: 'create' | 'update' | 'delete' | 'approve' | 'reject' | 'post' | 'void' | 'payment' | 'login' | 'export' | 'import'
+  action: string
+  description: string
+  userId: string
+  userName: string
+  userAvatar?: string
+  relatedType?: string
+  relatedId?: string
+  relatedNumber?: string
+  entityId: string
+  metadata?: Record<string, unknown>
+  createdAt: Date
+}

@@ -3193,3 +3193,552 @@ export async function revokeApiKey(id: string): Promise<{ success: boolean }> {
   }
   return { success: false }
 }
+
+// ============ TASK SERVICES ============
+
+import type { Task, Notification, ActivityItem } from '@/lib/types'
+
+const mockTasks: Task[] = [
+  {
+    id: 'task1',
+    title: 'Review March expense reports',
+    description: 'Review and approve expense reports submitted for March 2024',
+    type: 'review',
+    priority: 'high',
+    status: 'todo',
+    dueDate: new Date('2024-03-20'),
+    assigneeId: 'u1',
+    assigneeName: 'Sarah Chen',
+    entityId: 'e1',
+    createdBy: 'System',
+    createdAt: new Date('2024-03-15'),
+  },
+  {
+    id: 'task2',
+    title: 'Reconcile operating account',
+    description: 'Complete monthly bank reconciliation for operating account',
+    type: 'reconciliation',
+    priority: 'high',
+    status: 'in_progress',
+    dueDate: new Date('2024-03-18'),
+    assigneeId: 'u3',
+    assigneeName: 'Emily Davis',
+    relatedType: 'reconciliation',
+    entityId: 'e1',
+    createdBy: 'Michael Johnson',
+    createdAt: new Date('2024-03-10'),
+  },
+  {
+    id: 'task3',
+    title: 'Follow up on overdue invoice INV-2024-015',
+    description: 'Contact customer regarding payment for invoice INV-2024-015',
+    type: 'follow_up',
+    priority: 'medium',
+    status: 'todo',
+    dueDate: new Date('2024-03-19'),
+    assigneeId: 'u5',
+    assigneeName: 'Lisa Brown',
+    relatedType: 'invoice',
+    relatedId: 'inv15',
+    relatedNumber: 'INV-2024-015',
+    entityId: 'e1',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-03-14'),
+  },
+  {
+    id: 'task4',
+    title: 'Enter vendor invoices',
+    description: 'Enter 5 pending vendor invoices into the system',
+    type: 'data_entry',
+    priority: 'medium',
+    status: 'todo',
+    dueDate: new Date('2024-03-17'),
+    assigneeId: 'u4',
+    assigneeName: 'James Wilson',
+    entityId: 'e1',
+    createdBy: 'Emily Davis',
+    createdAt: new Date('2024-03-15'),
+  },
+  {
+    id: 'task5',
+    title: 'Review journal entry JE-2024-089',
+    description: 'Review and approve adjusting journal entry for accruals',
+    type: 'approval',
+    priority: 'high',
+    status: 'todo',
+    dueDate: new Date('2024-03-16'),
+    assigneeId: 'u2',
+    assigneeName: 'Michael Johnson',
+    relatedType: 'journal_entry',
+    relatedId: 'je89',
+    relatedNumber: 'JE-2024-089',
+    entityId: 'e1',
+    createdBy: 'Emily Davis',
+    createdAt: new Date('2024-03-15'),
+  },
+  {
+    id: 'task6',
+    title: 'Quarterly tax filing preparation',
+    description: 'Prepare documentation for Q1 2024 tax filing',
+    type: 'other',
+    priority: 'low',
+    status: 'completed',
+    dueDate: new Date('2024-03-31'),
+    assigneeId: 'u1',
+    assigneeName: 'Sarah Chen',
+    entityId: 'e1',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-03-01'),
+    completedAt: new Date('2024-03-14'),
+  },
+  {
+    id: 'task7',
+    title: 'Update vendor payment terms',
+    description: 'Update payment terms for Acme Supplies per new agreement',
+    type: 'data_entry',
+    priority: 'low',
+    status: 'cancelled',
+    assigneeId: 'u4',
+    assigneeName: 'James Wilson',
+    entityId: 'e1',
+    createdBy: 'Michael Johnson',
+    createdAt: new Date('2024-03-05'),
+  },
+]
+
+export async function getTasks(
+  assigneeId?: string,
+  status?: string[],
+  priority?: string[],
+  type?: string[],
+  sort?: SortConfig,
+  page: number = 1,
+  pageSize: number = 10
+): Promise<PaginatedResponse<Task>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockTasks]
+  
+  if (assigneeId) {
+    filtered = filtered.filter(t => t.assigneeId === assigneeId)
+  }
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(t => status.includes(t.status))
+  }
+  
+  if (priority && priority.length > 0) {
+    filtered = filtered.filter(t => priority.includes(t.priority))
+  }
+  
+  if (type && type.length > 0) {
+    filtered = filtered.filter(t => type.includes(t.type))
+  }
+  
+  if (sort) {
+    filtered.sort((a, b) => {
+      const aVal = a[sort.key as keyof Task]
+      const bVal = b[sort.key as keyof Task]
+      if (aVal === undefined || bVal === undefined) return 0
+      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  } else {
+    // Default sort: by due date, then by priority
+    filtered.sort((a, b) => {
+      if (a.dueDate && b.dueDate) {
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+      }
+      return 0
+    })
+  }
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
+export async function createTask(task: Partial<Task>): Promise<{ success: boolean; task?: Task }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newTask: Task = {
+    id: `task${mockTasks.length + 1}`,
+    title: task.title || 'New Task',
+    description: task.description,
+    type: task.type || 'other',
+    priority: task.priority || 'medium',
+    status: 'todo',
+    dueDate: task.dueDate,
+    assigneeId: task.assigneeId || 'u1',
+    assigneeName: task.assigneeName || 'Sarah Chen',
+    relatedType: task.relatedType,
+    relatedId: task.relatedId,
+    relatedNumber: task.relatedNumber,
+    entityId: task.entityId || 'e1',
+    createdBy: 'Current User',
+    createdAt: new Date(),
+  }
+  
+  mockTasks.push(newTask)
+  return { success: true, task: newTask }
+}
+
+export async function updateTaskStatus(id: string, status: Task['status']): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const task = mockTasks.find(t => t.id === id)
+  if (task) {
+    task.status = status
+    if (status === 'completed') {
+      task.completedAt = new Date()
+    }
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function assignTask(id: string, assigneeId: string, assigneeName: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const task = mockTasks.find(t => t.id === id)
+  if (task) {
+    task.assigneeId = assigneeId
+    task.assigneeName = assigneeName
+    return { success: true }
+  }
+  return { success: false }
+}
+
+// ============ NOTIFICATION SERVICES ============
+
+const mockNotifications: Notification[] = [
+  {
+    id: 'n1',
+    type: 'approval_required',
+    title: 'Bill Approval Required',
+    message: 'Bill BILL-2024-045 from Acme Supplies ($12,500) requires your approval',
+    read: false,
+    actionUrl: '/approvals',
+    relatedType: 'bill',
+    relatedId: 'b45',
+    createdAt: new Date('2024-03-15T10:30:00'),
+  },
+  {
+    id: 'n2',
+    type: 'task_assigned',
+    title: 'New Task Assigned',
+    message: 'You have been assigned: Review March expense reports',
+    read: false,
+    actionUrl: '/tasks',
+    relatedType: 'task',
+    relatedId: 'task1',
+    createdAt: new Date('2024-03-15T09:15:00'),
+  },
+  {
+    id: 'n3',
+    type: 'invoice_overdue',
+    title: 'Invoice Overdue',
+    message: 'Invoice INV-2024-015 to Globex Corp is 15 days overdue ($8,750)',
+    read: false,
+    actionUrl: '/accounts-receivable/invoices',
+    relatedType: 'invoice',
+    relatedId: 'inv15',
+    createdAt: new Date('2024-03-15T08:00:00'),
+  },
+  {
+    id: 'n4',
+    type: 'payment_received',
+    title: 'Payment Received',
+    message: 'Payment of $15,000 received from Initech Industries for INV-2024-012',
+    read: true,
+    actionUrl: '/accounts-receivable/receipts',
+    relatedType: 'receipt',
+    relatedId: 'rec1',
+    createdAt: new Date('2024-03-14T16:45:00'),
+  },
+  {
+    id: 'n5',
+    type: 'approval_completed',
+    title: 'Approval Completed',
+    message: 'Journal Entry JE-2024-088 has been approved by Michael Johnson',
+    read: true,
+    actionUrl: '/general-ledger/journal-entries',
+    relatedType: 'journal_entry',
+    relatedId: 'je88',
+    createdAt: new Date('2024-03-14T14:20:00'),
+  },
+  {
+    id: 'n6',
+    type: 'sync_error',
+    title: 'Integration Sync Error',
+    message: 'Shopify integration sync failed. Please check connection settings.',
+    read: false,
+    actionUrl: '/admin/integrations',
+    relatedType: 'integration',
+    relatedId: 'int5',
+    createdAt: new Date('2024-03-14T12:00:00'),
+  },
+  {
+    id: 'n7',
+    type: 'task_due',
+    title: 'Task Due Tomorrow',
+    message: 'Task "Reconcile operating account" is due tomorrow',
+    read: true,
+    actionUrl: '/tasks',
+    relatedType: 'task',
+    relatedId: 'task2',
+    createdAt: new Date('2024-03-14T09:00:00'),
+  },
+  {
+    id: 'n8',
+    type: 'system',
+    title: 'System Maintenance',
+    message: 'Scheduled maintenance on March 20, 2024 from 2:00 AM - 4:00 AM EST',
+    read: true,
+    createdAt: new Date('2024-03-13T10:00:00'),
+  },
+  {
+    id: 'n9',
+    type: 'mention',
+    title: 'You were mentioned',
+    message: 'Emily Davis mentioned you in a comment on Bill BILL-2024-042',
+    read: true,
+    actionUrl: '/accounts-payable/bills',
+    relatedType: 'bill',
+    relatedId: 'b42',
+    createdAt: new Date('2024-03-12T15:30:00'),
+  },
+]
+
+export async function getNotifications(
+  unreadOnly?: boolean,
+  type?: string[],
+  page: number = 1,
+  pageSize: number = 20
+): Promise<PaginatedResponse<Notification>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockNotifications]
+  
+  if (unreadOnly) {
+    filtered = filtered.filter(n => !n.read)
+  }
+  
+  if (type && type.length > 0) {
+    filtered = filtered.filter(n => type.includes(n.type))
+  }
+  
+  // Sort by date descending
+  filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
+export async function getUnreadCount(): Promise<number> {
+  await delay(50)
+  return mockNotifications.filter(n => !n.read).length
+}
+
+export async function markNotificationRead(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const notification = mockNotifications.find(n => n.id === id)
+  if (notification) {
+    notification.read = true
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function markAllNotificationsRead(): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  mockNotifications.forEach(n => { n.read = true })
+  return { success: true }
+}
+
+// ============ ACTIVITY TIMELINE SERVICES ============
+
+const mockActivityItems: ActivityItem[] = [
+  {
+    id: 'act1',
+    type: 'create',
+    action: 'Created bill',
+    description: 'Created bill BILL-2024-047 for Acme Supplies ($8,500)',
+    userId: 'u4',
+    userName: 'James Wilson',
+    relatedType: 'bill',
+    relatedId: 'b47',
+    relatedNumber: 'BILL-2024-047',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-15T11:30:00'),
+  },
+  {
+    id: 'act2',
+    type: 'approve',
+    action: 'Approved journal entry',
+    description: 'Approved journal entry JE-2024-090 ($45,000)',
+    userId: 'u2',
+    userName: 'Michael Johnson',
+    relatedType: 'journal_entry',
+    relatedId: 'je90',
+    relatedNumber: 'JE-2024-090',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-15T10:45:00'),
+  },
+  {
+    id: 'act3',
+    type: 'payment',
+    action: 'Recorded payment',
+    description: 'Recorded payment PAY-2024-023 to TechPro Services ($15,000)',
+    userId: 'u3',
+    userName: 'Emily Davis',
+    relatedType: 'payment',
+    relatedId: 'pay23',
+    relatedNumber: 'PAY-2024-023',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-15T10:15:00'),
+  },
+  {
+    id: 'act4',
+    type: 'update',
+    action: 'Updated invoice',
+    description: 'Updated invoice INV-2024-018 terms to Net 45',
+    userId: 'u5',
+    userName: 'Lisa Brown',
+    relatedType: 'invoice',
+    relatedId: 'inv18',
+    relatedNumber: 'INV-2024-018',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-15T09:30:00'),
+  },
+  {
+    id: 'act5',
+    type: 'login',
+    action: 'User login',
+    description: 'Sarah Chen logged in from 192.168.1.100',
+    userId: 'u1',
+    userName: 'Sarah Chen',
+    entityId: 'e1',
+    metadata: { ip: '192.168.1.100' },
+    createdAt: new Date('2024-03-15T08:30:00'),
+  },
+  {
+    id: 'act6',
+    type: 'post',
+    action: 'Posted journal entry',
+    description: 'Posted journal entry JE-2024-089 to general ledger',
+    userId: 'u1',
+    userName: 'Sarah Chen',
+    relatedType: 'journal_entry',
+    relatedId: 'je89',
+    relatedNumber: 'JE-2024-089',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-15T08:15:00'),
+  },
+  {
+    id: 'act7',
+    type: 'reject',
+    action: 'Rejected bill',
+    description: 'Rejected bill BILL-2024-044 - Missing documentation',
+    userId: 'u2',
+    userName: 'Michael Johnson',
+    relatedType: 'bill',
+    relatedId: 'b44',
+    relatedNumber: 'BILL-2024-044',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-14T17:00:00'),
+  },
+  {
+    id: 'act8',
+    type: 'export',
+    action: 'Exported report',
+    description: 'Exported Balance Sheet report for Q1 2024',
+    userId: 'u1',
+    userName: 'Sarah Chen',
+    relatedType: 'report',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-14T16:30:00'),
+  },
+  {
+    id: 'act9',
+    type: 'void',
+    action: 'Voided invoice',
+    description: 'Voided invoice INV-2024-010 - Duplicate entry',
+    userId: 'u3',
+    userName: 'Emily Davis',
+    relatedType: 'invoice',
+    relatedId: 'inv10',
+    relatedNumber: 'INV-2024-010',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-14T15:00:00'),
+  },
+  {
+    id: 'act10',
+    type: 'create',
+    action: 'Created receipt',
+    description: 'Created receipt REC-2024-008 from Wayne Enterprises ($25,000)',
+    userId: 'u5',
+    userName: 'Lisa Brown',
+    relatedType: 'receipt',
+    relatedId: 'rec8',
+    relatedNumber: 'REC-2024-008',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-14T14:00:00'),
+  },
+  {
+    id: 'act11',
+    type: 'import',
+    action: 'Imported bank transactions',
+    description: 'Imported 47 transactions from Chase Bank feed',
+    userId: 'u1',
+    userName: 'Sarah Chen',
+    relatedType: 'bank_account',
+    entityId: 'e1',
+    metadata: { count: 47, source: 'Chase Bank' },
+    createdAt: new Date('2024-03-14T06:00:00'),
+  },
+]
+
+export async function getActivityTimeline(
+  entityId?: string,
+  type?: string[],
+  userId?: string,
+  relatedType?: string,
+  page: number = 1,
+  pageSize: number = 20
+): Promise<PaginatedResponse<ActivityItem>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockActivityItems]
+  
+  if (entityId && entityId !== 'e4') {
+    filtered = filtered.filter(a => a.entityId === entityId)
+  }
+  
+  if (type && type.length > 0) {
+    filtered = filtered.filter(a => type.includes(a.type))
+  }
+  
+  if (userId) {
+    filtered = filtered.filter(a => a.userId === userId)
+  }
+  
+  if (relatedType) {
+    filtered = filtered.filter(a => a.relatedType === relatedType)
+  }
+  
+  // Sort by date descending
+  filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}

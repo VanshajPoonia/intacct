@@ -49,8 +49,9 @@ import {
   AlertCircle
 } from "lucide-react"
 import { format, differenceInDays } from "date-fns"
-import { getInvoices } from "@/lib/services"
+import { getInvoices, sendInvoice, voidInvoice } from "@/lib/services"
 import { InvoiceDrawer } from "@/components/accounts-receivable/invoice-drawer"
+import { CreateInvoiceModal } from "@/components/accounts-receivable/create-invoice-modal"
 import type { Invoice, SortConfig, PaginatedResponse, DashboardFilters } from "@/lib/types"
 
 function formatCurrency(value: number) {
@@ -129,8 +130,9 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [sort, setSort] = useState<SortConfig | null>({ key: 'date', direction: 'desc' })
   const [page, setPage] = useState(1)
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
   const pageSize = 10
 
   // Default filters for service calls
@@ -175,8 +177,18 @@ export default function InvoicesPage() {
   }
 
   const handleRowClick = (invoice: Invoice) => {
-    setSelectedInvoice(invoice)
+    setSelectedInvoiceId(invoice.id)
     setDrawerOpen(true)
+  }
+
+  const handleSend = async (id: string) => {
+    await sendInvoice(id)
+    fetchInvoices()
+  }
+
+  const handleVoid = async (id: string) => {
+    await voidInvoice(id)
+    fetchInvoices()
   }
 
   // Calculate summary stats from data
@@ -208,7 +220,7 @@ export default function InvoicesPage() {
                 <Download className="h-4 w-4 mr-2" />
                 Export
               </Button>
-              <Button size="sm">
+              <Button size="sm" onClick={() => setCreateModalOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 New Invoice
               </Button>
@@ -444,10 +456,16 @@ export default function InvoicesPage() {
       </div>
 
       <InvoiceDrawer
-        invoice={selectedInvoice}
+        invoiceId={selectedInvoiceId}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onUpdate={fetchInvoices}
+      />
+
+      <CreateInvoiceModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSuccess={fetchInvoices}
       />
     </AppShell>
   )

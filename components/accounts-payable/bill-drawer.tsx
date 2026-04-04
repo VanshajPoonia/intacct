@@ -36,9 +36,10 @@ import {
   DollarSign,
 } from "lucide-react"
 import type { Bill } from "@/lib/types"
+import { getBillById, approveBill, voidBill } from "@/lib/services"
 
 interface BillDrawerProps {
-  bill: Bill | null
+  billId: string | null
   open: boolean
   onClose: () => void
   onApprove?: (id: string) => void
@@ -63,7 +64,7 @@ const formatCurrency = (value: number) => {
 }
 
 export function BillDrawer({ 
-  bill, 
+  billId, 
   open, 
   onClose,
   onApprove,
@@ -72,14 +73,19 @@ export function BillDrawer({
 }: BillDrawerProps) {
   const [activeTab, setActiveTab] = useState("details")
   const [loading, setLoading] = useState(false)
+  const [bill, setBill] = useState<Bill | null>(null)
 
   useEffect(() => {
-    if (open && bill) {
+    if (open && billId) {
       setLoading(true)
-      // Simulate loading additional details
-      setTimeout(() => setLoading(false), 300)
+      getBillById(billId).then((data) => {
+        setBill(data)
+        setLoading(false)
+      })
+    } else {
+      setBill(null)
     }
-  }, [open, bill])
+  }, [open, billId])
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>

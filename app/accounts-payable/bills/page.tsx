@@ -61,8 +61,11 @@ import {
   getBills, 
   getEntities,
   getVendors,
+  approveBill,
+  voidBill,
 } from "@/lib/services"
 import { BillDrawer } from "@/components/accounts-payable/bill-drawer"
+import { CreateBillModal } from "@/components/accounts-payable/create-bill-modal"
 
 const statusColors: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
@@ -105,8 +108,9 @@ export default function BillsPage() {
   const [loading, setLoading] = useState(true)
   
   // UI state
-  const [selectedBill, setSelectedBill] = useState<Bill | null>(null)
+  const [selectedBillId, setSelectedBillId] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
 
   // Load entities and vendors on mount
   useEffect(() => {
@@ -182,28 +186,26 @@ export default function BillsPage() {
 
   // Handle row click
   const handleRowClick = (bill: Bill) => {
-    setSelectedBill(bill)
+    setSelectedBillId(bill.id)
     setDrawerOpen(true)
   }
 
   // Handle approve
   const handleApprove = async (id: string) => {
-    // In real app, call API
-    console.log('Approving bill:', id)
+    await approveBill(id)
     fetchData()
   }
 
   // Handle pay
   const handlePay = async (id: string) => {
-    // In real app, call API
-    console.log('Paying bill:', id)
+    // Navigate to payment creation with this bill pre-selected
+    console.log('Creating payment for bill:', id)
     fetchData()
   }
 
   // Handle void
   const handleVoid = async (id: string) => {
-    // In real app, call API
-    console.log('Voiding bill:', id)
+    await voidBill(id)
     fetchData()
   }
 
@@ -228,7 +230,7 @@ export default function BillsPage() {
                 <Download className="h-4 w-4 mr-1.5" />
                 Export
               </Button>
-              <Button size="sm">
+              <Button size="sm" onClick={() => setCreateModalOpen(true)}>
                 <Plus className="h-4 w-4 mr-1.5" />
                 New Bill
               </Button>
@@ -588,12 +590,19 @@ export default function BillsPage() {
 
       {/* Bill Drawer */}
       <BillDrawer
-        bill={selectedBill}
+        billId={selectedBillId}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onApprove={handleApprove}
         onPay={handlePay}
         onVoid={handleVoid}
+      />
+
+      {/* Create Bill Modal */}
+      <CreateBillModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSuccess={fetchData}
       />
     </AppShell>
   )

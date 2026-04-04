@@ -119,6 +119,28 @@ export interface InvoiceLineItem {
   unitPrice: number
 }
 
+// Receipt Types (Cash Receipts / AR Payments)
+export interface Receipt {
+  id: string
+  number: string
+  date: Date
+  amount: number
+  currency: string
+  method: 'check' | 'ach' | 'wire' | 'credit_card' | 'cash'
+  status: 'pending' | 'applied' | 'unapplied' | 'voided'
+  customerId: string
+  customerName: string
+  invoiceIds: string[]
+  bankAccountId: string
+  bankAccountName: string
+  checkNumber?: string
+  reference?: string
+  memo?: string
+  entityId: string
+  createdBy: string
+  createdAt: Date
+}
+
 export interface JournalEntry {
   id: string
   number: string

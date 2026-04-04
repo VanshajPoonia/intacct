@@ -30,9 +30,11 @@ import {
   Ban
 } from "lucide-react"
 import type { Invoice } from "@/lib/types"
+import { useState, useEffect } from "react"
+import { getInvoiceById, sendInvoice, voidInvoice } from "@/lib/services"
 
 interface InvoiceDrawerProps {
-  invoice: Invoice | null
+  invoiceId: string | null
   open: boolean
   onClose: () => void
   onUpdate?: () => void
@@ -90,12 +92,41 @@ function DetailRow({
   )
 }
 
-export function InvoiceDrawer({ invoice, open, onClose, onUpdate }: InvoiceDrawerProps) {
-  if (!invoice) return null
+export function InvoiceDrawer({ invoiceId, open, onClose, onUpdate }: InvoiceDrawerProps) {
+  const [invoice, setInvoice] = useState<Invoice | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  const isOverdue = invoice.status !== 'paid' && invoice.status !== 'void' && new Date(invoice.dueDate) < new Date()
-  const amountDue = invoice.amount - (invoice.amountPaid || 0)
-  const daysOverdue = isOverdue ? Math.floor((new Date().getTime() - new Date(invoice.dueDate).getTime()) / (1000 * 60 * 60 * 24)) : 0
+  useEffect(() => {
+    if (open && invoiceId) {
+      setLoading(true)
+      getInvoiceById(invoiceId).then((data) => {
+        setInvoice(data)
+        setLoading(false)
+      })
+    } else {
+      setInvoice(null)
+    }
+  }, [open, invoiceId])
+
+  const handleSend = async () => {
+    if (invoice) {
+      await sendInvoice(invoice.id)
+      onUpdate?.()
+    }
+  }
+
+  const handleVoid = async () => {
+    if (invoice) {
+      await voidInvoice(invoice.id)
+      onUpdate?.()
+    }
+  }
+
+  if (!invoice && !loading) return null
+
+  const isOverdue = invoice && invoice.status !== 'paid' && invoice.status !== 'voided' && new Date(invoice.dueDate) < new Date()
+  const amountDue = invoice ? invoice.amount - (invoice.amountPaid || 0) : 0
+  const daysOverdue = isOverdue && invoice ? Math.floor((new Date().getTime() - new Date(invoice.dueDate).getTime()) / (1000 * 60 * 60 * 24)) : 0
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>

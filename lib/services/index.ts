@@ -960,6 +960,291 @@ export async function getInvoices(
   return { data, total, page, pageSize, totalPages }
 }
 
+export async function getInvoiceById(id: string): Promise<Invoice | null> {
+  await delay(SIMULATED_DELAY)
+  return mockInvoices.find(i => i.id === id) || null
+}
+
+export async function createInvoice(invoice: Partial<Invoice>): Promise<{ success: boolean; invoice?: Invoice }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newInvoice: Invoice = {
+    id: `inv${mockInvoices.length + 1}`,
+    number: `INV-2024-${String(mockInvoices.length + 1).padStart(3, '0')}`,
+    customerId: invoice.customerId || '',
+    customerName: invoice.customerName || '',
+    date: invoice.date || new Date(),
+    dueDate: invoice.dueDate || new Date(),
+    amount: invoice.amount || 0,
+    currency: 'USD',
+    status: 'draft',
+    description: invoice.description,
+    lineItems: invoice.lineItems || [],
+    entityId: invoice.entityId || 'e1',
+    createdAt: new Date(),
+  }
+  mockInvoices.push(newInvoice)
+  return { success: true, invoice: newInvoice }
+}
+
+export async function updateInvoice(id: string, updates: Partial<Invoice>): Promise<{ success: boolean; invoice?: Invoice }> {
+  await delay(SIMULATED_DELAY)
+  const index = mockInvoices.findIndex(i => i.id === id)
+  if (index !== -1) {
+    mockInvoices[index] = { ...mockInvoices[index], ...updates }
+    return { success: true, invoice: mockInvoices[index] }
+  }
+  return { success: false }
+}
+
+export async function sendInvoice(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const invoice = mockInvoices.find(i => i.id === id)
+  if (invoice && invoice.status === 'draft') {
+    invoice.status = 'sent'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function voidInvoice(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const invoice = mockInvoices.find(i => i.id === id)
+  if (invoice && invoice.status !== 'paid') {
+    invoice.status = 'voided'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+// ============ RECEIPT SERVICES ============
+
+import type { Receipt } from '@/lib/types'
+
+const mockReceipts: Receipt[] = [
+  {
+    id: 'rec1',
+    number: 'REC-2024-001',
+    date: new Date('2024-03-08'),
+    amount: 15000,
+    currency: 'USD',
+    method: 'ach',
+    status: 'applied',
+    customerId: 'c1',
+    customerName: 'Globex Corporation',
+    invoiceIds: ['inv1'],
+    bankAccountId: 'ba1',
+    bankAccountName: 'Operating Account',
+    reference: 'ACH-12345',
+    memo: 'March payment',
+    entityId: 'e1',
+    createdBy: 'Emily Davis',
+    createdAt: new Date('2024-03-08'),
+  },
+  {
+    id: 'rec2',
+    number: 'REC-2024-002',
+    date: new Date('2024-03-10'),
+    amount: 8500,
+    currency: 'USD',
+    method: 'check',
+    status: 'applied',
+    customerId: 'c2',
+    customerName: 'Initech Industries',
+    invoiceIds: ['inv2'],
+    bankAccountId: 'ba1',
+    bankAccountName: 'Operating Account',
+    checkNumber: '5678',
+    memo: 'Invoice payment',
+    entityId: 'e1',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-03-10'),
+  },
+  {
+    id: 'rec3',
+    number: 'REC-2024-003',
+    date: new Date('2024-03-12'),
+    amount: 25000,
+    currency: 'USD',
+    method: 'wire',
+    status: 'unapplied',
+    customerId: 'c3',
+    customerName: 'Umbrella Corp',
+    invoiceIds: [],
+    bankAccountId: 'ba1',
+    bankAccountName: 'Operating Account',
+    reference: 'WIRE-2024-0312',
+    memo: 'Advance payment - to be applied',
+    entityId: 'e1',
+    createdBy: 'Michael Johnson',
+    createdAt: new Date('2024-03-12'),
+  },
+  {
+    id: 'rec4',
+    number: 'REC-2024-004',
+    date: new Date('2024-03-14'),
+    amount: 12300,
+    currency: 'USD',
+    method: 'credit_card',
+    status: 'applied',
+    customerId: 'c4',
+    customerName: 'Wayne Enterprises',
+    invoiceIds: ['inv3', 'inv4'],
+    bankAccountId: 'ba2',
+    bankAccountName: 'Merchant Account',
+    reference: 'CC-9876',
+    memo: 'Online payment',
+    entityId: 'e1',
+    createdBy: 'Emily Davis',
+    createdAt: new Date('2024-03-14'),
+  },
+  {
+    id: 'rec5',
+    number: 'REC-2024-005',
+    date: new Date('2024-03-15'),
+    amount: 5500,
+    currency: 'USD',
+    method: 'cash',
+    status: 'pending',
+    customerId: 'c1',
+    customerName: 'Globex Corporation',
+    invoiceIds: ['inv5'],
+    bankAccountId: 'ba1',
+    bankAccountName: 'Operating Account',
+    memo: 'Cash payment - pending deposit',
+    entityId: 'e1',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-03-15'),
+  },
+]
+
+export async function getReceipts(
+  filters: DashboardFilters,
+  search?: string,
+  status?: string[],
+  method?: string[],
+  sort?: SortConfig,
+  page: number = 1,
+  pageSize: number = 10
+): Promise<PaginatedResponse<Receipt>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockReceipts]
+  
+  if (filters.entityId && filters.entityId !== 'e4') {
+    filtered = filtered.filter(r => r.entityId === filters.entityId)
+  }
+  
+  if (filters.customerId) {
+    filtered = filtered.filter(r => r.customerId === filters.customerId)
+  }
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(r => status.includes(r.status))
+  }
+  
+  if (method && method.length > 0) {
+    filtered = filtered.filter(r => method.includes(r.method))
+  }
+  
+  if (search) {
+    const s = search.toLowerCase()
+    filtered = filtered.filter(r => 
+      r.number.toLowerCase().includes(s) ||
+      r.customerName.toLowerCase().includes(s) ||
+      r.reference?.toLowerCase().includes(s) ||
+      r.checkNumber?.toLowerCase().includes(s)
+    )
+  }
+  
+  if (sort) {
+    filtered.sort((a, b) => {
+      const aVal = a[sort.key as keyof Receipt]
+      const bVal = b[sort.key as keyof Receipt]
+      if (aVal === undefined || bVal === undefined) return 0
+      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  }
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
+export async function getReceiptById(id: string): Promise<Receipt | null> {
+  await delay(SIMULATED_DELAY)
+  return mockReceipts.find(r => r.id === id) || null
+}
+
+export async function createReceipt(receipt: Partial<Receipt>): Promise<{ success: boolean; receipt?: Receipt }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newReceipt: Receipt = {
+    id: `rec${mockReceipts.length + 1}`,
+    number: `REC-2024-${String(mockReceipts.length + 1).padStart(3, '0')}`,
+    date: receipt.date || new Date(),
+    amount: receipt.amount || 0,
+    currency: 'USD',
+    method: receipt.method || 'check',
+    status: receipt.invoiceIds && receipt.invoiceIds.length > 0 ? 'applied' : 'unapplied',
+    customerId: receipt.customerId || '',
+    customerName: receipt.customerName || '',
+    invoiceIds: receipt.invoiceIds || [],
+    bankAccountId: receipt.bankAccountId || '',
+    bankAccountName: receipt.bankAccountName || '',
+    checkNumber: receipt.checkNumber,
+    reference: receipt.reference,
+    memo: receipt.memo,
+    entityId: receipt.entityId || 'e1',
+    createdBy: 'Current User',
+    createdAt: new Date(),
+  }
+  
+  // Mark associated invoices as paid
+  newReceipt.invoiceIds.forEach(invoiceId => {
+    const invoice = mockInvoices.find(i => i.id === invoiceId)
+    if (invoice) invoice.status = 'paid'
+  })
+  
+  mockReceipts.push(newReceipt)
+  return { success: true, receipt: newReceipt }
+}
+
+export async function applyReceipt(id: string, invoiceIds: string[]): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const receipt = mockReceipts.find(r => r.id === id)
+  if (receipt && receipt.status === 'unapplied') {
+    receipt.invoiceIds = invoiceIds
+    receipt.status = 'applied'
+    // Mark invoices as paid
+    invoiceIds.forEach(invoiceId => {
+      const invoice = mockInvoices.find(i => i.id === invoiceId)
+      if (invoice) invoice.status = 'paid'
+    })
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function voidReceipt(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const receipt = mockReceipts.find(r => r.id === id)
+  if (receipt && receipt.status !== 'voided') {
+    receipt.status = 'voided'
+    // Restore invoices to sent status
+    receipt.invoiceIds.forEach(invoiceId => {
+      const invoice = mockInvoices.find(i => i.id === invoiceId)
+      if (invoice) invoice.status = 'sent'
+    })
+    return { success: true }
+  }
+  return { success: false }
+}
+
 // ============ JOURNAL ENTRY SERVICES ============
 
 export async function getJournalEntries(

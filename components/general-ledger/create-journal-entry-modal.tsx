@@ -46,6 +46,7 @@ import {
   Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 import type { Account, JournalEntryLine, Entity } from "@/lib/types"
 import { getAccounts, getEntities, saveJournalEntry } from "@/lib/services"
 
@@ -64,6 +65,9 @@ interface LineItem {
   description: string
   debit: number
   credit: number
+  departmentId?: string
+  locationId?: string
+  projectId?: string
 }
 
 const formatCurrency = (value: number) => {
@@ -82,6 +86,7 @@ export function CreateJournalEntryModal({
 }: CreateJournalEntryModalProps) {
   // Form state
   const [date, setDate] = useState<Date>(new Date())
+  const [reference, setReference] = useState("")
   const [description, setDescription] = useState("")
   const [entityId, setEntityId] = useState(initialEntityId || 'e1')
   const [lines, setLines] = useState<LineItem[]>([
@@ -115,6 +120,7 @@ export function CreateJournalEntryModal({
   useEffect(() => {
     if (!open) {
       setDate(new Date())
+      setReference("")
       setDescription("")
       setEntityId(initialEntityId || 'e1')
       setLines([
@@ -221,6 +227,7 @@ export function CreateJournalEntryModal({
       })
 
       if (result.success) {
+        toast.success('Journal entry saved as draft')
         onSuccess()
       } else {
         setError('Failed to save journal entry')
@@ -242,7 +249,7 @@ export function CreateJournalEntryModal({
         <ScrollArea className="flex-1 px-6">
           <div className="py-4 space-y-6">
             {/* Header Fields */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="date">Entry Date</Label>
                 <Popover>
@@ -286,9 +293,19 @@ export function CreateJournalEntryModal({
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="reference">Reference #</Label>
+                <Input
+                  id="reference"
+                  placeholder="Optional reference"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label>Status</Label>
                 <div className="h-10 px-3 py-2 border rounded-md bg-muted text-muted-foreground text-sm">
-                  Draft (will be saved as draft)
+                  Draft
                 </div>
               </div>
             </div>

@@ -261,8 +261,8 @@ export const navModules: NavModule[] = [
     id: 'general-ledger', label: 'General Ledger', icon: 'BookOpen',
     megaMenu: [
       { label: 'Transactions', items: [{ label: 'Journal Entries', href: '/general-ledger/journal-entries' }, { label: 'Recurring Journals', href: '/general-ledger/recurring-journals' }, { label: 'Adjustments', href: '/general-ledger/adjustments' }] },
-      { label: 'Setup', items: [{ label: 'Chart of Accounts', href: '/general-ledger/chart-of-accounts' }, { label: 'Accounting Periods', href: '/general-ledger/periods' }, { label: 'Allocations', href: '/general-ledger/allocations' }] },
-      { label: 'Reports', items: [{ label: 'Trial Balance', href: '/general-ledger/reports/trial-balance' }, { label: 'General Ledger Detail', href: '/general-ledger/reports/gl-detail' }, { label: 'Account Activity', href: '/general-ledger/reports/account-activity' }] }
+      { label: 'Setup', items: [{ label: 'Chart of Accounts', href: '/general-ledger/chart-of-accounts' }, { label: 'Accounting Periods', href: '/general-ledger/accounting-periods' }, { label: 'Allocations', href: '/general-ledger/allocations' }] },
+      { label: 'Reports', items: [{ label: 'Trial Balance', href: '/general-ledger/reports/trial-balance' }, { label: 'General Ledger Detail', href: '/general-ledger/reports/gl-detail' }, { label: 'Account Activity', href: '/general-ledger/reports/account-activity' }, { label: 'Audit Trail', href: '/general-ledger/audit-trail' }] }
     ]
   },
   {
@@ -356,8 +356,13 @@ export const searchableItems = [
   { type: 'module', label: 'Time & Expenses', href: '/time-expenses', icon: 'Clock' },
   { type: 'module', label: 'Multi-Entity', href: '/multi-entity', icon: 'Network' },
   // GL Sub-modules
+  { type: 'module', label: 'Journal Entries', href: '/general-ledger/journal-entries', icon: 'FileText' },
   { type: 'module', label: 'Recurring Journals', href: '/general-ledger/recurring-journals', icon: 'RefreshCcw' },
+  { type: 'module', label: 'Chart of Accounts', href: '/general-ledger/chart-of-accounts', icon: 'List' },
+  { type: 'module', label: 'Accounting Periods', href: '/general-ledger/accounting-periods', icon: 'Calendar' },
   { type: 'module', label: 'Allocations', href: '/general-ledger/allocations', icon: 'GitBranch' },
+  { type: 'module', label: 'Audit Trail', href: '/general-ledger/audit-trail', icon: 'History' },
+  { type: 'module', label: 'Trial Balance', href: '/general-ledger/reports/trial-balance', icon: 'FileSpreadsheet' },
   // Workflow
   { type: 'module', label: 'Tasks', href: '/tasks', icon: 'CheckSquare' },
   { type: 'module', label: 'Approvals', href: '/approvals', icon: 'UserCheck' },

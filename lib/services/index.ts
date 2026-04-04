@@ -5174,3 +5174,109 @@ export async function deactivateAllocation(id: string): Promise<{ success: boole
   }
   return { success: false }
 }
+
+// ==========================================
+// ACCOUNTING PERIODS
+// ==========================================
+
+interface AccountingPeriod {
+  id: string
+  name: string
+  fiscalYear: number
+  periodNumber: number
+  startDate: Date
+  endDate: Date
+  status: 'open' | 'closed' | 'locked' | 'future'
+  entityId: string
+  closedBy?: string
+  closedAt?: Date
+  lockedBy?: string
+  lockedAt?: Date
+}
+
+const mockAccountingPeriods: AccountingPeriod[] = [
+  { id: 'p1', name: 'January 2024', fiscalYear: 2024, periodNumber: 1, startDate: new Date('2024-01-01'), endDate: new Date('2024-01-31'), status: 'closed', entityId: 'e4', closedBy: 'Sarah Chen', closedAt: new Date('2024-02-05') },
+  { id: 'p2', name: 'February 2024', fiscalYear: 2024, periodNumber: 2, startDate: new Date('2024-02-01'), endDate: new Date('2024-02-29'), status: 'closed', entityId: 'e4', closedBy: 'Sarah Chen', closedAt: new Date('2024-03-05') },
+  { id: 'p3', name: 'March 2024', fiscalYear: 2024, periodNumber: 3, startDate: new Date('2024-03-01'), endDate: new Date('2024-03-31'), status: 'open', entityId: 'e4' },
+  { id: 'p4', name: 'April 2024', fiscalYear: 2024, periodNumber: 4, startDate: new Date('2024-04-01'), endDate: new Date('2024-04-30'), status: 'future', entityId: 'e4' },
+  { id: 'p5', name: 'May 2024', fiscalYear: 2024, periodNumber: 5, startDate: new Date('2024-05-01'), endDate: new Date('2024-05-31'), status: 'future', entityId: 'e4' },
+  { id: 'p6', name: 'June 2024', fiscalYear: 2024, periodNumber: 6, startDate: new Date('2024-06-01'), endDate: new Date('2024-06-30'), status: 'future', entityId: 'e4' },
+  { id: 'p7', name: 'July 2024', fiscalYear: 2024, periodNumber: 7, startDate: new Date('2024-07-01'), endDate: new Date('2024-07-31'), status: 'future', entityId: 'e4' },
+  { id: 'p8', name: 'August 2024', fiscalYear: 2024, periodNumber: 8, startDate: new Date('2024-08-01'), endDate: new Date('2024-08-31'), status: 'future', entityId: 'e4' },
+  { id: 'p9', name: 'September 2024', fiscalYear: 2024, periodNumber: 9, startDate: new Date('2024-09-01'), endDate: new Date('2024-09-30'), status: 'future', entityId: 'e4' },
+  { id: 'p10', name: 'October 2024', fiscalYear: 2024, periodNumber: 10, startDate: new Date('2024-10-01'), endDate: new Date('2024-10-31'), status: 'future', entityId: 'e4' },
+  { id: 'p11', name: 'November 2024', fiscalYear: 2024, periodNumber: 11, startDate: new Date('2024-11-01'), endDate: new Date('2024-11-30'), status: 'future', entityId: 'e4' },
+  { id: 'p12', name: 'December 2024', fiscalYear: 2024, periodNumber: 12, startDate: new Date('2024-12-01'), endDate: new Date('2024-12-31'), status: 'future', entityId: 'e4' },
+  // Previous year - all closed/locked
+  { id: 'p13', name: 'January 2023', fiscalYear: 2023, periodNumber: 1, startDate: new Date('2023-01-01'), endDate: new Date('2023-01-31'), status: 'locked', entityId: 'e4', closedBy: 'Sarah Chen', closedAt: new Date('2023-02-05'), lockedBy: 'Sarah Chen', lockedAt: new Date('2023-03-01') },
+  { id: 'p14', name: 'February 2023', fiscalYear: 2023, periodNumber: 2, startDate: new Date('2023-02-01'), endDate: new Date('2023-02-28'), status: 'locked', entityId: 'e4', closedBy: 'Sarah Chen', closedAt: new Date('2023-03-05'), lockedBy: 'Sarah Chen', lockedAt: new Date('2023-04-01') },
+  { id: 'p15', name: 'March 2023', fiscalYear: 2023, periodNumber: 3, startDate: new Date('2023-03-01'), endDate: new Date('2023-03-31'), status: 'locked', entityId: 'e4', closedBy: 'Sarah Chen', closedAt: new Date('2023-04-05'), lockedBy: 'Sarah Chen', lockedAt: new Date('2023-05-01') },
+]
+
+export async function getAccountingPeriods(
+  entityId?: string,
+  fiscalYear?: number
+): Promise<AccountingPeriod[]> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockAccountingPeriods]
+  
+  if (entityId && entityId !== 'all' && entityId !== 'e4') {
+    // For demo, return same data but with different entity
+    filtered = filtered.map(p => ({ ...p, entityId }))
+  }
+  
+  if (fiscalYear) {
+    filtered = filtered.filter(p => p.fiscalYear === fiscalYear)
+  }
+  
+  return filtered.sort((a, b) => b.startDate.getTime() - a.startDate.getTime())
+}
+
+export async function closePeriod(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const period = mockAccountingPeriods.find(p => p.id === id)
+  if (period && period.status === 'open') {
+    period.status = 'closed'
+    period.closedBy = 'Current User'
+    period.closedAt = new Date()
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function reopenPeriod(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const period = mockAccountingPeriods.find(p => p.id === id)
+  if (period && period.status === 'closed') {
+    period.status = 'open'
+    period.closedBy = undefined
+    period.closedAt = undefined
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function lockPeriod(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const period = mockAccountingPeriods.find(p => p.id === id)
+  if (period && period.status === 'closed') {
+    period.status = 'locked'
+    period.lockedBy = 'Current User'
+    period.lockedAt = new Date()
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function unlockPeriod(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const period = mockAccountingPeriods.find(p => p.id === id)
+  if (period && period.status === 'locked') {
+    period.status = 'closed'
+    period.lockedBy = undefined
+    period.lockedAt = undefined
+    return { success: true }
+  }
+  return { success: false }
+}

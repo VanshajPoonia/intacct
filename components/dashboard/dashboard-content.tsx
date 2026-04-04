@@ -40,7 +40,8 @@ import { DashboardTables } from "./dashboard-tables"
 import { DashboardInsights } from "./dashboard-insights"
 import { TransactionDrawer } from "./transaction-drawer"
 import { Button } from "@/components/ui/button"
-import { Plus, Download } from "lucide-react"
+import { Plus, Download, RefreshCw, Save, LayoutGrid } from "lucide-react"
+import { toast } from "sonner"
 
 const defaultFilters: DashboardFilters = {
   entityId: 'e4', // Consolidated view by default
@@ -170,6 +171,17 @@ export function DashboardContent() {
     setMetrics(metricsData)
   }, [filters])
 
+  // Handle refresh
+  const handleRefresh = useCallback(() => {
+    fetchDashboardData()
+    toast.success('Dashboard refreshed')
+  }, [fetchDashboardData])
+
+  // Handle save view
+  const handleSaveView = useCallback(() => {
+    toast.success('View saved successfully')
+  }, [])
+
   // Entity name for header
   const entityName = useMemo(() => {
     if (filters.entityId === 'e4') return 'Consolidated View'
@@ -188,6 +200,18 @@ export function DashboardContent() {
           <p className="text-sm text-muted-foreground">{entityName}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleSaveView}>
+            <Save className="h-4 w-4 mr-1.5" />
+            Save View
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button variant="outline" size="sm">
+            <LayoutGrid className="h-4 w-4 mr-1.5" />
+            Add Widget
+          </Button>
           <Button variant="outline" size="sm">
             <Download className="h-4 w-4 mr-1.5" />
             Export

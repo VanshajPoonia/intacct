@@ -142,10 +142,11 @@ export function InvoiceDrawer({ invoiceId, open, onClose, onUpdate }: InvoiceDra
         </SheetHeader>
 
         <Tabs defaultValue="details" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="lines">Line Items</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
           </TabsList>
 
           <TabsContent value="details" className="space-y-6 mt-4">
@@ -221,6 +222,37 @@ export function InvoiceDrawer({ invoiceId, open, onClose, onUpdate }: InvoiceDra
                        invoice.entityId === 'e2' ? 'Acme West' : 
                        invoice.entityId === 'e3' ? 'Acme Europe' : 'Unknown'}
               />
+            </div>
+
+            <Separator />
+
+            {/* Dimensions */}
+            <div className="space-y-1">
+              <h3 className="text-sm font-medium mb-3">Dimensions</h3>
+              
+              {invoice.departmentName && (
+                <DetailRow
+                  icon={Building2}
+                  label="Department"
+                  value={invoice.departmentName}
+                />
+              )}
+              
+              {invoice.billingAddress && (
+                <DetailRow
+                  icon={FileText}
+                  label="Billing Address"
+                  value={invoice.billingAddress}
+                />
+              )}
+
+              {invoice.memo && (
+                <DetailRow
+                  icon={FileText}
+                  label="Memo"
+                  value={invoice.memo}
+                />
+              )}
             </div>
 
             <Separator />
@@ -329,6 +361,50 @@ export function InvoiceDrawer({ invoiceId, open, onClose, onUpdate }: InvoiceDra
                   )}
                 </div>
               )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="activity" className="mt-4">
+            <div className="space-y-4">
+              {/* Activity Timeline */}
+              <div className="space-y-3">
+                {invoice.sentAt && (
+                  <div className="flex gap-3">
+                    <div className="w-2 h-2 mt-2 rounded-full bg-blue-500 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Invoice sent</p>
+                      <p className="text-xs text-muted-foreground">{format(invoice.sentAt, 'MMM d, yyyy h:mm a')}</p>
+                    </div>
+                  </div>
+                )}
+                {invoice.paidAt && (
+                  <div className="flex gap-3">
+                    <div className="w-2 h-2 mt-2 rounded-full bg-emerald-500 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Payment received</p>
+                      <p className="text-xs text-muted-foreground">{format(invoice.paidAt, 'MMM d, yyyy h:mm a')}</p>
+                    </div>
+                  </div>
+                )}
+                <div className="flex gap-3">
+                  <div className="w-2 h-2 mt-2 rounded-full bg-gray-400 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Invoice created</p>
+                    <p className="text-xs text-muted-foreground">{format(invoice.createdAt, 'MMM d, yyyy h:mm a')}</p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Notes section placeholder */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">Notes</h3>
+                <div className="text-center py-6 text-muted-foreground border rounded-lg border-dashed">
+                  <Clock className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No notes yet</p>
+                </div>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

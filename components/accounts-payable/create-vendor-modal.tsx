@@ -23,6 +23,7 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Loader2 } from "lucide-react"
 import type { Vendor } from "@/lib/types"
+import { createVendor, updateVendor } from "@/lib/services"
 import { toast } from "sonner"
 
 interface CreateVendorModalProps {
@@ -84,21 +85,41 @@ export function CreateVendorModal({ open, onClose, onSuccess, vendor }: CreateVe
 
   const isValid = name && code && email
 
-  const handleSubmit = async () => {
-    if (!isValid) return
-    
-    setSaving(true)
-    try {
-      // Simulated API call
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
-      toast.success(isEditing ? 'Vendor updated successfully' : 'Vendor created successfully')
-      onSuccess?.()
-      handleClose()
-    } finally {
-      setSaving(false)
+const handleSubmit = async () => {
+  if (!isValid) return
+  
+  setSaving(true)
+  try {
+    const vendorData = {
+      name,
+      code,
+      email,
+      phone: phone || undefined,
+      address: address || undefined,
+      taxId: taxId || undefined,
+      paymentTerms,
+      currency,
+      status,
+      bankName: bankName || undefined,
+      bankAccountNumber: bankAccountNumber || undefined,
+      bankRoutingNumber: bankRoutingNumber || undefined,
+      preferredPaymentMethod,
+      remittanceEmail: remittanceEmail || undefined,
     }
+    
+    if (isEditing && vendor) {
+      await updateVendor(vendor.id, vendorData)
+    } else {
+      await createVendor(vendorData)
+    }
+  
+    toast.success(isEditing ? 'Vendor updated successfully' : 'Vendor created successfully')
+    onSuccess?.()
+    handleClose()
+  } finally {
+    setSaving(false)
   }
+}
 
   const handleClose = () => {
     // Reset form

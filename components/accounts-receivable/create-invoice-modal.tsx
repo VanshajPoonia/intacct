@@ -64,9 +64,21 @@ export function CreateInvoiceModal({ open, onClose, onSuccess }: CreateInvoiceMo
   const [invoiceDate, setInvoiceDate] = useState<Date>(new Date())
   const [dueDate, setDueDate] = useState<Date>(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000))
   const [description, setDescription] = useState("")
+  const [departmentId, setDepartmentId] = useState("")
+  const [billingAddress, setBillingAddress] = useState("")
+  const [memo, setMemo] = useState("")
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([
-    { id: "1", description: "", accountId: "", accountName: "", amount: 0, quantity: 1, unitPrice: 0 }
+    { id: "1", description: "", accountId: "", accountName: "", amount: 0, quantity: 1, unitPrice: 0, taxAmount: 0 }
   ])
+
+  // Departments mock data
+  const departments = [
+    { id: 'd1', name: 'Operations' },
+    { id: 'd2', name: 'Engineering' },
+    { id: 'd3', name: 'HR' },
+    { id: 'd4', name: 'Marketing' },
+    { id: 'd5', name: 'Finance' },
+  ]
 
   // Load reference data
   useEffect(() => {
@@ -85,11 +97,12 @@ export function CreateInvoiceModal({ open, onClose, onSuccess }: CreateInvoiceMo
     }
   }, [open])
 
-  // Update customer name when customer changes
+  // Update customer name and billing address when customer changes
   useEffect(() => {
     const customer = customers.find(c => c.id === customerId)
     if (customer) {
       setCustomerName(customer.name)
+      setBillingAddress(customer.billingAddress || customer.address || '')
     }
   }, [customerId, customers])
 
@@ -101,7 +114,7 @@ export function CreateInvoiceModal({ open, onClose, onSuccess }: CreateInvoiceMo
   const addLineItem = () => {
     setLineItems([
       ...lineItems,
-      { id: String(lineItems.length + 1), description: "", accountId: "", accountName: "", amount: 0, quantity: 1, unitPrice: 0 }
+      { id: String(lineItems.length + 1), description: "", accountId: "", accountName: "", amount: 0, quantity: 1, unitPrice: 0, taxAmount: 0, departmentId: departmentId }
     ])
   }
 
@@ -141,8 +154,11 @@ export function CreateInvoiceModal({ open, onClose, onSuccess }: CreateInvoiceMo
     setInvoiceDate(new Date())
     setDueDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000))
     setDescription("")
+    setDepartmentId("")
+    setBillingAddress("")
+    setMemo("")
     setLineItems([
-      { id: "1", description: "", accountId: "", accountName: "", amount: 0, quantity: 1, unitPrice: 0 }
+      { id: "1", description: "", accountId: "", accountName: "", amount: 0, quantity: 1, unitPrice: 0, taxAmount: 0 }
     ])
   }, [])
 
@@ -272,14 +288,54 @@ export function CreateInvoiceModal({ open, onClose, onSuccess }: CreateInvoiceMo
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Invoice description or notes"
-                rows={2}
-              />
+            {/* Additional Fields */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Department</Label>
+                <Select value={departmentId} onValueChange={setDepartmentId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map(dept => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Billing Address</Label>
+                <Input
+                  value={billingAddress}
+                  onChange={(e) => setBillingAddress(e.target.value)}
+                  placeholder="Customer billing address"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Invoice description or notes"
+                  rows={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Memo (Internal)</Label>
+                <Textarea
+                  value={memo}
+                  onChange={(e) => setMemo(e.target.value)}
+                  placeholder="Internal memo"
+                  rows={2}
+                />
+              </div>
             </div>
 
             {/* Line Items */}

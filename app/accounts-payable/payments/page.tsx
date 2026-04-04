@@ -431,8 +431,16 @@ export default function PaymentsPage() {
                           <span>{methodLabels[payment.method]}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {payment.checkNumber || payment.reference || '-'}
+                      <TableCell>
+                        {payment.billIds && payment.billIds.length > 0 ? (
+                          <div className="flex items-center gap-1">
+                            <Badge variant="outline" className="text-xs font-mono">
+                              {payment.billIds.length} bill{payment.billIds.length > 1 ? 's' : ''}
+                            </Badge>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(payment.amount)}

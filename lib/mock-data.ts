@@ -60,11 +60,12 @@ export const vendors: Vendor[] = [
 
 // Customers
 export const customers: Customer[] = [
-  { id: 'c1', name: 'Enterprise Corp', code: 'EC001', email: 'ar@enterprisecorp.com', creditLimit: 500000, paymentTerms: 'Net 30', status: 'active', balance: 125000, currency: 'USD', createdAt: new Date('2023-06-15') },
-  { id: 'c2', name: 'Global Industries', code: 'GI002', email: 'payments@globalind.com', creditLimit: 250000, paymentTerms: 'Net 45', status: 'active', balance: 87500, currency: 'USD', createdAt: new Date('2023-08-20') },
-  { id: 'c3', name: 'Startup Ventures LLC', code: 'SV003', email: 'finance@startupventures.io', creditLimit: 100000, paymentTerms: 'Net 15', status: 'active', balance: 42000, currency: 'USD', createdAt: new Date('2024-01-10') },
-  { id: 'c4', name: 'Regional Medical Group', code: 'RMG004', email: 'ap@regionalmedical.org', creditLimit: 750000, paymentTerms: 'Net 60', status: 'active', balance: 215000, currency: 'USD', createdAt: new Date('2023-04-25') },
-  { id: 'c5', name: 'Education First', code: 'EF005', email: 'accounting@educationfirst.edu', creditLimit: 150000, paymentTerms: 'Net 30', status: 'active', balance: 68000, currency: 'USD', createdAt: new Date('2023-11-05') },
+  { id: 'c1', name: 'Enterprise Corp', code: 'EC001', email: 'ar@enterprisecorp.com', phone: '(555) 123-4567', address: '100 Enterprise Way, San Francisco, CA 94105', billingAddress: '100 Enterprise Way, Suite 100, San Francisco, CA 94105', creditLimit: 500000, paymentTerms: 'Net 30', status: 'active', balance: 125000, lifetimeRevenue: 2450000, lastPaymentDate: new Date('2024-03-01'), lastPaymentAmount: 45000, currency: 'USD', createdAt: new Date('2023-06-15') },
+  { id: 'c2', name: 'Global Industries', code: 'GI002', email: 'payments@globalind.com', phone: '(555) 234-5678', address: '500 Global Plaza, New York, NY 10001', billingAddress: '500 Global Plaza, Floor 25, New York, NY 10001', creditLimit: 250000, paymentTerms: 'Net 45', status: 'active', balance: 87500, lifetimeRevenue: 1250000, lastPaymentDate: new Date('2024-02-15'), lastPaymentAmount: 62500, currency: 'USD', createdAt: new Date('2023-08-20'), collectionNotes: 'Payment typically delayed by 10 days. Contact CFO directly for urgent matters.', collectionPriority: 'medium' },
+  { id: 'c3', name: 'Startup Ventures LLC', code: 'SV003', email: 'finance@startupventures.io', phone: '(555) 345-6789', address: '50 Innovation Drive, Austin, TX 78701', creditLimit: 100000, paymentTerms: 'Net 15', status: 'active', balance: 42000, lifetimeRevenue: 320000, lastPaymentDate: new Date('2024-03-10'), lastPaymentAmount: 28000, currency: 'USD', createdAt: new Date('2024-01-10') },
+  { id: 'c4', name: 'Regional Medical Group', code: 'RMG004', email: 'ap@regionalmedical.org', phone: '(555) 456-7890', address: '200 Healthcare Blvd, Chicago, IL 60601', billingAddress: 'PO Box 5000, Chicago, IL 60601', creditLimit: 750000, paymentTerms: 'Net 60', status: 'active', balance: 215000, lifetimeRevenue: 3800000, lastPaymentDate: new Date('2024-01-20'), lastPaymentAmount: 150000, currency: 'USD', createdAt: new Date('2023-04-25'), collectionNotes: 'Government-funded entity. Payments processed monthly.', assignedCollector: 'Sarah Chen' },
+  { id: 'c5', name: 'Education First', code: 'EF005', email: 'accounting@educationfirst.edu', phone: '(555) 567-8901', address: '1000 University Ave, Boston, MA 02115', creditLimit: 150000, paymentTerms: 'Net 30', status: 'active', balance: 68000, lifetimeRevenue: 580000, lastPaymentDate: new Date('2024-02-28'), lastPaymentAmount: 35000, currency: 'USD', createdAt: new Date('2023-11-05') },
+  { id: 'c6', name: 'TechStart Inc', code: 'TS006', email: 'billing@techstart.com', phone: '(555) 678-9012', address: '75 Tech Lane, Seattle, WA 98101', creditLimit: 50000, paymentTerms: 'Net 15', status: 'hold', balance: 45000, lifetimeRevenue: 120000, lastPaymentDate: new Date('2024-01-05'), lastPaymentAmount: 15000, currency: 'USD', createdAt: new Date('2024-02-01'), collectionNotes: 'Account on hold - exceeded credit limit. Multiple overdue invoices.', assignedCollector: 'John Smith', collectionPriority: 'critical' },
 ]
 
 // Chart of Accounts
@@ -131,16 +132,32 @@ export const bills: Bill[] = [
 // Invoices
 export const invoices: Invoice[] = [
   {
-    id: 'i1', number: 'INV-2024-089', customerId: 'c1', customerName: 'Enterprise Corp', date: new Date('2024-03-01'), dueDate: new Date('2024-03-31'), amount: 45000, currency: 'USD', status: 'sent', description: 'Consulting services - February', entityId: 'e1', createdAt: new Date('2024-03-01'),
-    lineItems: [{ id: 'il1', description: 'Strategic consulting - 40 hours', accountId: 'a11', accountName: 'Service Revenue', amount: 40000, quantity: 40, unitPrice: 1000 }, { id: 'il2', description: 'Travel expenses', accountId: 'a11', accountName: 'Service Revenue', amount: 5000, quantity: 1, unitPrice: 5000 }]
+    id: 'i1', number: 'INV-2024-089', customerId: 'c1', customerName: 'Enterprise Corp', date: new Date('2024-03-01'), dueDate: new Date('2024-03-31'), amount: 45000, openBalance: 45000, currency: 'USD', status: 'sent', collectionStatus: 'none', description: 'Consulting services - February', entityId: 'e1', departmentId: 'd1', departmentName: 'Operations', billingAddress: '100 Enterprise Way, Suite 100, San Francisco, CA 94105', createdAt: new Date('2024-03-01'), sentAt: new Date('2024-03-01'),
+    lineItems: [{ id: 'il1', description: 'Strategic consulting - 40 hours', accountId: 'a11', accountName: 'Service Revenue', amount: 40000, quantity: 40, unitPrice: 1000, departmentId: 'd1', departmentName: 'Operations' }, { id: 'il2', description: 'Travel expenses', accountId: 'a11', accountName: 'Service Revenue', amount: 5000, quantity: 1, unitPrice: 5000, departmentId: 'd1', departmentName: 'Operations' }]
   },
   {
-    id: 'i2', number: 'INV-2024-090', customerId: 'c2', customerName: 'Global Industries', date: new Date('2024-03-05'), dueDate: new Date('2024-04-19'), amount: 87500, currency: 'USD', status: 'overdue', description: 'Product delivery - Order #4521', entityId: 'e1', createdAt: new Date('2024-03-05'),
-    lineItems: [{ id: 'il3', description: 'Enterprise software package', accountId: 'a10', accountName: 'Sales Revenue', amount: 75000, quantity: 1, unitPrice: 75000 }, { id: 'il4', description: 'Implementation support', accountId: 'a11', accountName: 'Service Revenue', amount: 12500, quantity: 25, unitPrice: 500 }]
+    id: 'i2', number: 'INV-2024-090', customerId: 'c2', customerName: 'Global Industries', date: new Date('2024-03-05'), dueDate: new Date('2024-02-19'), amount: 87500, openBalance: 87500, currency: 'USD', status: 'overdue', collectionStatus: 'reminder_sent', description: 'Product delivery - Order #4521', entityId: 'e1', departmentId: 'd4', departmentName: 'Marketing', billingAddress: '500 Global Plaza, Floor 25, New York, NY 10001', createdAt: new Date('2024-03-05'), sentAt: new Date('2024-03-05'),
+    lineItems: [{ id: 'il3', description: 'Enterprise software package', accountId: 'a10', accountName: 'Sales Revenue', amount: 75000, quantity: 1, unitPrice: 75000, departmentId: 'd4', departmentName: 'Marketing' }, { id: 'il4', description: 'Implementation support', accountId: 'a11', accountName: 'Service Revenue', amount: 12500, quantity: 25, unitPrice: 500, departmentId: 'd2', departmentName: 'Engineering' }]
   },
   {
-    id: 'i3', number: 'INV-2024-091', customerId: 'c3', customerName: 'Startup Ventures LLC', date: new Date('2024-03-10'), dueDate: new Date('2024-03-25'), amount: 28000, currency: 'USD', status: 'paid', description: 'SaaS subscription - Annual', entityId: 'e1', createdAt: new Date('2024-03-10'),
-    lineItems: [{ id: 'il5', description: 'Annual subscription - Pro tier', accountId: 'a10', accountName: 'Sales Revenue', amount: 24000, quantity: 12, unitPrice: 2000 }, { id: 'il6', description: 'Onboarding package', accountId: 'a11', accountName: 'Service Revenue', amount: 4000, quantity: 1, unitPrice: 4000 }]
+    id: 'i3', number: 'INV-2024-091', customerId: 'c3', customerName: 'Startup Ventures LLC', date: new Date('2024-03-10'), dueDate: new Date('2024-03-25'), amount: 28000, openBalance: 0, currency: 'USD', status: 'paid', collectionStatus: 'none', description: 'SaaS subscription - Annual', entityId: 'e1', departmentId: 'd2', departmentName: 'Engineering', createdAt: new Date('2024-03-10'), sentAt: new Date('2024-03-10'), paidAt: new Date('2024-03-20'),
+    lineItems: [{ id: 'il5', description: 'Annual subscription - Pro tier', accountId: 'a10', accountName: 'Sales Revenue', amount: 24000, quantity: 12, unitPrice: 2000, departmentId: 'd2', departmentName: 'Engineering', projectId: 'p1', projectName: 'SaaS Platform' }, { id: 'il6', description: 'Onboarding package', accountId: 'a11', accountName: 'Service Revenue', amount: 4000, quantity: 1, unitPrice: 4000, departmentId: 'd2', departmentName: 'Engineering' }]
+  },
+  {
+    id: 'i4', number: 'INV-2024-092', customerId: 'c4', customerName: 'Regional Medical Group', date: new Date('2024-02-15'), dueDate: new Date('2024-04-15'), amount: 125000, openBalance: 125000, currency: 'USD', status: 'sent', collectionStatus: 'none', description: 'Healthcare IT implementation', entityId: 'e1', departmentId: 'd2', departmentName: 'Engineering', billingAddress: 'PO Box 5000, Chicago, IL 60601', createdAt: new Date('2024-02-15'), sentAt: new Date('2024-02-15'),
+    lineItems: [{ id: 'il7', description: 'System implementation', accountId: 'a11', accountName: 'Service Revenue', amount: 100000, quantity: 200, unitPrice: 500, departmentId: 'd2', departmentName: 'Engineering' }, { id: 'il8', description: 'Training sessions', accountId: 'a11', accountName: 'Service Revenue', amount: 25000, quantity: 50, unitPrice: 500, departmentId: 'd3', departmentName: 'HR' }]
+  },
+  {
+    id: 'i5', number: 'INV-2024-093', customerId: 'c6', customerName: 'TechStart Inc', date: new Date('2024-01-15'), dueDate: new Date('2024-01-30'), amount: 25000, openBalance: 25000, currency: 'USD', status: 'overdue', collectionStatus: 'escalated', description: 'Software licenses', entityId: 'e1', departmentId: 'd4', departmentName: 'Marketing', createdAt: new Date('2024-01-15'), sentAt: new Date('2024-01-15'),
+    lineItems: [{ id: 'il9', description: 'Enterprise license pack', accountId: 'a10', accountName: 'Sales Revenue', amount: 25000, quantity: 25, unitPrice: 1000, departmentId: 'd4', departmentName: 'Marketing' }]
+  },
+  {
+    id: 'i6', number: 'INV-2024-094', customerId: 'c6', customerName: 'TechStart Inc', date: new Date('2024-02-20'), dueDate: new Date('2024-03-05'), amount: 20000, openBalance: 20000, currency: 'USD', status: 'overdue', collectionStatus: 'in_collections', description: 'Additional services', entityId: 'e1', departmentId: 'd2', departmentName: 'Engineering', createdAt: new Date('2024-02-20'), sentAt: new Date('2024-02-20'),
+    lineItems: [{ id: 'il10', description: 'Custom development', accountId: 'a11', accountName: 'Service Revenue', amount: 20000, quantity: 40, unitPrice: 500, departmentId: 'd2', departmentName: 'Engineering' }]
+  },
+  {
+    id: 'i7', number: 'INV-2024-095', customerId: 'c1', customerName: 'Enterprise Corp', date: new Date('2024-03-15'), dueDate: new Date('2024-04-14'), amount: 35000, openBalance: 15000, currency: 'USD', status: 'partial', collectionStatus: 'none', description: 'Consulting services - March', entityId: 'e1', departmentId: 'd1', departmentName: 'Operations', billingAddress: '100 Enterprise Way, Suite 100, San Francisco, CA 94105', createdAt: new Date('2024-03-15'), sentAt: new Date('2024-03-15'),
+    lineItems: [{ id: 'il11', description: 'Strategic consulting - 30 hours', accountId: 'a11', accountName: 'Service Revenue', amount: 30000, quantity: 30, unitPrice: 1000, departmentId: 'd1', departmentName: 'Operations' }, { id: 'il12', description: 'Report preparation', accountId: 'a11', accountName: 'Service Revenue', amount: 5000, quantity: 1, unitPrice: 5000, departmentId: 'd1', departmentName: 'Operations' }]
   },
 ]
 
@@ -282,15 +299,15 @@ export const navModules: NavModule[] = [
     megaMenu: [
       { label: 'Operations', items: [{ label: 'Bills', href: '/accounts-payable/bills' }, { label: 'Approvals', href: '/accounts-payable/approvals' }, { label: 'Payments', href: '/accounts-payable/payments' }] },
       { label: 'Master Data', items: [{ label: 'Vendors', href: '/accounts-payable/vendors' }, { label: 'Terms', href: '/accounts-payable/terms' }, { label: 'Categories', href: '/accounts-payable/categories' }] },
-      { label: 'Reports', items: [{ label: 'AP Aging', href: '/accounts-payable/reports/aging' }, { label: 'Payment History', href: '/accounts-payable/reports/payment-history' }] }
+      { label: 'Reports', items: [{ label: 'AP Aging', href: '/accounts-payable/aging' }, { label: 'Payment History', href: '/accounts-payable/reports/payment-history' }] }
     ]
   },
   {
     id: 'accounts-receivable', label: 'Accounts Receivable', icon: 'CreditCard',
     megaMenu: [
-      { label: 'Operations', items: [{ label: 'Invoices', href: '/accounts-receivable/invoices' }, { label: 'Collections', href: '/accounts-receivable/collections' }, { label: 'Cash Receipts', href: '/accounts-receivable/cash-receipts' }] },
+      { label: 'Operations', items: [{ label: 'Invoices', href: '/accounts-receivable/invoices' }, { label: 'Collections', href: '/accounts-receivable/collections' }, { label: 'Cash Receipts', href: '/accounts-receivable/receipts' }] },
       { label: 'Master Data', items: [{ label: 'Customers', href: '/accounts-receivable/customers' }, { label: 'Credit Terms', href: '/accounts-receivable/credit-terms' }] },
-      { label: 'Reports', items: [{ label: 'AR Aging', href: '/accounts-receivable/reports/aging' }, { label: 'Collections Summary', href: '/accounts-receivable/reports/collections-summary' }] }
+      { label: 'Reports', items: [{ label: 'AR Aging', href: '/accounts-receivable/aging' }, { label: 'Collections Summary', href: '/accounts-receivable/collections' }] }
     ]
   },
   {

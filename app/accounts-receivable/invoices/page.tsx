@@ -320,8 +320,9 @@ export default function InvoicesPage() {
                         onSort={handleSort}
                       />
                     </TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
+                    <TableHead className="text-right">Open Balance</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Collection</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -336,12 +337,13 @@ export default function InvoicesPage() {
                         <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-8" /></TableCell>
                       </TableRow>
                     ))
                   ) : invoices?.data.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="h-32 text-center">
+                      <TableCell colSpan={9} className="h-32 text-center">
                         <div className="flex flex-col items-center justify-center text-muted-foreground">
                           <FileText className="h-8 w-8 mb-2" />
                           <p>No invoices found</p>
@@ -351,7 +353,7 @@ export default function InvoicesPage() {
                   ) : (
                     invoices?.data.map((invoice) => {
                       const isOverdue = invoice.status !== 'paid' && invoice.status !== 'void' && new Date(invoice.dueDate) < now
-                      const balance = invoice.amount - (invoice.amountPaid || 0)
+                      const balance = invoice.openBalance ?? (invoice.amount - (invoice.amountPaid || 0))
                       const daysOverdue = isOverdue ? differenceInDays(now, new Date(invoice.dueDate)) : 0
                       
                       return (
@@ -377,6 +379,23 @@ export default function InvoicesPage() {
                           </TableCell>
                           <TableCell>
                             <StatusBadge status={invoice.status} isOverdue={isOverdue} />
+                          </TableCell>
+                          <TableCell>
+                            {invoice.collectionStatus && invoice.collectionStatus !== 'none' ? (
+                              <Badge variant="outline" className={`text-xs ${
+                                invoice.collectionStatus === 'escalated' ? 'bg-red-50 text-red-700 border-red-200' :
+                                invoice.collectionStatus === 'in_collections' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                invoice.collectionStatus === 'reminder_sent' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                'bg-gray-50 text-gray-700 border-gray-200'
+                              }`}>
+                                {invoice.collectionStatus === 'reminder_sent' ? 'Reminder' :
+                                 invoice.collectionStatus === 'in_collections' ? 'Collections' :
+                                 invoice.collectionStatus === 'escalated' ? 'Escalated' :
+                                 invoice.collectionStatus === 'written_off' ? 'Written Off' : '-'}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <DropdownMenu>

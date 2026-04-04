@@ -643,6 +643,40 @@ export async function getVendorById(id: string): Promise<Vendor | null> {
   return vendors.find(v => v.id === id) || null
 }
 
+export async function createVendor(data: Partial<Vendor>): Promise<{ success: boolean; vendor?: Vendor }> {
+  await delay(SIMULATED_DELAY)
+  const newVendor: Vendor = {
+    id: `v${vendors.length + 1}`,
+    name: data.name || '',
+    code: data.code || `V${String(vendors.length + 1).padStart(3, '0')}`,
+    email: data.email || '',
+    phone: data.phone,
+    address: data.address,
+    taxId: data.taxId,
+    paymentTerms: data.paymentTerms || 'Net 30',
+    status: data.status || 'active',
+    balance: 0,
+    currency: data.currency || 'USD',
+    createdAt: new Date(),
+    bankName: data.bankName,
+    bankAccountNumber: data.bankAccountNumber,
+    bankRoutingNumber: data.bankRoutingNumber,
+    preferredPaymentMethod: data.preferredPaymentMethod,
+    remittanceEmail: data.remittanceEmail,
+  }
+  vendors.push(newVendor)
+  return { success: true, vendor: newVendor }
+}
+
+export async function updateVendor(id: string, data: Partial<Vendor>): Promise<{ success: boolean; vendor?: Vendor }> {
+  await delay(SIMULATED_DELAY)
+  const index = vendors.findIndex(v => v.id === id)
+  if (index === -1) return { success: false }
+  
+  vendors[index] = { ...vendors[index], ...data }
+  return { success: true, vendor: vendors[index] }
+}
+
 export async function getCustomerById(id: string): Promise<Customer | null> {
   await delay(SIMULATED_DELAY)
   return customers.find(c => c.id === id) || null

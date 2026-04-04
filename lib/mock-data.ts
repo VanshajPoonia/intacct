@@ -282,7 +282,7 @@ export const navModules: NavModule[] = [
     megaMenu: [
       { label: 'Operations', items: [{ label: 'Bills', href: '/accounts-payable/bills' }, { label: 'Approvals', href: '/accounts-payable/approvals' }, { label: 'Payments', href: '/accounts-payable/payments' }] },
       { label: 'Master Data', items: [{ label: 'Vendors', href: '/accounts-payable/vendors' }, { label: 'Terms', href: '/accounts-payable/terms' }, { label: 'Categories', href: '/accounts-payable/categories' }] },
-      { label: 'Reports', items: [{ label: 'AP Aging', href: '/accounts-payable/reports/aging' }, { label: 'Payment History', href: '/accounts-payable/reports/payment-history' }] }
+      { label: 'Reports', items: [{ label: 'AP Aging', href: '/accounts-payable/aging' }, { label: 'Payment History', href: '/accounts-payable/reports/payment-history' }] }
     ]
   },
   {

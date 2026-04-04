@@ -43,6 +43,15 @@ import {
   FolderKanban,
   Tag,
   Settings2,
+  ChevronRight,
+  Palette,
+  Star,
+  Zap,
+  Target,
+  Briefcase,
+  Users,
+  CircleDot,
+  Trash2,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -61,6 +70,35 @@ const dimensionTypes = [
   { value: "custom", label: "Custom", icon: Settings2 },
 ]
 
+const colorOptions = [
+  { value: "gray", label: "Gray", bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-700 dark:text-gray-300", dot: "bg-gray-500" },
+  { value: "red", label: "Red", bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-700 dark:text-red-300", dot: "bg-red-500" },
+  { value: "orange", label: "Orange", bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-700 dark:text-orange-300", dot: "bg-orange-500" },
+  { value: "amber", label: "Amber", bg: "bg-amber-100 dark:bg-amber-900/30", text: "text-amber-700 dark:text-amber-300", dot: "bg-amber-500" },
+  { value: "green", label: "Green", bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-700 dark:text-green-300", dot: "bg-green-500" },
+  { value: "blue", label: "Blue", bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-700 dark:text-blue-300", dot: "bg-blue-500" },
+  { value: "purple", label: "Purple", bg: "bg-purple-100 dark:bg-purple-900/30", text: "text-purple-700 dark:text-purple-300", dot: "bg-purple-500" },
+  { value: "pink", label: "Pink", bg: "bg-pink-100 dark:bg-pink-900/30", text: "text-pink-700 dark:text-pink-300", dot: "bg-pink-500" },
+]
+
+const iconOptions = [
+  { value: "circle", label: "Circle", icon: CircleDot },
+  { value: "star", label: "Star", icon: Star },
+  { value: "zap", label: "Zap", icon: Zap },
+  { value: "target", label: "Target", icon: Target },
+  { value: "briefcase", label: "Briefcase", icon: Briefcase },
+  { value: "users", label: "Users", icon: Users },
+  { value: "tag", label: "Tag", icon: Tag },
+  { value: "folder", label: "Folder", icon: FolderKanban },
+]
+
+// Enhanced dimension type with color and icon
+interface EnhancedDimension extends Dimension {
+  color?: string
+  icon?: string
+  children?: EnhancedDimension[]
+}
+
 export default function DimensionsPage() {
   const [dimensions, setDimensions] = useState<Dimension[]>([])
   const [entities, setEntities] = useState<Entity[]>([])
@@ -76,6 +114,9 @@ export default function DimensionsPage() {
     code: "",
     type: "department" as Dimension["type"],
     entityIds: [] as string[],
+    parentId: "",
+    color: "blue",
+    icon: "circle",
   })
 
   useEffect(() => {
@@ -101,29 +142,53 @@ export default function DimensionsPage() {
     )
 
   const handleCreate = async () => {
-    await createDimension(formData)
+    await createDimension({
+      ...formData,
+      parentId: formData.parentId || undefined,
+    })
     setCreateModalOpen(false)
-    setFormData({ name: "", code: "", type: activeTab as Dimension["type"], entityIds: [] })
+    setFormData({ name: "", code: "", type: activeTab as Dimension["type"], entityIds: [], parentId: "", color: "blue", icon: "circle" })
     fetchData()
   }
 
   const handleEdit = (dimension: Dimension) => {
     setEditDimension(dimension)
+    const enhanced = dimension as EnhancedDimension
     setFormData({
       name: dimension.name,
       code: dimension.code,
       type: dimension.type,
       entityIds: dimension.entityIds,
+      parentId: dimension.parentId || "",
+      color: enhanced.color || "blue",
+      icon: enhanced.icon || "circle",
     })
   }
 
   const handleSaveEdit = async () => {
     if (editDimension) {
-      await updateDimension(editDimension.id, formData)
+      await updateDimension(editDimension.id, {
+        ...formData,
+        parentId: formData.parentId || undefined,
+      })
     }
     setEditDimension(null)
-    setFormData({ name: "", code: "", type: activeTab as Dimension["type"], entityIds: [] })
+    setFormData({ name: "", code: "", type: activeTab as Dimension["type"], entityIds: [], parentId: "", color: "blue", icon: "circle" })
     fetchData()
+  }
+
+  const getColorConfig = (color?: string) => {
+    return colorOptions.find(c => c.value === color) || colorOptions[5] // default blue
+  }
+
+  const getIconComponent = (iconValue?: string) => {
+    const found = iconOptions.find(i => i.value === iconValue)
+    return found ? found.icon : CircleDot
+  }
+
+  const getParentDimension = (parentId?: string) => {
+    if (!parentId) return null
+    return dimensions.find(d => d.id === parentId)
   }
 
   const handleToggleStatus = async (dimension: Dimension) => {
@@ -242,24 +307,45 @@ export default function DimensionsPage() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Code</TableHead>
+                    <TableHead>Parent</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Entities</TableHead>
-                    <TableHead>Created</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredDimensions.map((dimension) => {
-                    const Icon = getTabIcon(dimension.type)
+                    const enhanced = dimension as EnhancedDimension
+                    const colorConfig = getColorConfig(enhanced.color)
+                    const IconComponent = getIconComponent(enhanced.icon)
+                    const parent = getParentDimension(dimension.parentId)
                     return (
                       <TableRow key={dimension.id}>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Icon className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">{dimension.name}</span>
+                            <div className={`p-1.5 rounded ${colorConfig.bg}`}>
+                              <IconComponent className={`h-3.5 w-3.5 ${colorConfig.text}`} />
+                            </div>
+                            <div>
+                              <span className="font-medium">{dimension.name}</span>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <div className={`h-2 w-2 rounded-full ${colorConfig.dot}`} />
+                                <span className="text-xs text-muted-foreground capitalize">{enhanced.color || 'blue'}</span>
+                              </div>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell className="font-mono text-sm">{dimension.code}</TableCell>
+                        <TableCell>
+                          {parent ? (
+                            <div className="flex items-center gap-1">
+                              <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-sm">{parent.name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge variant={dimension.status === "active" ? "default" : "secondary"}>
                             {dimension.status}
@@ -281,9 +367,6 @@ export default function DimensionsPage() {
                               </Badge>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {new Date(dimension.createdAt).toLocaleDateString()}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>
@@ -322,21 +405,84 @@ export default function DimensionsPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input 
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder={`Enter ${activeTab} name`}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Name</Label>
+                  <Input 
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder={`Enter ${activeTab} name`}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Code</Label>
+                  <Input 
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                    placeholder="e.g., SALES"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label>Code</Label>
-                <Input 
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                  placeholder="e.g., SALES"
-                />
+                <Label>Parent {activeTab}</Label>
+                <Select 
+                  value={formData.parentId || "none"}
+                  onValueChange={(v) => setFormData({ ...formData, parentId: v === "none" ? "" : v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="No parent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No parent (top-level)</SelectItem>
+                    {dimensions.filter(d => d.type === activeTab).map((dim) => (
+                      <SelectItem key={dim.id} value={dim.id}>{dim.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Palette className="h-4 w-4" />
+                  Color
+                </Label>
+                <div className="flex flex-wrap gap-2">
+                  {colorOptions.map((color) => (
+                    <button
+                      key={color.value}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, color: color.value })}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${
+                        formData.color === color.value 
+                          ? 'border-primary ring-2 ring-primary/20' 
+                          : 'border-transparent hover:border-muted-foreground/30'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full ${color.dot}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Icon</Label>
+                <div className="flex flex-wrap gap-2">
+                  {iconOptions.map((iconOpt) => {
+                    const IconComp = iconOpt.icon
+                    return (
+                      <button
+                        key={iconOpt.value}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, icon: iconOpt.value })}
+                        className={`p-2 rounded-lg border transition-all ${
+                          formData.icon === iconOpt.value 
+                            ? 'border-primary bg-primary/10' 
+                            : 'border-muted hover:border-muted-foreground/30'
+                        }`}
+                      >
+                        <IconComp className="h-4 w-4" />
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Applies to Entities</Label>

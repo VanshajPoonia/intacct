@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { getEntities } from "@/lib/services"
 import type { Entity } from "@/lib/types"
+import { EntityDetailDrawer } from "@/components/company/entity-detail-drawer"
 
 export default function EntitiesPage() {
   const [entities, setEntities] = useState<Entity[]>([])
@@ -55,6 +56,8 @@ export default function EntitiesPage() {
   const [search, setSearch] = useState("")
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [editEntity, setEditEntity] = useState<Entity | null>(null)
+  const [drawerEntity, setDrawerEntity] = useState<Entity | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -98,6 +101,16 @@ export default function EntitiesPage() {
       currency: entity.currency,
       country: entity.country || "United States",
     })
+  }
+
+  const handleViewDetail = (entity: Entity) => {
+    setDrawerEntity(entity)
+    setDrawerOpen(true)
+  }
+
+  const handleDrawerSave = (updatedEntity: Entity) => {
+    console.log("Saving entity:", updatedEntity)
+    fetchEntities()
   }
 
   const handleSaveEdit = () => {
@@ -209,7 +222,11 @@ export default function EntitiesPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredEntities.map((entity) => (
-                    <TableRow key={entity.id}>
+                    <TableRow 
+                      key={entity.id} 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleViewDetail(entity)}
+                    >
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Building2 className="h-4 w-4 text-muted-foreground" />
@@ -402,6 +419,15 @@ export default function EntitiesPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Entity Detail Drawer */}
+        <EntityDetailDrawer
+          entity={drawerEntity}
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          onSave={handleDrawerSave}
+          entities={entities}
+        />
       </div>
     </AppShell>
   )

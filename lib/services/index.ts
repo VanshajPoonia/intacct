@@ -2415,3 +2415,211 @@ export async function getIncomeStatementData(filters: DashboardFilters): Promise
     previousNetIncome
   }
 }
+
+// ============ CASH FLOW STATEMENT SERVICE ============
+
+export interface CashFlowData {
+  operatingActivities: {
+    netIncome: number
+    adjustments: { name: string; amount: number }[]
+    changesInWorkingCapital: { name: string; amount: number }[]
+    total: number
+  }
+  investingActivities: {
+    items: { name: string; amount: number }[]
+    total: number
+  }
+  financingActivities: {
+    items: { name: string; amount: number }[]
+    total: number
+  }
+  netChangeInCash: number
+  beginningCash: number
+  endingCash: number
+  previousNetChangeInCash: number
+}
+
+export async function getCashFlowData(filters: DashboardFilters): Promise<CashFlowData> {
+  await delay(SIMULATED_DELAY)
+  
+  const entityMultiplier = filters.entityId === 'e4' ? 1 : filters.entityId === 'e1' ? 0.6 : 0.2
+  const dateMultiplier = filters.dateRange.preset === 'this_year' ? 1 : 
+                        filters.dateRange.preset === 'this_quarter' ? 0.25 : 
+                        filters.dateRange.preset === 'this_month' ? 0.08 : 0.5
+  
+  const multiplier = entityMultiplier * dateMultiplier
+  
+  const netIncome = Math.round(485000 * multiplier)
+  
+  const adjustments = [
+    { name: 'Depreciation & Amortization', amount: Math.round(145000 * multiplier) },
+    { name: 'Stock-Based Compensation', amount: Math.round(35000 * multiplier) },
+    { name: 'Deferred Taxes', amount: Math.round(-15000 * multiplier) },
+    { name: 'Loss on Asset Disposal', amount: Math.round(5000 * multiplier) },
+  ]
+  
+  const changesInWorkingCapital = [
+    { name: 'Accounts Receivable', amount: Math.round(-45000 * multiplier) },
+    { name: 'Inventory', amount: Math.round(-25000 * multiplier) },
+    { name: 'Prepaid Expenses', amount: Math.round(-8000 * multiplier) },
+    { name: 'Accounts Payable', amount: Math.round(32000 * multiplier) },
+    { name: 'Accrued Expenses', amount: Math.round(18000 * multiplier) },
+    { name: 'Deferred Revenue', amount: Math.round(12000 * multiplier) },
+  ]
+  
+  const operatingTotal = netIncome + 
+    adjustments.reduce((sum, a) => sum + a.amount, 0) +
+    changesInWorkingCapital.reduce((sum, c) => sum + c.amount, 0)
+  
+  const investingItems = [
+    { name: 'Purchase of Property & Equipment', amount: Math.round(-180000 * multiplier) },
+    { name: 'Purchase of Intangible Assets', amount: Math.round(-45000 * multiplier) },
+    { name: 'Proceeds from Sale of Assets', amount: Math.round(15000 * multiplier) },
+    { name: 'Acquisitions, Net of Cash', amount: Math.round(-250000 * multiplier) },
+    { name: 'Purchase of Investments', amount: Math.round(-100000 * multiplier) },
+  ]
+  const investingTotal = investingItems.reduce((sum, i) => sum + i.amount, 0)
+  
+  const financingItems = [
+    { name: 'Proceeds from Debt Issuance', amount: Math.round(200000 * multiplier) },
+    { name: 'Repayment of Debt', amount: Math.round(-75000 * multiplier) },
+    { name: 'Dividends Paid', amount: Math.round(-50000 * multiplier) },
+    { name: 'Stock Repurchases', amount: Math.round(-30000 * multiplier) },
+    { name: 'Proceeds from Stock Options', amount: Math.round(25000 * multiplier) },
+  ]
+  const financingTotal = financingItems.reduce((sum, f) => sum + f.amount, 0)
+  
+  const netChangeInCash = operatingTotal + investingTotal + financingTotal
+  const beginningCash = Math.round(2100000 * entityMultiplier)
+  const endingCash = beginningCash + netChangeInCash
+  
+  return {
+    operatingActivities: {
+      netIncome,
+      adjustments,
+      changesInWorkingCapital,
+      total: operatingTotal,
+    },
+    investingActivities: {
+      items: investingItems,
+      total: investingTotal,
+    },
+    financingActivities: {
+      items: financingItems,
+      total: financingTotal,
+    },
+    netChangeInCash,
+    beginningCash,
+    endingCash,
+    previousNetChangeInCash: Math.round(netChangeInCash * 0.85),
+  }
+}
+
+// ============ REPORT BUILDER SERVICE ============
+
+export interface SavedReport {
+  id: string
+  name: string
+  type: 'balance_sheet' | 'income_statement' | 'cash_flow' | 'budget_vs_actual' | 'trial_balance' | 'custom'
+  filters: Partial<DashboardFilters>
+  columns: string[]
+  groupBy?: string
+  sortBy?: string
+  createdBy: string
+  createdAt: Date
+  lastRunAt?: Date
+  isFavorite: boolean
+}
+
+const mockSavedReports: SavedReport[] = [
+  {
+    id: 'sr1',
+    name: 'Monthly P&L - All Entities',
+    type: 'income_statement',
+    filters: { entityId: 'e4', dateRange: { startDate: new Date('2024-01-01'), endDate: new Date('2024-12-31'), preset: 'this_year' } },
+    columns: ['account', 'current', 'previous', 'variance', 'variance_pct'],
+    groupBy: 'category',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-01-15'),
+    lastRunAt: new Date('2024-03-14'),
+    isFavorite: true,
+  },
+  {
+    id: 'sr2',
+    name: 'Quarterly Balance Sheet',
+    type: 'balance_sheet',
+    filters: { entityId: 'e1', dateRange: { startDate: new Date('2024-01-01'), endDate: new Date('2024-03-31'), preset: 'this_quarter' } },
+    columns: ['account', 'current', 'previous'],
+    createdBy: 'Michael Johnson',
+    createdAt: new Date('2024-02-01'),
+    lastRunAt: new Date('2024-03-10'),
+    isFavorite: false,
+  },
+  {
+    id: 'sr3',
+    name: 'Department Budget Variance',
+    type: 'budget_vs_actual',
+    filters: { entityId: 'e1' },
+    columns: ['department', 'budget', 'actual', 'variance', 'variance_pct'],
+    groupBy: 'department',
+    createdBy: 'Emily Davis',
+    createdAt: new Date('2024-02-15'),
+    lastRunAt: new Date('2024-03-12'),
+    isFavorite: true,
+  },
+  {
+    id: 'sr4',
+    name: 'Cash Flow Analysis',
+    type: 'cash_flow',
+    filters: { entityId: 'e4', dateRange: { startDate: new Date('2024-01-01'), endDate: new Date('2024-03-31'), preset: 'this_quarter' } },
+    columns: ['category', 'amount', 'previous'],
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-03-01'),
+    isFavorite: false,
+  },
+]
+
+export async function getSavedReports(): Promise<SavedReport[]> {
+  await delay(SIMULATED_DELAY)
+  return mockSavedReports
+}
+
+export async function saveReport(report: Partial<SavedReport>): Promise<{ success: boolean; report?: SavedReport }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newReport: SavedReport = {
+    id: `sr${mockSavedReports.length + 1}`,
+    name: report.name || 'Untitled Report',
+    type: report.type || 'custom',
+    filters: report.filters || {},
+    columns: report.columns || [],
+    groupBy: report.groupBy,
+    sortBy: report.sortBy,
+    createdBy: 'Current User',
+    createdAt: new Date(),
+    isFavorite: false,
+  }
+  
+  mockSavedReports.push(newReport)
+  return { success: true, report: newReport }
+}
+
+export async function deleteReport(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const index = mockSavedReports.findIndex(r => r.id === id)
+  if (index !== -1) {
+    mockSavedReports.splice(index, 1)
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function toggleReportFavorite(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const report = mockSavedReports.find(r => r.id === id)
+  if (report) {
+    report.isFavorite = !report.isFavorite
+    return { success: true }
+  }
+  return { success: false }
+}

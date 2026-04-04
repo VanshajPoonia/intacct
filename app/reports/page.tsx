@@ -14,7 +14,9 @@ import {
   Building, 
   Calendar,
   Search,
-  Star
+  Star,
+  Plus,
+  Wrench,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -95,10 +97,26 @@ export default function ReportsPage() {
       breadcrumbs={[{ label: 'Reports' }]}
     >
       <div className="space-y-6">
-        {/* Search */}
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search reports..." className="pl-9" />
+        {/* Header Actions */}
+        <div className="flex items-center justify-between">
+          <div className="relative max-w-md flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input placeholder="Search reports..." className="pl-9" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href="/reports/builder">
+              <Button variant="outline">
+                <Wrench className="h-4 w-4 mr-2" />
+                Report Builder
+              </Button>
+            </Link>
+            <Link href="/reports/builder">
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                New Report
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Starred Reports */}

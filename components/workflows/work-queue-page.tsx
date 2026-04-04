@@ -201,7 +201,7 @@ export function WorkQueuePage() {
       getWorkQueueFilterOptions(
         {
           entityId: activeEntity.id,
-          dateRange,
+          dateRange: dateRange ?? undefined,
           sectionId: localState.sectionId,
         },
         currentUser.id
@@ -384,12 +384,20 @@ export function WorkQueuePage() {
   }
 
   async function refreshViews(nextActiveId?: string | null) {
+    if (!activeRole) {
+      return
+    }
+
     const views = await getWorkQueueSavedViews(activeRole.id)
     setSavedViews(views)
     setActiveViewId(nextActiveId ?? activeViewId)
   }
 
   async function handleSaveView(payload: { name: string; isDefault: boolean }) {
+    if (!activeRole) {
+      return
+    }
+
     setIsSavingView(true)
 
     try {
@@ -437,6 +445,10 @@ export function WorkQueuePage() {
   }
 
   async function executeQueueAction(actionId: WorkQueueActionId, payload?: { assigneeId?: string; assigneeName?: string }, itemIds?: string[]) {
+    if (!currentUser) {
+      return
+    }
+
     const targetIds = itemIds ?? (drawerItemId ? [drawerItemId] : [])
     if (!targetIds.length) {
       return

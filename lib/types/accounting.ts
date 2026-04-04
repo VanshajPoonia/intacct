@@ -204,7 +204,7 @@ export interface ReconciliationSummary {
   outstandingWithdrawals: number
   adjustments: number
   reconciledBalance: number
-  unmatchedCount: number
+  unmatchedCount?: number
   lastReconciledDate?: Date
   status: 'in_progress' | 'completed' | 'needs_review'
 }

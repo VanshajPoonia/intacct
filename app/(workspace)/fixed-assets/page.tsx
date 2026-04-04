@@ -1,5 +1,5 @@
-import { ShellStubRoute } from "@/components/layout/shell-stub-route"
+import { FixedAssetsPage } from "@/components/finance/fixed-assets-page"
 
 export default function FixedAssetsLandingPage() {
-  return <ShellStubRoute pathname="/fixed-assets" />
+  return <FixedAssetsPage />
 }

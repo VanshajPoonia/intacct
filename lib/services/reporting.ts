@@ -179,8 +179,8 @@ function sumNamedLines(sections: PnLData['revenue'][]) {
   }
 }
 
-function sumBalanceBucket(buckets: Array<Record<string, number>>) {
-  const combined: Record<string, number> = {}
+function sumBalanceBucket(buckets: Array<Record<string, number>>): BalanceSheetData['assets']['currentAssets'] {
+  const combined: BalanceSheetData['assets']['currentAssets'] = { total: 0 }
 
   buckets.forEach(bucket => {
     Object.entries(bucket).forEach(([key, value]) => {

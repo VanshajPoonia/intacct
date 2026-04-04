@@ -43,6 +43,14 @@ export interface WorkspaceOverviewSection {
   rows: WorkspaceOverviewRow[]
 }
 
+export interface WorkspaceTabItem {
+  id: string
+  label: string
+  description?: string
+  count?: number
+  tone?: WorkspaceTone
+}
+
 export interface ModuleOverviewData {
   moduleId: string
   title: string

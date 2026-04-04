@@ -313,7 +313,7 @@ function buildMissingDocumentItems(filters: FinanceFilters, closeTasks: CloseTas
           href: '/accounts-payable/bills',
           icon: 'ReceiptText',
           status: 'missing',
-          statusTone: 'critical',
+          statusTone: 'critical' as const,
           meta: [formatShortDate(bill.dueDate)],
         })
       }
@@ -333,7 +333,7 @@ function buildMissingDocumentItems(filters: FinanceFilters, closeTasks: CloseTas
           href: '/accounts-receivable/invoices',
           icon: 'WalletCards',
           status: 'missing',
-          statusTone: 'critical',
+          statusTone: 'critical' as const,
           meta: [formatShortDate(invoice.dueDate)],
         })
       }
@@ -359,7 +359,7 @@ function buildExceptionItems(
         href: '/work-queue',
         icon: 'Inbox',
         status: 'blocked',
-        statusTone: 'critical',
+        statusTone: 'critical' as const,
         meta: [formatShortDateTime(task.dueDate)],
       })),
     ...reconExceptions.map(item => ({
@@ -1175,7 +1175,7 @@ async function getCFOHomepageData(filters: FinanceFilters): Promise<RoleHomepage
               href: '/reports/income-statement',
               icon: 'LineChart',
               status: pnl.revenue.total >= pnl.revenue.previousTotal ? 'ahead' : 'watch',
-              statusTone: pnl.revenue.total >= pnl.revenue.previousTotal ? 'positive' : 'warning',
+              statusTone: pnl.revenue.total >= pnl.revenue.previousTotal ? ('positive' as const) : ('warning' as const),
             },
             {
               id: 'trend-gross-profit',
@@ -1185,7 +1185,7 @@ async function getCFOHomepageData(filters: FinanceFilters): Promise<RoleHomepage
               href: '/reports/income-statement',
               icon: 'LineChart',
               status: pnl.grossProfit >= pnl.previousGrossProfit ? 'ahead' : 'watch',
-              statusTone: pnl.grossProfit >= pnl.previousGrossProfit ? 'positive' : 'warning',
+              statusTone: pnl.grossProfit >= pnl.previousGrossProfit ? ('positive' as const) : ('warning' as const),
             },
             {
               id: 'trend-operating-income',
@@ -1195,7 +1195,7 @@ async function getCFOHomepageData(filters: FinanceFilters): Promise<RoleHomepage
               href: '/reports/income-statement',
               icon: 'LineChart',
               status: pnl.operatingIncome >= pnl.previousOperatingIncome ? 'ahead' : 'watch',
-              statusTone: pnl.operatingIncome >= pnl.previousOperatingIncome ? 'positive' : 'warning',
+              statusTone: pnl.operatingIncome >= pnl.previousOperatingIncome ? ('positive' as const) : ('warning' as const),
             },
             {
               id: 'trend-net-income',
@@ -1205,9 +1205,9 @@ async function getCFOHomepageData(filters: FinanceFilters): Promise<RoleHomepage
               href: '/reports/income-statement',
               icon: 'LineChart',
               status: pnl.netIncome >= pnl.previousNetIncome ? 'ahead' : 'watch',
-              statusTone: pnl.netIncome >= pnl.previousNetIncome ? 'positive' : 'warning',
+              statusTone: pnl.netIncome >= pnl.previousNetIncome ? ('positive' as const) : ('warning' as const),
             },
-          ].map(item => ({
+          ].map((item): RoleHomepageWidgetItem => ({
             ...item,
             href: '/reports/income-statement',
           })),

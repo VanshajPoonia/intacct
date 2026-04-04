@@ -1,5 +1,5 @@
-import { ShellStubRoute } from "@/components/layout/shell-stub-route"
+import { ContractsRevenuePage } from "@/components/finance/contracts-revenue-page"
 
 export default function ContractsRevenueLandingPage() {
-  return <ShellStubRoute pathname="/contracts-revenue" />
+  return <ContractsRevenuePage />
 }

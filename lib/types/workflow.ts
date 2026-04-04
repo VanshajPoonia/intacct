@@ -160,9 +160,12 @@ export interface ActivityItem extends VersionHistoryItem {
   userId: string
   userName: string
   userAvatar?: string
+  entityName?: string
+  createdAt?: Date
+  timestamp?: Date
+  organizationEntityId?: string
   relatedType?: string
   relatedId?: string
   relatedNumber?: string
-  entityId: string
   metadata?: Record<string, unknown>
 }

@@ -4,6 +4,7 @@ export const customers: Customer[] = [
   { id: 'c-apex', name: 'Apex Retail Group', code: 'APEX', email: 'ap@apexretail.com', phone: '(646) 555-1001', creditLimit: 250000, paymentTerms: 'Net 30', status: 'active', balance: 128000, lifetimeRevenue: 1680000, currency: 'USD', createdAt: new Date('2024-05-10'), lastPaymentDate: new Date('2026-03-31'), lastPaymentAmount: 128000 },
   { id: 'c-luma', name: 'Luma Health Systems', code: 'LUMA', email: 'payments@lumahealth.com', phone: '(404) 555-3390', creditLimit: 350000, paymentTerms: 'Net 45', status: 'active', balance: 94000, lifetimeRevenue: 2210000, currency: 'USD', createdAt: new Date('2024-09-02') },
   { id: 'c-berger', name: 'Berger Industrial GmbH', code: 'BERGER', email: 'finance@berger-industrial.de', creditLimit: 200000, paymentTerms: 'Net 30', status: 'active', balance: 41000, lifetimeRevenue: 640000, currency: 'EUR', createdAt: new Date('2025-01-12'), collectionPriority: 'medium' },
+  { id: 'c-northwind', name: 'Northwind Health', code: 'NORTHWIND', email: 'ap@northwindhealth.com', phone: '(617) 555-2210', creditLimit: 280000, paymentTerms: 'Net 30', status: 'active', balance: 31000, lifetimeRevenue: 480000, currency: 'USD', createdAt: new Date('2025-07-19') },
   { id: 'c-trident', name: 'Trident Foods', code: 'TRIDENT', email: 'billing@tridentfoods.com', phone: '(312) 555-7810', creditLimit: 150000, paymentTerms: 'Net 15', status: 'hold', balance: 76500, lifetimeRevenue: 540000, currency: 'USD', createdAt: new Date('2025-03-05'), collectionNotes: 'Late payer in Q1 close review', assignedCollector: 'Owen Price', collectionPriority: 'high' },
 ]
 
@@ -104,6 +105,7 @@ export const invoices: Invoice[] = [
 export const contracts: Contract[] = [
   { id: 'ctr-9001', number: 'CTR-9001', name: 'Apex multi-year implementation', customerId: 'c-apex', customerName: 'Apex Retail Group', entityId: 'e1', projectId: 'p-close', startDate: new Date('2025-08-01'), endDate: new Date('2027-07-31'), contractValue: 1250000, recognizedRevenue: 812000, deferredRevenue: 182000, billingFrequency: 'milestone', status: 'active', createdAt: new Date('2025-07-15') },
   { id: 'ctr-9002', number: 'CTR-9002', name: 'Berger shared services agreement', customerId: 'c-berger', customerName: 'Berger Industrial GmbH', entityId: 'e3', projectId: 'p-eu', startDate: new Date('2025-11-01'), endDate: new Date('2026-10-31'), contractValue: 240000, recognizedRevenue: 82000, deferredRevenue: 38000, billingFrequency: 'monthly', status: 'active', createdAt: new Date('2025-10-18') },
+  { id: 'ctr-9003', number: 'CTR-9003', name: 'Northwind analytics support', customerId: 'c-northwind', customerName: 'Northwind Health', entityId: 'e1', startDate: new Date('2026-01-01'), endDate: new Date('2026-12-31'), contractValue: 320000, recognizedRevenue: 118000, deferredRevenue: 202000, billingFrequency: 'monthly', status: 'active', createdAt: new Date('2025-12-14') },
 ]
 
 export const receivableDocuments: Document[] = [

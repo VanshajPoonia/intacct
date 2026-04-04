@@ -296,7 +296,58 @@ export default function CashDashboardPage() {
             </Card>
           </div>
 
-          {/* Account Breakdown & Recent Transfers */}
+          {/* Entity Breakdown */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-medium">Cash by Entity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-[200px] w-full" />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {entities.filter(e => e.type !== 'consolidated').map((entity) => {
+                    const entityAccounts = accounts.filter(a => a.entityId === entity.id)
+                    const entityBalance = entityAccounts.reduce((sum, a) => sum + a.balance, 0)
+                    const entityAvailable = entityAccounts.reduce((sum, a) => sum + (a.availableBalance || a.balance), 0)
+                    
+                    return (
+                      <div 
+                        key={entity.id}
+                        className="p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="h-8 w-8 bg-accent/10 rounded-lg flex items-center justify-center">
+                            <Building2 className="h-4 w-4 text-accent" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{entity.name}</p>
+                            <p className="text-xs text-muted-foreground">{entity.currency}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Balance</span>
+                            <span className="font-semibold">{formatCurrency(entityBalance)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Available</span>
+                            <span className="text-green-600">{formatCurrency(entityAvailable)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Accounts</span>
+                            <span>{entityAccounts.length}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Account Breakdown & Short-term Obligations */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Account Breakdown */}
             <Card>
@@ -341,6 +392,70 @@ export default function CashDashboardPage() {
               </CardContent>
             </Card>
 
+            {/* Short-term Obligations */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-medium">Short-term Obligations</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-16 w-full" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 rounded-lg border bg-red-50 border-red-200">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 bg-red-100 rounded-lg flex items-center justify-center">
+                          <ArrowDownRight className="h-4 w-4 text-red-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-red-900">Payables Due (7 days)</p>
+                          <p className="text-xs text-red-700">12 bills pending</p>
+                        </div>
+                      </div>
+                      <p className="text-sm font-semibold text-red-600">-{formatCurrency(85000)}</p>
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-lg border bg-amber-50 border-amber-200">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 bg-amber-100 rounded-lg flex items-center justify-center">
+                          <ArrowDownRight className="h-4 w-4 text-amber-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-amber-900">Payroll (Next)</p>
+                          <p className="text-xs text-amber-700">Due in 5 days</p>
+                        </div>
+                      </div>
+                      <p className="text-sm font-semibold text-amber-600">-{formatCurrency(125000)}</p>
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-lg border bg-green-50 border-green-200">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 bg-green-100 rounded-lg flex items-center justify-center">
+                          <ArrowUpRight className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-green-900">Receivables Due (7 days)</p>
+                          <p className="text-xs text-green-700">8 invoices expected</p>
+                        </div>
+                      </div>
+                      <p className="text-sm font-semibold text-green-600">+{formatCurrency(142500)}</p>
+                    </div>
+                    <div className="pt-3 border-t">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Net Cash Flow (7 days)</span>
+                        <span className="font-semibold text-green-600">+{formatCurrency(142500 - 85000 - 125000)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recent Transfers & Corporate Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Recent Transfers */}
             <Card>
               <CardHeader className="pb-2">
@@ -399,6 +514,46 @@ export default function CashDashboardPage() {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Corporate Cards Summary */}
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base font-medium">Corporate Card Activity</CardTitle>
+                  <Button variant="ghost" size="sm" asChild>
+                    <a href="/cash-management/card-feed">View All</a>
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-lg bg-muted/30">
+                      <p className="text-xs text-muted-foreground">This Month</p>
+                      <p className="text-lg font-bold">{formatCurrency(4459)}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                      <p className="text-xs text-amber-700">Missing Receipts</p>
+                      <p className="text-lg font-bold text-amber-600">2</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Uncoded transactions</span>
+                      <span className="font-medium">3</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">AI suggestions pending</span>
+                      <span className="font-medium">2</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Active cards</span>
+                      <span className="font-medium">2</span>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>

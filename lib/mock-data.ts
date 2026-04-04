@@ -15,6 +15,7 @@ import type {
   Task,
   BankAccount,
   ChartDataPoint,
+  CorporateCardTransaction,
 } from './types'
 
 // Entities
@@ -207,10 +208,25 @@ export const dashboardMetrics: DashboardMetric[] = [
 
 // Bank Accounts
 export const bankAccounts: BankAccount[] = [
-  { id: 'ba1', name: 'Operating Account', accountNumber: '****4521', bankName: 'First National Bank', type: 'checking', balance: 1850000, currency: 'USD', status: 'active', lastSyncedAt: new Date('2024-03-15T10:30:00'), entityId: 'e1' },
-  { id: 'ba2', name: 'Payroll Account', accountNumber: '****7832', bankName: 'First National Bank', type: 'checking', balance: 425000, currency: 'USD', status: 'active', lastSyncedAt: new Date('2024-03-15T10:30:00'), entityId: 'e1' },
-  { id: 'ba3', name: 'Savings Reserve', accountNumber: '****9154', bankName: 'Community Credit Union', type: 'savings', balance: 175000, currency: 'USD', status: 'active', lastSyncedAt: new Date('2024-03-14T16:45:00'), entityId: 'e1' },
-  { id: 'ba4', name: 'Corporate Card', accountNumber: '****3367', bankName: 'Business Bank', type: 'credit', balance: -12500, currency: 'USD', status: 'active', lastSyncedAt: new Date('2024-03-15T08:00:00'), entityId: 'e1' },
+  { id: 'ba1', name: 'Operating Account', accountNumber: '****4521', bankName: 'First National Bank', type: 'checking', balance: 1850000, availableBalance: 1820000, currency: 'USD', status: 'active', lastSyncedAt: new Date('2024-03-15T10:30:00'), entityId: 'e1', entityName: 'Acme Corporation' },
+  { id: 'ba2', name: 'Payroll Account', accountNumber: '****7832', bankName: 'First National Bank', type: 'checking', balance: 425000, availableBalance: 425000, currency: 'USD', status: 'active', lastSyncedAt: new Date('2024-03-15T10:30:00'), entityId: 'e1', entityName: 'Acme Corporation' },
+  { id: 'ba3', name: 'Savings Reserve', accountNumber: '****9154', bankName: 'Community Credit Union', type: 'savings', balance: 175000, availableBalance: 175000, currency: 'USD', status: 'active', lastSyncedAt: new Date('2024-03-14T16:45:00'), entityId: 'e1', entityName: 'Acme Corporation' },
+  { id: 'ba4', name: 'Corporate Card', accountNumber: '****3367', bankName: 'Business Bank', type: 'corporate_card', balance: -12500, availableBalance: 37500, currency: 'USD', status: 'active', lastSyncedAt: new Date('2024-03-15T08:00:00'), entityId: 'e1', entityName: 'Acme Corporation' },
+  { id: 'ba5', name: 'West Operating', accountNumber: '****6289', bankName: 'Pacific Bank', type: 'checking', balance: 580000, availableBalance: 565000, currency: 'USD', status: 'active', lastSyncedAt: new Date('2024-03-15T09:15:00'), entityId: 'e2', entityName: 'Acme West' },
+  { id: 'ba6', name: 'Europe Account', accountNumber: '****1456', bankName: 'Deutsche Bank', type: 'checking', balance: 420000, availableBalance: 420000, currency: 'EUR', status: 'active', lastSyncedAt: new Date('2024-03-15T06:00:00'), entityId: 'e3', entityName: 'Acme Europe' },
+  { id: 'ba7', name: 'Travel Card', accountNumber: '****9912', bankName: 'Business Bank', type: 'corporate_card', balance: -4250, availableBalance: 45750, currency: 'USD', status: 'active', lastSyncedAt: new Date('2024-03-15T08:00:00'), entityId: 'e1', entityName: 'Acme Corporation' },
+]
+
+// Corporate Card Transactions
+export const corporateCardTransactions: CorporateCardTransaction[] = [
+  { id: 'cct1', cardId: 'ba4', cardLastFour: '3367', cardholderName: 'Sarah Chen', merchantName: 'Amazon Web Services', merchantCategory: 'Cloud Services', transactionDate: new Date('2024-03-14'), postDate: new Date('2024-03-15'), amount: 2450.00, currency: 'USD', status: 'posted', receiptStatus: 'uploaded', codingStatus: 'coded', suggestedCategory: 'Software & Cloud', suggestedAccountId: 'a21', suggestedAccountName: 'Software Subscriptions', actualCategory: 'Software & Cloud', actualAccountId: 'a21', actualAccountName: 'Software Subscriptions', departmentId: 'd2', departmentName: 'Engineering', entityId: 'e1', createdAt: new Date('2024-03-14') },
+  { id: 'cct2', cardId: 'ba4', cardLastFour: '3367', cardholderName: 'Sarah Chen', merchantName: 'Hilton Hotels', merchantCategory: 'Travel - Lodging', transactionDate: new Date('2024-03-13'), postDate: new Date('2024-03-14'), amount: 589.00, currency: 'USD', status: 'posted', receiptStatus: 'missing', codingStatus: 'suggested', suggestedCategory: 'Travel & Entertainment', suggestedAccountId: 'a22', suggestedAccountName: 'Travel Expenses', entityId: 'e1', createdAt: new Date('2024-03-13') },
+  { id: 'cct3', cardId: 'ba4', cardLastFour: '3367', cardholderName: 'John Smith', merchantName: 'United Airlines', merchantCategory: 'Travel - Air', transactionDate: new Date('2024-03-12'), postDate: new Date('2024-03-13'), amount: 1245.00, currency: 'USD', status: 'posted', receiptStatus: 'uploaded', codingStatus: 'reviewed', suggestedCategory: 'Travel & Entertainment', suggestedAccountId: 'a22', suggestedAccountName: 'Travel Expenses', actualCategory: 'Travel & Entertainment', actualAccountId: 'a22', actualAccountName: 'Travel Expenses', departmentId: 'd4', departmentName: 'Marketing', projectId: 'p1', projectName: 'Q1 Conference', entityId: 'e1', createdAt: new Date('2024-03-12') },
+  { id: 'cct4', cardId: 'ba7', cardLastFour: '9912', cardholderName: 'Mike Johnson', merchantName: 'Uber', merchantCategory: 'Travel - Ground', transactionDate: new Date('2024-03-15'), postDate: new Date('2024-03-15'), amount: 45.50, currency: 'USD', status: 'pending', receiptStatus: 'not_required', codingStatus: 'suggested', suggestedCategory: 'Travel & Entertainment', suggestedAccountId: 'a22', suggestedAccountName: 'Travel Expenses', entityId: 'e1', createdAt: new Date('2024-03-15') },
+  { id: 'cct5', cardId: 'ba4', cardLastFour: '3367', cardholderName: 'Sarah Chen', merchantName: 'Office Depot', merchantCategory: 'Office Supplies', transactionDate: new Date('2024-03-11'), postDate: new Date('2024-03-12'), amount: 234.50, currency: 'USD', status: 'posted', receiptStatus: 'uploaded', codingStatus: 'coded', suggestedCategory: 'Office Supplies', suggestedAccountId: 'a23', suggestedAccountName: 'Office Supplies', actualCategory: 'Office Supplies', actualAccountId: 'a23', actualAccountName: 'Office Supplies', departmentId: 'd1', departmentName: 'Operations', entityId: 'e1', createdAt: new Date('2024-03-11') },
+  { id: 'cct6', cardId: 'ba7', cardLastFour: '9912', cardholderName: 'Lisa Wang', merchantName: 'Marriott', merchantCategory: 'Travel - Lodging', transactionDate: new Date('2024-03-10'), postDate: new Date('2024-03-11'), amount: 425.00, currency: 'USD', status: 'posted', receiptStatus: 'missing', codingStatus: 'uncoded', suggestedCategory: 'Travel & Entertainment', suggestedAccountId: 'a22', suggestedAccountName: 'Travel Expenses', entityId: 'e1', createdAt: new Date('2024-03-10') },
+  { id: 'cct7', cardId: 'ba4', cardLastFour: '3367', cardholderName: 'John Smith', merchantName: 'Starbucks', merchantCategory: 'Meals & Entertainment', transactionDate: new Date('2024-03-15'), postDate: new Date('2024-03-15'), amount: 24.50, currency: 'USD', status: 'pending', receiptStatus: 'not_required', codingStatus: 'suggested', suggestedCategory: 'Meals & Entertainment', suggestedAccountId: 'a24', suggestedAccountName: 'Meals & Entertainment', entityId: 'e1', createdAt: new Date('2024-03-15') },
+  { id: 'cct8', cardId: 'ba4', cardLastFour: '3367', cardholderName: 'Sarah Chen', merchantName: 'GitHub', merchantCategory: 'Software', transactionDate: new Date('2024-03-01'), postDate: new Date('2024-03-02'), amount: 441.00, currency: 'USD', status: 'posted', receiptStatus: 'matched', codingStatus: 'reviewed', suggestedCategory: 'Software & Cloud', suggestedAccountId: 'a21', suggestedAccountName: 'Software Subscriptions', actualCategory: 'Software & Cloud', actualAccountId: 'a21', actualAccountName: 'Software Subscriptions', departmentId: 'd2', departmentName: 'Engineering', entityId: 'e1', createdAt: new Date('2024-03-01') },
 ]
 
 // Notifications
@@ -281,7 +297,7 @@ export const navModules: NavModule[] = [
   {
     id: 'cash-management', label: 'Cash Management', icon: 'Banknote',
     megaMenu: [
-      { label: 'Accounts', items: [{ label: 'Bank Accounts', href: '/cash-management/accounts' }, { label: 'Card Feeds', href: '/cash-management/card-feeds' }] },
+      { label: 'Accounts', items: [{ label: 'Bank Accounts', href: '/cash-management/accounts' }, { label: 'Corporate Cards', href: '/cash-management/card-feed' }] },
       { label: 'Activity', items: [{ label: 'Transactions', href: '/cash-management/transactions' }, { label: 'Transfers', href: '/cash-management/transfers' }, { label: 'Reconciliation', href: '/cash-management/reconciliation' }] },
       { label: 'Reports', items: [{ label: 'Cash Position', href: '/cash-management/reports/cash-position' }, { label: 'Bank Activity', href: '/cash-management/reports/bank-activity' }] }
     ]

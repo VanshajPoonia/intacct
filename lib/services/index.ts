@@ -27,6 +27,7 @@ import type {
   Employee,
   Entity,
   BankAccount,
+  CorporateCardTransaction,
 } from '@/lib/types'
 import {
   entities,
@@ -39,6 +40,7 @@ import {
   journalEntries as mockJournalEntries,
   approvalItems as mockApprovalItems,
   bankAccounts,
+  corporateCardTransactions,
 } from '@/lib/mock-data'
 
 // Simulated latency for realistic UX
@@ -84,6 +86,52 @@ export async function getBankAccounts(): Promise<BankAccount[]> {
 export async function getBankAccountById(id: string): Promise<BankAccount | null> {
   await delay(SIMULATED_DELAY)
   return bankAccounts.find(a => a.id === id) || null
+}
+
+// ============ CORPORATE CARD SERVICES ============
+
+export async function getCorporateCardTransactions(
+  cardId?: string,
+  receiptStatus?: string,
+  codingStatus?: string,
+  search?: string,
+  page: number = 1,
+  pageSize: number = 15
+): Promise<PaginatedResponse<CorporateCardTransaction>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...corporateCardTransactions]
+  
+  if (cardId) {
+    filtered = filtered.filter(t => t.cardId === cardId)
+  }
+  
+  if (receiptStatus) {
+    filtered = filtered.filter(t => t.receiptStatus === receiptStatus)
+  }
+  
+  if (codingStatus) {
+    filtered = filtered.filter(t => t.codingStatus === codingStatus)
+  }
+  
+  if (search) {
+    const searchLower = search.toLowerCase()
+    filtered = filtered.filter(t => 
+      t.merchantName.toLowerCase().includes(searchLower) ||
+      t.cardholderName.toLowerCase().includes(searchLower) ||
+      t.merchantCategory.toLowerCase().includes(searchLower)
+    )
+  }
+  
+  // Sort by date desc
+  filtered.sort((a, b) => new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime())
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
 }
 
 // ============ CASH POSITION SERVICES ============

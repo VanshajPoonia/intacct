@@ -4,7 +4,9 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { OrgSwitcher } from "@/components/layout/org-switcher"
 import { 
   Home, 
   Clock, 
@@ -47,6 +49,12 @@ export function AppSidebar({ collapsed, onToggle, className }: AppSidebarProps) 
         collapsed ? "w-14" : "w-56",
         className
       )}>
+        {/* Organization Switcher */}
+        <div className="p-2">
+          <OrgSwitcher collapsed={collapsed} />
+        </div>
+        <Separator className="mx-2 w-auto" />
+        
         {/* Sidebar Items */}
         <nav className="flex-1 space-y-1 p-2">
           {sidebarItems.map((item) => {

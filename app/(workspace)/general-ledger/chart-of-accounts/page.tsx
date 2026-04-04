@@ -1,431 +1,234 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { AppShell } from "@/components/layout/app-shell"
-import { PageHeader } from "@/components/finance/page-header"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useEffect, useMemo, useState } from "react"
+import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Skeleton } from "@/components/ui/skeleton"
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Download, 
-  MoreHorizontal,
-  ArrowUpDown,
-  Folder,
-  Eye,
-  Pencil,
-  Archive,
-} from "lucide-react"
-import type { Account, SortConfig } from "@/lib/types"
-import { getChartOfAccounts, saveAccount, deleteAccount } from "@/lib/services"
+import { OperatorListWorkspace } from "@/components/finance/operator-list-workspace"
+import { RecordDetailDrawer } from "@/components/finance/record-detail-drawer"
 import { AccountModal } from "@/components/general-ledger/account-modal"
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-provider"
+import {
+  deleteAccount,
+  getChartAccountWorkspaceDetail,
+  getChartOfAccountsWorkspace,
+  saveAccount,
+} from "@/lib/services"
+import type { Account, SortConfig, WorkspaceDetailAction, WorkspaceDetailData, WorkspaceFilterDefinition } from "@/lib/types"
+import type { OperatorTableColumn } from "@/components/finance/operator-data-table"
+import { formatCurrency } from "@/lib/utils"
 
-const typeColors: Record<string, string> = {
-  asset: "bg-blue-100 text-blue-800",
-  liability: "bg-purple-100 text-purple-800",
-  equity: "bg-green-100 text-green-800",
-  revenue: "bg-emerald-100 text-emerald-800",
-  expense: "bg-orange-100 text-orange-800",
-}
-
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(value)
+const typeToneClasses: Record<Account["type"], string> = {
+  asset: "border-primary/20 bg-primary/10 text-primary",
+  liability: "border-purple-200 bg-purple-50 text-purple-700",
+  equity: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  revenue: "border-sky-200 bg-sky-50 text-sky-700",
+  expense: "border-amber-200 bg-amber-50 text-amber-700",
 }
 
 export default function ChartOfAccountsPage() {
-  // Filter state
-  const [typeFilter, setTypeFilter] = useState<string[]>([])
-  const [statusFilter, setStatusFilter] = useState<string>('active')
+  const { activeEntity, dateRange } = useWorkspaceShell()
+  const [workspace, setWorkspace] = useState<Awaited<ReturnType<typeof getChartOfAccountsWorkspace>> | null>(null)
   const [search, setSearch] = useState("")
-  const [sort, setSort] = useState<SortConfig | undefined>(undefined)
-  
-  // Data state
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [loading, setLoading] = useState(true)
-  
-  // UI state
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null)
+  const [typeFilter, setTypeFilter] = useState("all")
+  const [sort, setSort] = useState<SortConfig>({ key: "number", direction: "asc" })
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [detail, setDetail] = useState<WorkspaceDetailData | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
-  const [modalMode, setModalMode] = useState<'create' | 'edit' | 'view'>('create')
-
-  // Fetch accounts
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const result = await getChartOfAccounts(
-        search || undefined,
-        typeFilter.length > 0 ? typeFilter : undefined,
-        statusFilter ? [statusFilter] : undefined,
-        sort
-      )
-      setAccounts(result)
-    } catch (error) {
-      console.error('Error fetching accounts:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [search, typeFilter, statusFilter, sort])
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
-
-  // Handle type filter change
-  const handleTypeChange = (type: string) => {
-    if (type === 'all') {
-      setTypeFilter([])
-    } else {
-      setTypeFilter([type])
+    if (!activeEntity || !dateRange) {
+      return
     }
-  }
 
-  // Handle status filter change
-  const handleStatusChange = (status: string) => {
-    setStatusFilter(status === 'all' ? '' : status)
-  }
-
-  // Handle search
-  const handleSearch = (value: string) => {
-    setSearch(value)
-  }
-
-  // Handle sort
-  const handleSort = (key: string) => {
-    setSort(prev => {
-      if (prev?.key === key) {
-        return prev.direction === 'asc' 
-          ? { key, direction: 'desc' } 
-          : undefined
+    getChartOfAccountsWorkspace(
+      {
+        entityId: activeEntity.id,
+        dateRange,
+      },
+      {
+        search: search || undefined,
+        types: typeFilter !== "all" ? [typeFilter] : undefined,
+        sort,
       }
-      return { key, direction: 'asc' }
+    ).then(setWorkspace)
+  }, [activeEntity, dateRange, refreshKey, search, sort, typeFilter])
+
+  const columns = useMemo<OperatorTableColumn<Account>[]>(
+    () => [
+      {
+        id: "account",
+        label: "Account",
+        sortKey: "number",
+        render: account => (
+          <div className="space-y-1">
+            <div className="font-medium text-foreground">{account.number}</div>
+            <div className="text-sm text-muted-foreground">{account.name}</div>
+          </div>
+        ),
+      },
+      {
+        id: "type",
+        label: "Type",
+        sortKey: "type",
+        render: account => (
+          <Badge variant="outline" className={`rounded-sm px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${typeToneClasses[account.type]}`}>
+            {account.type}
+          </Badge>
+        ),
+      },
+      {
+        id: "category",
+        label: "Category",
+        sortKey: "category",
+        render: account => <div className="text-sm text-foreground">{account.category}</div>,
+      },
+      {
+        id: "status",
+        label: "Status",
+        sortKey: "status",
+        render: account => <div className="text-sm text-foreground capitalize">{account.status}</div>,
+      },
+      {
+        id: "balance",
+        label: "Balance",
+        sortKey: "balance",
+        align: "right",
+        render: account => <div className="font-medium text-foreground">{formatCurrency(account.balance, account.currency)}</div>,
+      },
+    ],
+    []
+  )
+
+  const currentFilters = {
+    search,
+    typeFilter,
+    sortKey: sort.key,
+    sortDirection: sort.direction,
+  }
+
+  function applySavedView(filters: Record<string, unknown>) {
+    setSearch(String(filters.search ?? ""))
+    setTypeFilter(String(filters.typeFilter ?? "all"))
+    setSort({
+      key: String(filters.sortKey ?? "number"),
+      direction: filters.sortDirection === "desc" ? "desc" : "asc",
     })
   }
 
-  // Handle create
-  const handleCreate = () => {
-    setSelectedAccount(null)
-    setModalMode('create')
-    setModalOpen(true)
+  async function openDetail(account: Account) {
+    setDetailOpen(true)
+    setDetailLoading(true)
+    const nextDetail = await getChartAccountWorkspaceDetail(account.id)
+    setDetail(nextDetail)
+    setDetailLoading(false)
   }
 
-  // Handle edit
-  const handleEdit = (account: Account) => {
-    setSelectedAccount(account)
-    setModalMode('edit')
-    setModalOpen(true)
+  async function handleDetailAction(action: WorkspaceDetailAction) {
+    if (!detail) {
+      return
+    }
+
+    if (action.id === "edit-account") {
+      const account = workspace?.data.find(item => item.id === detail.id) ?? null
+      setEditingAccount(account)
+      setModalOpen(true)
+      return
+    }
+
+    if (action.id === "archive-account") {
+      await deleteAccount(detail.id)
+      toast.success("Account archived")
+    }
+
+    if (action.id === "activate-account") {
+      await saveAccount({ id: detail.id, status: "active" })
+      toast.success("Account reactivated")
+    }
+
+    setRefreshKey(previous => previous + 1)
+    setDetail(await getChartAccountWorkspaceDetail(detail.id))
   }
 
-  // Handle view
-  const handleView = (account: Account) => {
-    setSelectedAccount(account)
-    setModalMode('view')
-    setModalOpen(true)
-  }
+  const filters = useMemo<Array<WorkspaceFilterDefinition & { value: string; onChange: (value: string) => void }>>(
+    () =>
+      (workspace?.filters.map(filter => ({
+        ...filter,
+        value: typeFilter,
+        onChange: setTypeFilter,
+      })) ?? []),
+    [typeFilter, workspace?.filters]
+  )
 
-  // Handle archive
-  const handleArchive = async (id: string) => {
-    await deleteAccount(id)
-    fetchData()
+  if (!workspace) {
+    return null
   }
-
-  // Handle save
-  const handleSave = async (data: Partial<Account>) => {
-    await saveAccount(data)
-    setModalOpen(false)
-    fetchData()
-  }
-
-  // Group accounts by type for summary
-  const accountsByType = accounts.reduce((acc, account) => {
-    acc[account.type] = (acc[account.type] || 0) + 1
-    return acc
-  }, {} as Record<string, number>)
 
   return (
-    <AppShell>
-      <div className="space-y-6">
-        <PageHeader
-          title="Chart of Accounts"
-          description="Manage your general ledger account structure"
-          actions={
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-1.5" />
-                Export
-              </Button>
-              <Button size="sm" onClick={handleCreate}>
-                <Plus className="h-4 w-4 mr-1.5" />
-                New Account
-              </Button>
-            </div>
-          }
-        />
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-5 gap-4">
-          {['asset', 'liability', 'equity', 'revenue', 'expense'].map(type => (
-            <Card 
-              key={type} 
-              className={`cursor-pointer transition-colors ${typeFilter.includes(type) ? 'ring-2 ring-primary' : ''}`}
-              onClick={() => handleTypeChange(typeFilter.includes(type) ? 'all' : type)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <Badge variant="secondary" className={typeColors[type]}>
-                    {type}
-                  </Badge>
-                  <span className="text-2xl font-semibold">{accountsByType[type] || 0}</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2 capitalize">{type} Accounts</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Filters */}
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Select 
-                  value={typeFilter.length === 0 ? 'all' : typeFilter[0]} 
-                  onValueChange={handleTypeChange}
-                >
-                  <SelectTrigger className="w-[140px] h-9">
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="asset">Asset</SelectItem>
-                    <SelectItem value="liability">Liability</SelectItem>
-                    <SelectItem value="equity">Equity</SelectItem>
-                    <SelectItem value="revenue">Revenue</SelectItem>
-                    <SelectItem value="expense">Expense</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Select 
-                  value={statusFilter || 'all'} 
-                  onValueChange={handleStatusChange}
-                >
-                  <SelectTrigger className="w-[140px] h-9">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search accounts..."
-                  value={search}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  className="pl-9 h-9"
-                />
-              </div>
-
-              <Button variant="outline" size="sm" className="ml-auto">
-                <Filter className="h-4 w-4 mr-1.5" />
-                More Filters
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Table */}
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[120px]">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="-ml-3 h-8"
-                      onClick={() => handleSort('number')}
-                    >
-                      Number
-                      <ArrowUpDown className="ml-1 h-3.5 w-3.5" />
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="-ml-3 h-8"
-                      onClick={() => handleSort('name')}
-                    >
-                      Name
-                      <ArrowUpDown className="ml-1 h-3.5 w-3.5" />
-                    </Button>
-                  </TableHead>
-                  <TableHead className="w-[100px]">Type</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="w-[80px]">Normal</TableHead>
-                  <TableHead className="text-right w-[140px]">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="-mr-3 h-8"
-                      onClick={() => handleSort('balance')}
-                    >
-                      Balance
-                      <ArrowUpDown className="ml-1 h-3.5 w-3.5" />
-                    </Button>
-                  </TableHead>
-                  <TableHead className="w-[90px]">Status</TableHead>
-                  <TableHead className="w-[60px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 8 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-14" /></TableCell>
-                      <TableCell><Skeleton className="h-8 w-8" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : accounts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="h-32 text-center">
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <Folder className="h-8 w-8" />
-                        <p>No accounts found</p>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={handleCreate}
-                        >
-                          Create Account
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  accounts.map((account) => (
-                    <TableRow 
-                      key={account.id} 
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => handleView(account)}
-                    >
-                      <TableCell className="font-mono font-medium">{account.number}</TableCell>
-                      <TableCell className="font-medium">{account.name}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className={typeColors[account.type]}>
-                          {account.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{account.category}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {['asset', 'expense'].includes(account.type) ? 'Debit' : 'Credit'}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatCurrency(account.balance)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={account.status === 'active' ? 'default' : 'secondary'}>
-                          {account.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation()
-                              handleView(account)
-                            }}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation()
-                              handleEdit(account)
-                            }}>
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            {account.status === 'active' && (
-                              <DropdownMenuItem 
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleArchive(account.id)
-                                }}
-                                className="text-orange-600"
-                              >
-                                <Archive className="h-4 w-4 mr-2" />
-                                Archive
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Account Modal */}
-      <AccountModal
-        account={selectedAccount}
-        open={modalOpen}
-        mode={modalMode}
-        onClose={() => setModalOpen(false)}
-        onSave={handleSave}
+    <>
+      <OperatorListWorkspace
+        moduleKey="general-ledger-chart-of-accounts"
+        eyebrow="Ledger Structure"
+        title="Chart of Accounts"
+        description="Maintain account structure and review balances with service-driven ledger metadata."
+        metrics={workspace.metrics}
+        actions={workspace.actions}
+        actionHandlers={{
+          "new-account": () => {
+            setEditingAccount(null)
+            setModalOpen(true)
+          },
+          "export-accounts": () => toast.info("Account export will connect to the export service in a later milestone."),
+        }}
+        currentFilters={currentFilters}
+        onApplySavedView={applySavedView}
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search account number, name, or category..."
+        filters={filters}
+        rows={workspace.data}
+        columns={columns}
+        rowId={account => account.id}
+        sort={sort}
+        selectedIds={selectedIds}
+        page={1}
+        pageSize={workspace.total}
+        total={workspace.total}
+        totalPages={1}
+        emptyMessage={workspace.emptyMessage}
+        onRowClick={openDetail}
+        onSortChange={setSort}
+        onSelectedIdsChange={setSelectedIds}
+        onPageChange={() => undefined}
+        onPageSizeChange={() => undefined}
+        drawer={
+          <RecordDetailDrawer
+            detail={detail}
+            open={detailOpen}
+            isLoading={detailLoading}
+            onOpenChange={setDetailOpen}
+            onAction={handleDetailAction}
+          />
+        }
       />
-    </AppShell>
+      <AccountModal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false)
+          setEditingAccount(null)
+        }}
+        account={editingAccount}
+        mode={editingAccount ? "edit" : "create"}
+        onSave={async data => {
+          await saveAccount(data)
+          setModalOpen(false)
+          setEditingAccount(null)
+          setRefreshKey(previous => previous + 1)
+        }}
+      />
+    </>
   )
 }

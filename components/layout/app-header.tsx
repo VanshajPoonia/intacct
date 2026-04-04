@@ -59,7 +59,8 @@ export function AppHeader({ onSearchClick, className }: AppHeaderProps) {
   } = useWorkspaceShell()
 
   const userName =
-    currentUser?.displayName ?? [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(" ") || "Finance User"
+    currentUser?.displayName ??
+    ([currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(" ") || "Finance User")
   const userInitials = [currentUser?.firstName?.[0], currentUser?.lastName?.[0]].filter(Boolean).join("") || "FU"
 
   const handleLogout = async () => {

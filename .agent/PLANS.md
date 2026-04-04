@@ -21,57 +21,66 @@ Use this file for any major feature or multi-step implementation.
 
 ---
 
-## Active Plan: Milestone 7 Accountant Work Queue Module
+## Active Plan: Milestone 8 Service-Driven GL, AP, AR, And Cash Workspaces
 
 ### Goal
-Turn `/work-queue` into a real accountant-first operational workspace with a unified queue table, sticky controls, saved views, bulk actions, and service-driven detail drawers.
+Rebuild General Ledger, Accounts Payable, Accounts Receivable, and Cash Management as shared-shell, service-driven operator workspaces with green validation.
 
 ### Scope
-- `app/(workspace)/work-queue/page.tsx`
-- `components/tables`
-- `components/workflows`
+- `app/(workspace)/general-ledger`
+- `app/(workspace)/accounts-payable`
+- `app/(workspace)/accounts-receivable`
+- `app/(workspace)/cash-management`
 - `components/layout`
+- `components/finance`
+- `components/general-ledger`
+- `components/accounts-payable`
+- `components/accounts-receivable`
 - `lib/types`
 - `lib/mock-data`
 - `lib/services`
 - `lib/services/index.ts`
+- `lib/utils.ts`
 
 ### Files and architecture
-- Replace the `/work-queue` shell stub with a real module page built inside the shared shell and driven by the existing role, entity, and date-range workspace context
-- Add a dedicated work queue domain with typed items, detail payloads, section definitions, actions, and queue-local filter state
-- Keep one unified queue table surface and switch sections, columns, counts, and actions through service-driven metadata instead of subpages or inline conditionals
-- Reuse existing shell and service foundations, but make the work queue its own canonical module instead of leaning on the older `/tasks` and `/approvals` pages
+- Replace the remaining GL/AP/AR/Cash stubs and older page-local implementations with module workspaces that inherit the shared `(workspace)` shell
+- Normalize the module surface around shared toolbar, summary strip, sticky filters, dense tables, right-side drawers, saved views, and service-driven mutations
+- Add module-specific service adapters for workspace summaries, list results, detail payloads, filter options, and operator actions without introducing direct `mock-data` reads in components
+- Keep secondary routes available, but fully rebuild the primary routes in this milestone: GL landing, journal entries, chart of accounts; AP landing, bills, vendors, payments; AR landing, invoices, customers, receipts; Cash landing, accounts, transactions, reconciliation
 
 ### Domain types
-- Add a dedicated `lib/types/work-queue.ts` domain file for queue items, queue detail, queue sections, queue filters, queue actions, queue summaries, and queue table metadata
-- Export the new queue types through the shared `@/lib/types` barrel so components can stay decoupled from implementation files
+- Add module workspace response types, detail drawer field types, and table metadata where needed so the UI can stay generic and service-driven
+- Export any new types through the shared `@/lib/types` barrel
 
 ### Mock data and services
-- Add `lib/mock-data/work-queue.ts` for dedicated queue records that normalize missing-document issues, import errors, assignment state, and action availability across multiple source modules
-- Add `lib/services/work-queue.ts` with canonical queue APIs for sections, list results, detail data, saved views, single-item actions, and bulk actions
-- Keep queue services composing existing service-layer data where possible, including approvals, journal entries, close tasks, reconciliation exceptions, transactions, departments, projects, and saved views
-- Keep all queue components consuming the service layer only
+- Extend canonical and compatibility services so GL/AP/AR/Cash pages can read summaries, lists, details, and mutations only through `@/lib/services`
+- Keep entity, date range, department, project, search, sort, pagination, selection, and saved-view state flowing through services plus local UI state
+- Use existing mock datasets as the source of truth and add missing derived service responses instead of hardcoding business labels in components
 
 ### UX and behavior
-- The queue is table-first and queue-first, with sticky section tabs, sticky filter controls, a sticky table header, right-side detail drawers, and an action bar for selected rows
-- Sections include Needs Review, Approvals, Reconciliation Exceptions, Missing Documents, Import Errors, Close Tasks, and Assigned to Me
-- Queue-local filters include department, project, status, assignee, search, sort, and pagination; shell filters remain entity and date range
-- Mutations update list rows, section counts, selection state, and the open drawer without refresh so the module feels API-backed
+- Each rebuilt module is table-first and operator-focused, with shell-driven entity/date changes refreshing every summary, list, and drawer
+- GL emphasizes journals, review status, and chart-of-accounts maintenance
+- AP emphasizes bill review, vendor exposure, payment release readiness, and bulk approval or payment actions
+- AR emphasizes invoice follow-up, customer balances, receipt application, and collection visibility
+- Cash emphasizes bank accounts, transaction review, and reconciliation exceptions rather than dashboard cards
+- Mutations keep list and detail state in sync without refresh
 
 ### Validation
 - Run `npm run lint`
 - Run `npx tsc --noEmit`
 - Run `npm run build`
-- If dependencies are still missing, report the exact missing binary/blocker
+- Fix the existing baseline issues that currently block validation before considering the milestone complete
 
 ### Milestones
-1. Update the milestone plan and add the new queue domain types plus dataset/service scaffolding
-2. Build the unified queue page, filters, table, bulk action bar, saved views, and detail drawer
-3. Wire queue actions and saved views so mutations stay in sync with the open workspace
-4. Run static validation and capture blockers
+1. Install dependencies and fix current validation blockers unrelated to the module rebuild
+2. Add module service adapters and shared operator-workspace components
+3. Rebuild GL primary routes and validate
+4. Rebuild AP primary routes and validate
+5. Rebuild AR primary routes and validate
+6. Rebuild Cash primary routes and validate
+7. Run final lint, typecheck, and build
 
 ### Progress log
-- 2026-04-04: Confirmed `/work-queue` is still a shell stub and the existing generic table primitives do not yet support sticky headers, selection, bulk actions, or queue-local saved views.
-- 2026-04-04: Audited the current services and datasets for approvals, close tasks, reconciliations, journal entries, documents, tasks, and notifications to define the unified queue composition.
-- 2026-04-04: Chose the unified-table queue design with queue-local department/project filters and operational bulk actions, keeping shell-level filters limited to entity and date range.
-- 2026-04-04: Validation is still expected to be blocked by missing local `eslint`, `tsc`, and `next` binaries until dependencies are installed.
+- 2026-04-04: Confirmed dependencies were missing and installed `node_modules` so milestone validation can become a real gate.
+- 2026-04-04: Audited GL/AP/AR/Cash routes and confirmed the primary pages still rely on older page-local state and `AppShell`, while top-level GL/AP/AR landing pages remain stubs.
+- 2026-04-04: Identified baseline validation blockers outside milestone 8 UI work, including missing lint tooling, missing compatibility exports, and existing build errors in older routes.

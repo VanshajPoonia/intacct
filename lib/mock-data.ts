@@ -283,36 +283,41 @@ export const navModules: NavModule[] = [
   },
   {
     id: 'purchasing', label: 'Purchasing', icon: 'ShoppingCart',
+    href: '/purchasing',
     megaMenu: [
-      { label: 'Operations', items: [{ label: 'Purchase Orders', href: '/purchasing/orders' }, { label: 'Requisitions', href: '/purchasing/requisitions' }, { label: 'Receiving', href: '/purchasing/receiving' }] },
+      { label: 'Operations', items: [{ label: 'All Purchase Orders', href: '/purchasing' }, { label: 'New Purchase Order', href: '/purchasing/orders/new' }, { label: 'Requisitions', href: '/purchasing/requisitions' }, { label: 'Receiving', href: '/purchasing/receiving' }] },
       { label: 'Setup', items: [{ label: 'Approval Workflows', href: '/purchasing/workflows' }, { label: 'Spend Categories', href: '/purchasing/categories' }] }
     ]
   },
   {
     id: 'order-management', label: 'Order Management', icon: 'Package',
+    href: '/order-management',
     megaMenu: [
-      { label: 'Orders', items: [{ label: 'Sales Orders', href: '/order-management/sales-orders' }, { label: 'Quotes', href: '/order-management/quotes' }, { label: 'Fulfillment', href: '/order-management/fulfillment' }] },
+      { label: 'Orders', items: [{ label: 'All Sales Orders', href: '/order-management' }, { label: 'New Sales Order', href: '/order-management/orders/new' }, { label: 'Quotes', href: '/order-management/quotes' }, { label: 'Fulfillment', href: '/order-management/fulfillment' }] },
       { label: 'Setup', items: [{ label: 'Products', href: '/order-management/products' }, { label: 'Price Lists', href: '/order-management/price-lists' }] }
     ]
   },
   {
     id: 'projects', label: 'Projects', icon: 'FolderKanban',
+    href: '/projects',
     megaMenu: [
-      { label: 'Management', items: [{ label: 'All Projects', href: '/projects' }, { label: 'Time Tracking', href: '/projects/time-tracking' }, { label: 'Expenses', href: '/projects/expenses' }] },
-      { label: 'Billing', items: [{ label: 'Project Billing', href: '/projects/billing' }, { label: 'Revenue Recognition', href: '/projects/revenue-recognition' }] }
+      { label: 'Management', items: [{ label: 'All Projects', href: '/projects' }, { label: 'New Project', href: '/projects/new' }] },
+      { label: 'Time & Billing', items: [{ label: 'Time Tracking', href: '/time-expenses' }, { label: 'Project Expenses', href: '/time-expenses' }, { label: 'Project Billing', href: '/projects/billing' }] }
     ]
   },
   {
     id: 'time-expenses', label: 'Time & Expenses', icon: 'Clock',
+    href: '/time-expenses',
     megaMenu: [
-      { label: 'Entry', items: [{ label: 'Timesheets', href: '/time-expenses/timesheets' }, { label: 'Expense Reports', href: '/time-expenses/expense-reports' }] },
+      { label: 'Entry', items: [{ label: 'Time & Expenses', href: '/time-expenses' }, { label: 'Log Time', href: '/time-expenses/time/new' }, { label: 'New Expense', href: '/time-expenses/expenses/new' }] },
       { label: 'Management', items: [{ label: 'Approvals', href: '/time-expenses/approvals' }, { label: 'Policies', href: '/time-expenses/policies' }] }
     ]
   },
   {
     id: 'multi-entity', label: 'Multi-Entity', icon: 'Network',
+    href: '/multi-entity',
     megaMenu: [
-      { label: 'Consolidation', items: [{ label: 'Intercompany', href: '/multi-entity/intercompany' }, { label: 'Eliminations', href: '/multi-entity/eliminations' }, { label: 'Consolidation', href: '/multi-entity/consolidation' }] },
+      { label: 'Overview', items: [{ label: 'Multi-Entity Hub', href: '/multi-entity' }, { label: 'Intercompany', href: '/multi-entity/intercompany' }, { label: 'Eliminations', href: '/multi-entity/eliminations' }, { label: 'Consolidation', href: '/multi-entity/consolidation' }] },
       { label: 'Setup', items: [{ label: 'Entities', href: '/multi-entity/entities' }, { label: 'Mapping', href: '/multi-entity/mapping' }] }
     ]
   },
@@ -345,6 +350,14 @@ export const searchableItems = [
   { type: 'module', label: 'Accounts Payable', href: '/accounts-payable', icon: 'Receipt' },
   { type: 'module', label: 'Accounts Receivable', href: '/accounts-receivable', icon: 'CreditCard' },
   { type: 'module', label: 'Cash Management', href: '/cash-management', icon: 'Banknote' },
+  { type: 'module', label: 'Purchasing', href: '/purchasing', icon: 'ShoppingCart' },
+  { type: 'module', label: 'Order Management', href: '/order-management', icon: 'Package' },
+  { type: 'module', label: 'Projects', href: '/projects', icon: 'FolderKanban' },
+  { type: 'module', label: 'Time & Expenses', href: '/time-expenses', icon: 'Clock' },
+  { type: 'module', label: 'Multi-Entity', href: '/multi-entity', icon: 'Network' },
+  // GL Sub-modules
+  { type: 'module', label: 'Recurring Journals', href: '/general-ledger/recurring-journals', icon: 'RefreshCcw' },
+  { type: 'module', label: 'Allocations', href: '/general-ledger/allocations', icon: 'GitBranch' },
   // Workflow
   { type: 'module', label: 'Tasks', href: '/tasks', icon: 'CheckSquare' },
   { type: 'module', label: 'Approvals', href: '/approvals', icon: 'UserCheck' },
@@ -368,6 +381,10 @@ export const searchableItems = [
   { type: 'transaction', label: 'Create Journal Entry', href: '/general-ledger/journal-entries/new', icon: 'Plus' },
   { type: 'transaction', label: 'Create Bill', href: '/accounts-payable/bills/new', icon: 'Plus' },
   { type: 'transaction', label: 'Create Invoice', href: '/accounts-receivable/invoices/new', icon: 'Plus' },
+  { type: 'transaction', label: 'Create Purchase Order', href: '/purchasing/orders/new', icon: 'Plus' },
+  { type: 'transaction', label: 'Create Sales Order', href: '/order-management/orders/new', icon: 'Plus' },
+  { type: 'transaction', label: 'Log Time', href: '/time-expenses/time/new', icon: 'Plus' },
+  { type: 'transaction', label: 'New Expense', href: '/time-expenses/expenses/new', icon: 'Plus' },
 ]
 
 // Saved Views

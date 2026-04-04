@@ -122,3 +122,62 @@ export interface ShellContextData {
   roleHomeConfig: RoleHomeConfig | null
   counts: ShellUtilityCounts
 }
+
+export type HomepageTone = 'neutral' | 'accent' | 'positive' | 'warning' | 'critical'
+
+export interface RoleHomepageAction extends ShellRouteLink {
+  tone?: HomepageTone
+}
+
+export interface RoleHomepageMetric {
+  id: string
+  label: string
+  value: string
+  detail?: string
+  href?: string
+  icon?: string
+  tone?: HomepageTone
+}
+
+export interface RoleHomepageWidgetItem {
+  id: string
+  title: string
+  description?: string
+  value?: string
+  secondaryValue?: string
+  href?: string
+  icon?: string
+  status?: string
+  statusTone?: HomepageTone
+  meta?: string[]
+}
+
+export interface RoleHomepageWidget {
+  id: string
+  title: string
+  description?: string
+  kind: 'metrics' | 'list' | 'actions' | 'progress'
+  metrics?: RoleHomepageMetric[]
+  items?: RoleHomepageWidgetItem[]
+  actions?: RoleHomepageAction[]
+  footerLink?: ShellRouteLink
+  emptyMessage?: string
+}
+
+export interface RoleHomepageSection {
+  id: string
+  area: 'full' | 'main' | 'rail'
+  widgets: RoleHomepageWidget[]
+}
+
+export interface RoleHomepageData {
+  roleId: RoleId
+  roleLabel: string
+  title: string
+  subtitle: string
+  accentLabel: string
+  summaryMetrics: RoleHomepageMetric[]
+  primaryActions: RoleHomepageAction[]
+  sections: RoleHomepageSection[]
+  refreshedAt: Date
+}

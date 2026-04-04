@@ -21,41 +21,41 @@ Use this file for any major feature or multi-step implementation.
 
 ---
 
-## Active Plan: Milestone 5 ERP Shell And Navigation System
+## Active Plan: Milestone 6 Dynamic Role Homepages And Demo Role System
 
 ### Goal
-Rebuild the app chrome as a shared, role-aware ERP workspace shell with dense accountant-friendly navigation and service-driven shell configuration.
+Turn `/` into a dynamic, role-aware finance homepage surface so each demo role lands in a distinct, service-driven workspace without leaving the shared shell.
 
 ### Scope
-- `app/(workspace)`
+- `app/(workspace)/page.tsx`
 - `components/layout`
-- `components/navigation`
+- `components/finance`
+- `components/workflows`
 - `lib/types/ui.ts`
-- `lib/mock-data/shell.ts`
-- `lib/services/shell.ts`
-- minimal route stubs only for missing top-level modules
+- `lib/mock-data/identity.ts`
+- `lib/services/homepages.ts`
+- `lib/services/index.ts`
 
 ### Files and architecture
-- Move authenticated routes under `app/(workspace)/...` so the shell mounts once without changing public URLs
-- Add a client workspace shell provider for active role, entity, date range, sidebar collapse, and command palette state
-- Keep `lib/mock-data/shell.ts` as the canonical chrome dataset and `lib/services/shell.ts` as the only shell read surface
-- Keep `AppShell` as a compatibility wrapper so existing module pages still render inside the new shared shell during the transition
+- Keep `/` as the shared home URL and swap homepage content based on the visible shell role instead of redirecting per role
+- Keep the existing shared shell provider as the single source for active role, entity, and date range so homepage data refreshes automatically with shell changes
+- Add a dedicated homepage service module that composes existing services and returns typed homepage payloads for every role
+- Replace the generic `RoleWorkspaceLanding` entrypoint with a homepage resolver that renders a bespoke accountant workspace and lighter shared role homepages
 
 ### Domain types
-- Expand `lib/types/ui.ts` with shell module, sidebar, command palette, breadcrumb, stub-page, and shell-context contracts
-- Keep route metadata, menu groups, and command actions typed instead of embedding labels or nav structure inside JSX
+- Expand `lib/types/ui.ts` with homepage-specific contracts for role homepage data, sections, widgets, metrics, and actions
+- Keep homepage widget metadata typed so copy, actions, emphasis, and list structure stay out of JSX
 
 ### Mock data and services
-- Add shell datasets for top-module navigation, mega-menu groupings, role-aware sidebar sections, breadcrumb registry, command palette definitions, stub-page metadata, and date presets
-- Add shell services for available roles, shell context, top nav, sidebar nav, breadcrumbs, command palette config, and stub pages
-- Derive role-aware shell behavior from the existing identity and master-data services rather than duplicating user/entity logic in components
+- Keep role titles, subtitles, quick actions, and emphasis in the identity dataset, with `/` as the universal default route for all primary roles
+- Add `lib/services/homepages.ts` with canonical role homepage APIs that compose finance, close, workflow, search, and admin services
+- Keep components consuming homepage services only, even when the homepage service internally stitches together canonical and transitional legacy service outputs
 
 ### UX and behavior
-- Dense ERP chrome with sticky header, top module nav, collapsible sidebar, breadcrumb row, and command palette trigger
-- Role switcher, entity switcher, and date-range switcher live in the header and drive shared shell state
-- Mega menus open on click only and close on outside click or `Escape`
-- Breadcrumbs derive from typed route metadata, including semantic labels for dynamic detail routes
-- Landing and stub routes are lightweight but real pages backed by shell services, not handwritten placeholders
+- Role switching changes `/` in place without changing the URL and updates visible actions, widgets, and navigation emphasis immediately
+- Accountant homepage is the most polished surface, with queue-first, table-first sections for tasks due today, unreconciled transactions, draft journals, missing documents, close progress, exceptions, and quick actions
+- AP, AR, Controller, CFO, and Admin each get distinct service-driven homepages with role-specific section ordering and action sets
+- Homepage components stay dense and operational, avoiding startup-style hero cards and generic dashboard mosaics
 
 ### Validation
 - Run `npm run lint`
@@ -64,17 +64,13 @@ Rebuild the app chrome as a shared, role-aware ERP workspace shell with dense ac
 - If dependencies are still missing, report the exact missing binary/blocker
 
 ### Milestones
-1. Add typed shell contracts and the shell mock-data/service layer
-2. Implement the shared workspace provider and shell primitives
-3. Refactor header, sidebar, module nav, breadcrumbs, command palette, and compatibility shell wrapper
-4. Move authenticated routes under the workspace layout and add shell-level landing/stub pages
-5. Run static validation and capture blockers
+1. Update the milestone plan and align role-home metadata for shared-home behavior
+2. Add typed homepage contracts and canonical homepage service composition for all six roles
+3. Implement service-driven homepage components and replace the `/` landing entrypoint
+4. Run static validation and capture blockers
 
 ### Progress log
-- 2026-04-04: Audited the current route tree and existing shell components to identify the shared-shell migration path.
-- 2026-04-04: Expanded `lib/types/ui.ts` with shell-specific module, sidebar, breadcrumb, command, stub-page, and context types.
-- 2026-04-04: Confirmed the migration strategy: keep `/login` outside the shell, move authenticated routes into a route group, and retain `AppShell` as a compatibility wrapper while the module pages catch up.
-- 2026-04-04: Added `lib/mock-data/shell.ts` and `lib/services/shell.ts` to make modules, mega menus, sidebar sections, breadcrumbs, command groups, and stub pages service-driven.
-- 2026-04-04: Rebuilt the shell chrome around a shared workspace provider and refactored the header, sidebar, module nav, breadcrumbs, command palette, org switcher, and layout primitives to consume shell services.
-- 2026-04-04: Moved authenticated routes into `app/(workspace)/...`, replaced `/` with a role-aware workspace landing, and added shell-level landing routes for missing top-level ERP modules.
-- 2026-04-04: Validation remains blocked by missing local `eslint`, `tsc`, and `next` binaries because project dependencies are not installed.
+- 2026-04-04: Confirmed the shared shell already persists role, entity, and date-range state, so milestone 6 can focus on replacing the generic home surface rather than reworking shell state.
+- 2026-04-04: Audited the current identity, close, reporting, workflow, and legacy service layers to map accountant-first homepage widgets to existing service-driven data.
+- 2026-04-04: Confirmed `/` still renders `RoleWorkspaceLanding`, making it the correct entrypoint to replace with the new homepage resolver.
+- 2026-04-04: Validation is still expected to be blocked by missing local `eslint`, `tsc`, and `next` binaries until dependencies are installed.

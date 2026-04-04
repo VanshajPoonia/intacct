@@ -26,6 +26,7 @@ import type {
   Project,
   Employee,
   Entity,
+  BankAccount,
 } from '@/lib/types'
 import {
   entities,
@@ -74,8 +75,6 @@ export const employees: Employee[] = [
 ]
 
 // ============ BANK ACCOUNT SERVICES ============
-
-import type { BankAccount } from '@/lib/types'
 
 export async function getBankAccounts(): Promise<BankAccount[]> {
   await delay(SIMULATED_DELAY)

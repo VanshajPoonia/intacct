@@ -3193,3 +3193,1977 @@ export async function revokeApiKey(id: string): Promise<{ success: boolean }> {
   }
   return { success: false }
 }
+
+// ============ TASK SERVICES ============
+
+import type { Task, Notification, ActivityItem } from '@/lib/types'
+
+const mockTasks: Task[] = [
+  {
+    id: 'task1',
+    title: 'Review March expense reports',
+    description: 'Review and approve expense reports submitted for March 2024',
+    type: 'review',
+    priority: 'high',
+    status: 'todo',
+    dueDate: new Date('2024-03-20'),
+    assigneeId: 'u1',
+    assigneeName: 'Sarah Chen',
+    entityId: 'e1',
+    createdBy: 'System',
+    createdAt: new Date('2024-03-15'),
+  },
+  {
+    id: 'task2',
+    title: 'Reconcile operating account',
+    description: 'Complete monthly bank reconciliation for operating account',
+    type: 'reconciliation',
+    priority: 'high',
+    status: 'in_progress',
+    dueDate: new Date('2024-03-18'),
+    assigneeId: 'u3',
+    assigneeName: 'Emily Davis',
+    relatedType: 'reconciliation',
+    entityId: 'e1',
+    createdBy: 'Michael Johnson',
+    createdAt: new Date('2024-03-10'),
+  },
+  {
+    id: 'task3',
+    title: 'Follow up on overdue invoice INV-2024-015',
+    description: 'Contact customer regarding payment for invoice INV-2024-015',
+    type: 'follow_up',
+    priority: 'medium',
+    status: 'todo',
+    dueDate: new Date('2024-03-19'),
+    assigneeId: 'u5',
+    assigneeName: 'Lisa Brown',
+    relatedType: 'invoice',
+    relatedId: 'inv15',
+    relatedNumber: 'INV-2024-015',
+    entityId: 'e1',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-03-14'),
+  },
+  {
+    id: 'task4',
+    title: 'Enter vendor invoices',
+    description: 'Enter 5 pending vendor invoices into the system',
+    type: 'data_entry',
+    priority: 'medium',
+    status: 'todo',
+    dueDate: new Date('2024-03-17'),
+    assigneeId: 'u4',
+    assigneeName: 'James Wilson',
+    entityId: 'e1',
+    createdBy: 'Emily Davis',
+    createdAt: new Date('2024-03-15'),
+  },
+  {
+    id: 'task5',
+    title: 'Review journal entry JE-2024-089',
+    description: 'Review and approve adjusting journal entry for accruals',
+    type: 'approval',
+    priority: 'high',
+    status: 'todo',
+    dueDate: new Date('2024-03-16'),
+    assigneeId: 'u2',
+    assigneeName: 'Michael Johnson',
+    relatedType: 'journal_entry',
+    relatedId: 'je89',
+    relatedNumber: 'JE-2024-089',
+    entityId: 'e1',
+    createdBy: 'Emily Davis',
+    createdAt: new Date('2024-03-15'),
+  },
+  {
+    id: 'task6',
+    title: 'Quarterly tax filing preparation',
+    description: 'Prepare documentation for Q1 2024 tax filing',
+    type: 'other',
+    priority: 'low',
+    status: 'completed',
+    dueDate: new Date('2024-03-31'),
+    assigneeId: 'u1',
+    assigneeName: 'Sarah Chen',
+    entityId: 'e1',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-03-01'),
+    completedAt: new Date('2024-03-14'),
+  },
+  {
+    id: 'task7',
+    title: 'Update vendor payment terms',
+    description: 'Update payment terms for Acme Supplies per new agreement',
+    type: 'data_entry',
+    priority: 'low',
+    status: 'cancelled',
+    assigneeId: 'u4',
+    assigneeName: 'James Wilson',
+    entityId: 'e1',
+    createdBy: 'Michael Johnson',
+    createdAt: new Date('2024-03-05'),
+  },
+]
+
+export async function getTasks(
+  assigneeId?: string,
+  status?: string[],
+  priority?: string[],
+  type?: string[],
+  sort?: SortConfig,
+  page: number = 1,
+  pageSize: number = 10
+): Promise<PaginatedResponse<Task>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockTasks]
+  
+  if (assigneeId) {
+    filtered = filtered.filter(t => t.assigneeId === assigneeId)
+  }
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(t => status.includes(t.status))
+  }
+  
+  if (priority && priority.length > 0) {
+    filtered = filtered.filter(t => priority.includes(t.priority))
+  }
+  
+  if (type && type.length > 0) {
+    filtered = filtered.filter(t => type.includes(t.type))
+  }
+  
+  if (sort) {
+    filtered.sort((a, b) => {
+      const aVal = a[sort.key as keyof Task]
+      const bVal = b[sort.key as keyof Task]
+      if (aVal === undefined || bVal === undefined) return 0
+      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  } else {
+    // Default sort: by due date, then by priority
+    filtered.sort((a, b) => {
+      if (a.dueDate && b.dueDate) {
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+      }
+      return 0
+    })
+  }
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
+export async function createTask(task: Partial<Task>): Promise<{ success: boolean; task?: Task }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newTask: Task = {
+    id: `task${mockTasks.length + 1}`,
+    title: task.title || 'New Task',
+    description: task.description,
+    type: task.type || 'other',
+    priority: task.priority || 'medium',
+    status: 'todo',
+    dueDate: task.dueDate,
+    assigneeId: task.assigneeId || 'u1',
+    assigneeName: task.assigneeName || 'Sarah Chen',
+    relatedType: task.relatedType,
+    relatedId: task.relatedId,
+    relatedNumber: task.relatedNumber,
+    entityId: task.entityId || 'e1',
+    createdBy: 'Current User',
+    createdAt: new Date(),
+  }
+  
+  mockTasks.push(newTask)
+  return { success: true, task: newTask }
+}
+
+export async function updateTaskStatus(id: string, status: Task['status']): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const task = mockTasks.find(t => t.id === id)
+  if (task) {
+    task.status = status
+    if (status === 'completed') {
+      task.completedAt = new Date()
+    }
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function assignTask(id: string, assigneeId: string, assigneeName: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const task = mockTasks.find(t => t.id === id)
+  if (task) {
+    task.assigneeId = assigneeId
+    task.assigneeName = assigneeName
+    return { success: true }
+  }
+  return { success: false }
+}
+
+// ============ NOTIFICATION SERVICES ============
+
+const mockNotifications: Notification[] = [
+  {
+    id: 'n1',
+    type: 'approval_required',
+    title: 'Bill Approval Required',
+    message: 'Bill BILL-2024-045 from Acme Supplies ($12,500) requires your approval',
+    read: false,
+    actionUrl: '/approvals',
+    relatedType: 'bill',
+    relatedId: 'b45',
+    createdAt: new Date('2024-03-15T10:30:00'),
+  },
+  {
+    id: 'n2',
+    type: 'task_assigned',
+    title: 'New Task Assigned',
+    message: 'You have been assigned: Review March expense reports',
+    read: false,
+    actionUrl: '/tasks',
+    relatedType: 'task',
+    relatedId: 'task1',
+    createdAt: new Date('2024-03-15T09:15:00'),
+  },
+  {
+    id: 'n3',
+    type: 'invoice_overdue',
+    title: 'Invoice Overdue',
+    message: 'Invoice INV-2024-015 to Globex Corp is 15 days overdue ($8,750)',
+    read: false,
+    actionUrl: '/accounts-receivable/invoices',
+    relatedType: 'invoice',
+    relatedId: 'inv15',
+    createdAt: new Date('2024-03-15T08:00:00'),
+  },
+  {
+    id: 'n4',
+    type: 'payment_received',
+    title: 'Payment Received',
+    message: 'Payment of $15,000 received from Initech Industries for INV-2024-012',
+    read: true,
+    actionUrl: '/accounts-receivable/receipts',
+    relatedType: 'receipt',
+    relatedId: 'rec1',
+    createdAt: new Date('2024-03-14T16:45:00'),
+  },
+  {
+    id: 'n5',
+    type: 'approval_completed',
+    title: 'Approval Completed',
+    message: 'Journal Entry JE-2024-088 has been approved by Michael Johnson',
+    read: true,
+    actionUrl: '/general-ledger/journal-entries',
+    relatedType: 'journal_entry',
+    relatedId: 'je88',
+    createdAt: new Date('2024-03-14T14:20:00'),
+  },
+  {
+    id: 'n6',
+    type: 'sync_error',
+    title: 'Integration Sync Error',
+    message: 'Shopify integration sync failed. Please check connection settings.',
+    read: false,
+    actionUrl: '/admin/integrations',
+    relatedType: 'integration',
+    relatedId: 'int5',
+    createdAt: new Date('2024-03-14T12:00:00'),
+  },
+  {
+    id: 'n7',
+    type: 'task_due',
+    title: 'Task Due Tomorrow',
+    message: 'Task "Reconcile operating account" is due tomorrow',
+    read: true,
+    actionUrl: '/tasks',
+    relatedType: 'task',
+    relatedId: 'task2',
+    createdAt: new Date('2024-03-14T09:00:00'),
+  },
+  {
+    id: 'n8',
+    type: 'system',
+    title: 'System Maintenance',
+    message: 'Scheduled maintenance on March 20, 2024 from 2:00 AM - 4:00 AM EST',
+    read: true,
+    createdAt: new Date('2024-03-13T10:00:00'),
+  },
+  {
+    id: 'n9',
+    type: 'mention',
+    title: 'You were mentioned',
+    message: 'Emily Davis mentioned you in a comment on Bill BILL-2024-042',
+    read: true,
+    actionUrl: '/accounts-payable/bills',
+    relatedType: 'bill',
+    relatedId: 'b42',
+    createdAt: new Date('2024-03-12T15:30:00'),
+  },
+]
+
+export async function getNotifications(
+  unreadOnly?: boolean,
+  type?: string[],
+  page: number = 1,
+  pageSize: number = 20
+): Promise<PaginatedResponse<Notification>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockNotifications]
+  
+  if (unreadOnly) {
+    filtered = filtered.filter(n => !n.read)
+  }
+  
+  if (type && type.length > 0) {
+    filtered = filtered.filter(n => type.includes(n.type))
+  }
+  
+  // Sort by date descending
+  filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
+export async function getUnreadCount(): Promise<number> {
+  await delay(50)
+  return mockNotifications.filter(n => !n.read).length
+}
+
+export async function markNotificationRead(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const notification = mockNotifications.find(n => n.id === id)
+  if (notification) {
+    notification.read = true
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function markAllNotificationsRead(): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  mockNotifications.forEach(n => { n.read = true })
+  return { success: true }
+}
+
+// ============ ACTIVITY TIMELINE SERVICES ============
+
+const mockActivityItems: ActivityItem[] = [
+  {
+    id: 'act1',
+    type: 'create',
+    action: 'Created bill',
+    description: 'Created bill BILL-2024-047 for Acme Supplies ($8,500)',
+    userId: 'u4',
+    userName: 'James Wilson',
+    relatedType: 'bill',
+    relatedId: 'b47',
+    relatedNumber: 'BILL-2024-047',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-15T11:30:00'),
+  },
+  {
+    id: 'act2',
+    type: 'approve',
+    action: 'Approved journal entry',
+    description: 'Approved journal entry JE-2024-090 ($45,000)',
+    userId: 'u2',
+    userName: 'Michael Johnson',
+    relatedType: 'journal_entry',
+    relatedId: 'je90',
+    relatedNumber: 'JE-2024-090',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-15T10:45:00'),
+  },
+  {
+    id: 'act3',
+    type: 'payment',
+    action: 'Recorded payment',
+    description: 'Recorded payment PAY-2024-023 to TechPro Services ($15,000)',
+    userId: 'u3',
+    userName: 'Emily Davis',
+    relatedType: 'payment',
+    relatedId: 'pay23',
+    relatedNumber: 'PAY-2024-023',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-15T10:15:00'),
+  },
+  {
+    id: 'act4',
+    type: 'update',
+    action: 'Updated invoice',
+    description: 'Updated invoice INV-2024-018 terms to Net 45',
+    userId: 'u5',
+    userName: 'Lisa Brown',
+    relatedType: 'invoice',
+    relatedId: 'inv18',
+    relatedNumber: 'INV-2024-018',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-15T09:30:00'),
+  },
+  {
+    id: 'act5',
+    type: 'login',
+    action: 'User login',
+    description: 'Sarah Chen logged in from 192.168.1.100',
+    userId: 'u1',
+    userName: 'Sarah Chen',
+    entityId: 'e1',
+    metadata: { ip: '192.168.1.100' },
+    createdAt: new Date('2024-03-15T08:30:00'),
+  },
+  {
+    id: 'act6',
+    type: 'post',
+    action: 'Posted journal entry',
+    description: 'Posted journal entry JE-2024-089 to general ledger',
+    userId: 'u1',
+    userName: 'Sarah Chen',
+    relatedType: 'journal_entry',
+    relatedId: 'je89',
+    relatedNumber: 'JE-2024-089',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-15T08:15:00'),
+  },
+  {
+    id: 'act7',
+    type: 'reject',
+    action: 'Rejected bill',
+    description: 'Rejected bill BILL-2024-044 - Missing documentation',
+    userId: 'u2',
+    userName: 'Michael Johnson',
+    relatedType: 'bill',
+    relatedId: 'b44',
+    relatedNumber: 'BILL-2024-044',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-14T17:00:00'),
+  },
+  {
+    id: 'act8',
+    type: 'export',
+    action: 'Exported report',
+    description: 'Exported Balance Sheet report for Q1 2024',
+    userId: 'u1',
+    userName: 'Sarah Chen',
+    relatedType: 'report',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-14T16:30:00'),
+  },
+  {
+    id: 'act9',
+    type: 'void',
+    action: 'Voided invoice',
+    description: 'Voided invoice INV-2024-010 - Duplicate entry',
+    userId: 'u3',
+    userName: 'Emily Davis',
+    relatedType: 'invoice',
+    relatedId: 'inv10',
+    relatedNumber: 'INV-2024-010',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-14T15:00:00'),
+  },
+  {
+    id: 'act10',
+    type: 'create',
+    action: 'Created receipt',
+    description: 'Created receipt REC-2024-008 from Wayne Enterprises ($25,000)',
+    userId: 'u5',
+    userName: 'Lisa Brown',
+    relatedType: 'receipt',
+    relatedId: 'rec8',
+    relatedNumber: 'REC-2024-008',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-14T14:00:00'),
+  },
+  {
+    id: 'act11',
+    type: 'import',
+    action: 'Imported bank transactions',
+    description: 'Imported 47 transactions from Chase Bank feed',
+    userId: 'u1',
+    userName: 'Sarah Chen',
+    relatedType: 'bank_account',
+    entityId: 'e1',
+    metadata: { count: 47, source: 'Chase Bank' },
+    createdAt: new Date('2024-03-14T06:00:00'),
+  },
+]
+
+export async function getActivityTimeline(
+  entityId?: string,
+  type?: string[],
+  userId?: string,
+  relatedType?: string,
+  page: number = 1,
+  pageSize: number = 20
+): Promise<PaginatedResponse<ActivityItem>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockActivityItems]
+  
+  if (entityId && entityId !== 'e4') {
+    filtered = filtered.filter(a => a.entityId === entityId)
+  }
+  
+  if (type && type.length > 0) {
+    filtered = filtered.filter(a => type.includes(a.type))
+  }
+  
+  if (userId) {
+    filtered = filtered.filter(a => a.userId === userId)
+  }
+  
+  if (relatedType) {
+    filtered = filtered.filter(a => a.relatedType === relatedType)
+  }
+  
+  // Sort by date descending
+  filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
+// ============ AUTH SERVICES ============
+
+import type { AuthUser, AuthSession, UserPreferences, SavedView } from '@/lib/types'
+import { currentUser, savedViews as mockSavedViews } from '@/lib/mock-data'
+
+// Simulated user credentials for demo
+const demoCredentials = [
+  { email: 'sarah.chen@company.com', password: 'demo123', userId: 'u1' },
+  { email: 'michael.johnson@company.com', password: 'demo123', userId: 'u2' },
+  { email: 'emily.davis@company.com', password: 'demo123', userId: 'u3' },
+  { email: 'demo@intacct.com', password: 'demo', userId: 'u1' },
+]
+
+export async function login(email: string, password: string): Promise<{ success: boolean; session?: AuthSession; error?: string }> {
+  await delay(SIMULATED_DELAY * 2)
+  
+  const cred = demoCredentials.find(c => c.email.toLowerCase() === email.toLowerCase() && c.password === password)
+  
+  if (!cred) {
+    return { success: false, error: 'Invalid email or password' }
+  }
+  
+  const user: AuthUser = {
+    id: currentUser.id,
+    email: currentUser.email,
+    firstName: currentUser.firstName,
+    lastName: currentUser.lastName,
+    role: currentUser.role,
+    avatar: currentUser.avatar,
+    entityIds: currentUser.entityIds,
+  }
+  
+  const session: AuthSession = {
+    user,
+    accessToken: `mock_token_${Date.now()}`,
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+  }
+  
+  return { success: true, session }
+}
+
+export async function logout(): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  return { success: true }
+}
+
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  await delay(SIMULATED_DELAY)
+  
+  // In a real app, this would validate the session token
+  return {
+    id: currentUser.id,
+    email: currentUser.email,
+    firstName: currentUser.firstName,
+    lastName: currentUser.lastName,
+    role: currentUser.role,
+    avatar: currentUser.avatar,
+    entityIds: currentUser.entityIds,
+  }
+}
+
+export async function validateSession(token: string): Promise<boolean> {
+  await delay(50)
+  return token.startsWith('mock_token_')
+}
+
+// ============ PREFERENCES SERVICES ============
+
+let userPreferences: UserPreferences = { ...currentUser.preferences }
+
+export async function getPreferences(): Promise<UserPreferences> {
+  await delay(SIMULATED_DELAY)
+  return { ...userPreferences }
+}
+
+export async function updatePreferences(updates: Partial<UserPreferences>): Promise<{ success: boolean; preferences: UserPreferences }> {
+  await delay(SIMULATED_DELAY)
+  userPreferences = { ...userPreferences, ...updates }
+  return { success: true, preferences: { ...userPreferences } }
+}
+
+export async function resetPreferences(): Promise<{ success: boolean; preferences: UserPreferences }> {
+  await delay(SIMULATED_DELAY)
+  userPreferences = { ...currentUser.preferences }
+  return { success: true, preferences: { ...userPreferences } }
+}
+
+// ============ SAVED VIEW SERVICES ============
+
+const savedViewsData = [...mockSavedViews]
+
+export async function getSavedViews(module?: string): Promise<SavedView[]> {
+  await delay(SIMULATED_DELAY)
+  
+  if (module) {
+    return savedViewsData.filter(v => v.module === module)
+  }
+  return [...savedViewsData]
+}
+
+export async function getSavedViewById(id: string): Promise<SavedView | null> {
+  await delay(SIMULATED_DELAY)
+  return savedViewsData.find(v => v.id === id) || null
+}
+
+export async function createSavedView(view: Omit<SavedView, 'id' | 'createdBy' | 'createdAt'>): Promise<{ success: boolean; view?: SavedView }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newView: SavedView = {
+    ...view,
+    id: `sv${savedViewsData.length + 1}`,
+    createdBy: currentUser.id,
+    createdAt: new Date(),
+  }
+  
+  savedViewsData.push(newView)
+  return { success: true, view: newView }
+}
+
+export async function updateSavedView(id: string, updates: Partial<SavedView>): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const index = savedViewsData.findIndex(v => v.id === id)
+  if (index !== -1) {
+    savedViewsData[index] = { ...savedViewsData[index], ...updates }
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function deleteSavedView(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const index = savedViewsData.findIndex(v => v.id === id)
+  if (index !== -1) {
+    savedViewsData.splice(index, 1)
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function setDefaultView(id: string, module: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  
+  // Remove default from other views in same module
+  savedViewsData.forEach(v => {
+    if (v.module === module) {
+      v.isDefault = v.id === id
+    }
+  })
+  
+  return { success: true }
+}
+
+// ============ PURCHASE ORDER SERVICES ============
+
+import type { PurchaseOrder, SalesOrder, ProjectDetail, TimeEntry, ExpenseEntry, RecurringJournal, Allocation } from '@/lib/types'
+
+const mockPurchaseOrders: PurchaseOrder[] = [
+  {
+    id: 'po1',
+    number: 'PO-2024-001',
+    vendorId: 'v1',
+    vendorName: 'Acme Supplies',
+    status: 'approved',
+    orderDate: new Date('2024-03-10'),
+    expectedDate: new Date('2024-03-20'),
+    lines: [
+      { id: 'pol1', description: 'Office Supplies', quantity: 100, unitPrice: 25, amount: 2500, receivedQuantity: 0, accountId: 'acc1' },
+      { id: 'pol2', description: 'Printer Paper', quantity: 50, unitPrice: 30, amount: 1500, receivedQuantity: 0, accountId: 'acc1' },
+    ],
+    subtotal: 4000,
+    tax: 320,
+    total: 4320,
+    entityId: 'e1',
+    departmentId: 'd1',
+    createdBy: 'James Wilson',
+    createdAt: new Date('2024-03-10'),
+  },
+  {
+    id: 'po2',
+    number: 'PO-2024-002',
+    vendorId: 'v2',
+    vendorName: 'TechPro Services',
+    status: 'sent',
+    orderDate: new Date('2024-03-12'),
+    expectedDate: new Date('2024-03-25'),
+    lines: [
+      { id: 'pol3', description: 'Software Licenses', quantity: 10, unitPrice: 500, amount: 5000, receivedQuantity: 0, accountId: 'acc2' },
+    ],
+    subtotal: 5000,
+    tax: 0,
+    total: 5000,
+    entityId: 'e1',
+    departmentId: 'd3',
+    projectId: 'd10',
+    createdBy: 'Emily Davis',
+    createdAt: new Date('2024-03-12'),
+  },
+  {
+    id: 'po3',
+    number: 'PO-2024-003',
+    vendorId: 'v3',
+    vendorName: 'Global Logistics',
+    status: 'partially_received',
+    orderDate: new Date('2024-03-05'),
+    expectedDate: new Date('2024-03-15'),
+    lines: [
+      { id: 'pol4', description: 'Shipping Materials', quantity: 200, unitPrice: 15, amount: 3000, receivedQuantity: 150, accountId: 'acc3' },
+      { id: 'pol5', description: 'Packing Supplies', quantity: 100, unitPrice: 8, amount: 800, receivedQuantity: 100, accountId: 'acc3' },
+    ],
+    subtotal: 3800,
+    tax: 304,
+    total: 4104,
+    entityId: 'e1',
+    createdBy: 'James Wilson',
+    createdAt: new Date('2024-03-05'),
+  },
+  {
+    id: 'po4',
+    number: 'PO-2024-004',
+    vendorId: 'v1',
+    vendorName: 'Acme Supplies',
+    status: 'draft',
+    orderDate: new Date('2024-03-15'),
+    lines: [
+      { id: 'pol6', description: 'Furniture - Desks', quantity: 5, unitPrice: 450, amount: 2250, receivedQuantity: 0, accountId: 'acc4' },
+    ],
+    subtotal: 2250,
+    tax: 180,
+    total: 2430,
+    entityId: 'e1',
+    departmentId: 'd5',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-03-15'),
+  },
+  {
+    id: 'po5',
+    number: 'PO-2024-005',
+    vendorId: 'v4',
+    vendorName: 'Cloud Systems Inc',
+    status: 'pending_approval',
+    orderDate: new Date('2024-03-14'),
+    expectedDate: new Date('2024-03-30'),
+    lines: [
+      { id: 'pol7', description: 'Cloud Infrastructure - Annual', quantity: 1, unitPrice: 24000, amount: 24000, receivedQuantity: 0, accountId: 'acc5' },
+    ],
+    subtotal: 24000,
+    tax: 0,
+    total: 24000,
+    entityId: 'e1',
+    departmentId: 'd3',
+    notes: 'Annual subscription renewal',
+    createdBy: 'Michael Johnson',
+    createdAt: new Date('2024-03-14'),
+  },
+]
+
+export async function getPurchaseOrders(
+  status?: string[],
+  vendorId?: string,
+  search?: string,
+  sort?: SortConfig,
+  page: number = 1,
+  pageSize: number = 10
+): Promise<PaginatedResponse<PurchaseOrder>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockPurchaseOrders]
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(po => status.includes(po.status))
+  }
+  
+  if (vendorId) {
+    filtered = filtered.filter(po => po.vendorId === vendorId)
+  }
+  
+  if (search) {
+    const s = search.toLowerCase()
+    filtered = filtered.filter(po => 
+      po.number.toLowerCase().includes(s) ||
+      po.vendorName.toLowerCase().includes(s)
+    )
+  }
+  
+  if (sort) {
+    filtered.sort((a, b) => {
+      const aVal = a[sort.key as keyof PurchaseOrder]
+      const bVal = b[sort.key as keyof PurchaseOrder]
+      if (aVal === undefined || bVal === undefined) return 0
+      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  }
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
+export async function getPurchaseOrderById(id: string): Promise<PurchaseOrder | null> {
+  await delay(SIMULATED_DELAY)
+  return mockPurchaseOrders.find(po => po.id === id) || null
+}
+
+export async function createPurchaseOrder(po: Partial<PurchaseOrder>): Promise<{ success: boolean; purchaseOrder?: PurchaseOrder }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newPO: PurchaseOrder = {
+    id: `po${mockPurchaseOrders.length + 1}`,
+    number: `PO-2024-${String(mockPurchaseOrders.length + 1).padStart(3, '0')}`,
+    vendorId: po.vendorId || '',
+    vendorName: po.vendorName || '',
+    status: 'draft',
+    orderDate: new Date(),
+    lines: po.lines || [],
+    subtotal: po.subtotal || 0,
+    tax: po.tax || 0,
+    total: po.total || 0,
+    entityId: po.entityId || 'e1',
+    departmentId: po.departmentId,
+    projectId: po.projectId,
+    notes: po.notes,
+    createdBy: 'Current User',
+    createdAt: new Date(),
+  }
+  
+  mockPurchaseOrders.push(newPO)
+  return { success: true, purchaseOrder: newPO }
+}
+
+export async function approvePurchaseOrder(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const po = mockPurchaseOrders.find(p => p.id === id)
+  if (po && (po.status === 'draft' || po.status === 'pending_approval')) {
+    po.status = 'approved'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function sendPurchaseOrder(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const po = mockPurchaseOrders.find(p => p.id === id)
+  if (po && po.status === 'approved') {
+    po.status = 'sent'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function receivePurchaseOrder(id: string, lineId: string, quantity: number): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const po = mockPurchaseOrders.find(p => p.id === id)
+  if (po) {
+    const line = po.lines.find(l => l.id === lineId)
+    if (line) {
+      line.receivedQuantity = Math.min(line.quantity, line.receivedQuantity + quantity)
+      
+      const allReceived = po.lines.every(l => l.receivedQuantity >= l.quantity)
+      const someReceived = po.lines.some(l => l.receivedQuantity > 0)
+      
+      if (allReceived) {
+        po.status = 'received'
+      } else if (someReceived) {
+        po.status = 'partially_received'
+      }
+      return { success: true }
+    }
+  }
+  return { success: false }
+}
+
+// ============ SALES ORDER SERVICES ============
+
+const mockSalesOrders: SalesOrder[] = [
+  {
+    id: 'so1',
+    number: 'SO-2024-001',
+    customerId: 'c1',
+    customerName: 'Globex Corporation',
+    status: 'confirmed',
+    orderDate: new Date('2024-03-08'),
+    requestedDate: new Date('2024-03-22'),
+    lines: [
+      { id: 'sol1', description: 'Consulting Services - Phase 1', quantity: 40, unitPrice: 150, amount: 6000, shippedQuantity: 0, accountId: 'acc10' },
+      { id: 'sol2', description: 'Implementation Support', quantity: 20, unitPrice: 175, amount: 3500, shippedQuantity: 0, accountId: 'acc10' },
+    ],
+    subtotal: 9500,
+    tax: 760,
+    total: 10260,
+    entityId: 'e1',
+    salesRepId: 'u5',
+    createdBy: 'Lisa Brown',
+    createdAt: new Date('2024-03-08'),
+  },
+  {
+    id: 'so2',
+    number: 'SO-2024-002',
+    customerId: 'c2',
+    customerName: 'Initech Industries',
+    status: 'shipped',
+    orderDate: new Date('2024-03-05'),
+    requestedDate: new Date('2024-03-15'),
+    lines: [
+      { id: 'sol3', description: 'Enterprise License', quantity: 1, unitPrice: 25000, amount: 25000, shippedQuantity: 1, accountId: 'acc11' },
+    ],
+    subtotal: 25000,
+    tax: 0,
+    total: 25000,
+    entityId: 'e1',
+    salesRepId: 'u5',
+    createdBy: 'Lisa Brown',
+    createdAt: new Date('2024-03-05'),
+  },
+  {
+    id: 'so3',
+    number: 'SO-2024-003',
+    customerId: 'c3',
+    customerName: 'Wayne Enterprises',
+    status: 'draft',
+    orderDate: new Date('2024-03-15'),
+    lines: [
+      { id: 'sol4', description: 'Custom Development', quantity: 80, unitPrice: 200, amount: 16000, shippedQuantity: 0, accountId: 'acc10' },
+    ],
+    subtotal: 16000,
+    tax: 1280,
+    total: 17280,
+    entityId: 'e1',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-03-15'),
+  },
+  {
+    id: 'so4',
+    number: 'SO-2024-004',
+    customerId: 'c4',
+    customerName: 'Stark Industries',
+    status: 'invoiced',
+    orderDate: new Date('2024-03-01'),
+    lines: [
+      { id: 'sol5', description: 'Training Program', quantity: 3, unitPrice: 5000, amount: 15000, shippedQuantity: 3, accountId: 'acc12' },
+    ],
+    subtotal: 15000,
+    tax: 1200,
+    total: 16200,
+    entityId: 'e1',
+    salesRepId: 'u5',
+    createdBy: 'Lisa Brown',
+    createdAt: new Date('2024-03-01'),
+  },
+]
+
+export async function getSalesOrders(
+  status?: string[],
+  customerId?: string,
+  search?: string,
+  sort?: SortConfig,
+  page: number = 1,
+  pageSize: number = 10
+): Promise<PaginatedResponse<SalesOrder>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockSalesOrders]
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(so => status.includes(so.status))
+  }
+  
+  if (customerId) {
+    filtered = filtered.filter(so => so.customerId === customerId)
+  }
+  
+  if (search) {
+    const s = search.toLowerCase()
+    filtered = filtered.filter(so => 
+      so.number.toLowerCase().includes(s) ||
+      so.customerName.toLowerCase().includes(s)
+    )
+  }
+  
+  if (sort) {
+    filtered.sort((a, b) => {
+      const aVal = a[sort.key as keyof SalesOrder]
+      const bVal = b[sort.key as keyof SalesOrder]
+      if (aVal === undefined || bVal === undefined) return 0
+      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  }
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
+export async function getSalesOrderById(id: string): Promise<SalesOrder | null> {
+  await delay(SIMULATED_DELAY)
+  return mockSalesOrders.find(so => so.id === id) || null
+}
+
+export async function createSalesOrder(so: Partial<SalesOrder>): Promise<{ success: boolean; salesOrder?: SalesOrder }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newSO: SalesOrder = {
+    id: `so${mockSalesOrders.length + 1}`,
+    number: `SO-2024-${String(mockSalesOrders.length + 1).padStart(3, '0')}`,
+    customerId: so.customerId || '',
+    customerName: so.customerName || '',
+    status: 'draft',
+    orderDate: new Date(),
+    lines: so.lines || [],
+    subtotal: so.subtotal || 0,
+    tax: so.tax || 0,
+    total: so.total || 0,
+    entityId: so.entityId || 'e1',
+    salesRepId: so.salesRepId,
+    notes: so.notes,
+    createdBy: 'Current User',
+    createdAt: new Date(),
+  }
+  
+  mockSalesOrders.push(newSO)
+  return { success: true, salesOrder: newSO }
+}
+
+export async function confirmSalesOrder(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const so = mockSalesOrders.find(s => s.id === id)
+  if (so && (so.status === 'draft' || so.status === 'approved')) {
+    so.status = 'confirmed'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function shipSalesOrder(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const so = mockSalesOrders.find(s => s.id === id)
+  if (so && so.status === 'confirmed') {
+    so.lines.forEach(l => { l.shippedQuantity = l.quantity })
+    so.status = 'shipped'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function invoiceSalesOrder(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const so = mockSalesOrders.find(s => s.id === id)
+  if (so && so.status === 'shipped') {
+    so.status = 'invoiced'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+// ============ PROJECT DETAIL SERVICES ============
+
+const mockProjectDetails: ProjectDetail[] = [
+  {
+    id: 'proj1',
+    name: 'Project Alpha',
+    code: 'ALPHA',
+    status: 'active',
+    customerId: 'c1',
+    customerName: 'Globex Corporation',
+    managerId: 'u2',
+    managerName: 'Michael Johnson',
+    startDate: new Date('2024-01-15'),
+    endDate: new Date('2024-06-30'),
+    budget: 150000,
+    actualCost: 67500,
+    revenue: 85000,
+    profitMargin: 25.9,
+    percentComplete: 45,
+    entityId: 'e1',
+    departmentId: 'd3',
+    description: 'Enterprise system implementation',
+    createdAt: new Date('2024-01-10'),
+  },
+  {
+    id: 'proj2',
+    name: 'Project Beta',
+    code: 'BETA',
+    status: 'active',
+    customerId: 'c2',
+    customerName: 'Initech Industries',
+    managerId: 'u1',
+    managerName: 'Sarah Chen',
+    startDate: new Date('2024-02-01'),
+    endDate: new Date('2024-08-31'),
+    budget: 280000,
+    actualCost: 42000,
+    revenue: 56000,
+    profitMargin: 33.3,
+    percentComplete: 15,
+    entityId: 'e1',
+    departmentId: 'd3',
+    description: 'Custom platform development',
+    createdAt: new Date('2024-01-25'),
+  },
+  {
+    id: 'proj3',
+    name: 'Infrastructure Upgrade',
+    code: 'INFRA',
+    status: 'planning',
+    managerId: 'u3',
+    managerName: 'Emily Davis',
+    startDate: new Date('2024-04-01'),
+    budget: 75000,
+    actualCost: 0,
+    revenue: 0,
+    profitMargin: 0,
+    percentComplete: 0,
+    entityId: 'e1',
+    departmentId: 'd3',
+    description: 'Internal infrastructure modernization',
+    createdAt: new Date('2024-03-01'),
+  },
+  {
+    id: 'proj4',
+    name: 'Marketing Campaign Q2',
+    code: 'MKT-Q2',
+    status: 'active',
+    managerId: 'u1',
+    managerName: 'Sarah Chen',
+    startDate: new Date('2024-03-01'),
+    endDate: new Date('2024-05-31'),
+    budget: 50000,
+    actualCost: 22000,
+    revenue: 0,
+    profitMargin: 0,
+    percentComplete: 60,
+    entityId: 'e1',
+    departmentId: 'd2',
+    description: 'Q2 marketing initiatives',
+    createdAt: new Date('2024-02-15'),
+  },
+  {
+    id: 'proj5',
+    name: 'Legacy Migration',
+    code: 'LEGACY',
+    status: 'completed',
+    customerId: 'c3',
+    customerName: 'Wayne Enterprises',
+    managerId: 'u2',
+    managerName: 'Michael Johnson',
+    startDate: new Date('2023-09-01'),
+    endDate: new Date('2024-02-28'),
+    budget: 200000,
+    actualCost: 185000,
+    revenue: 220000,
+    profitMargin: 18.9,
+    percentComplete: 100,
+    entityId: 'e1',
+    departmentId: 'd3',
+    description: 'Legacy system migration project',
+    createdAt: new Date('2023-08-15'),
+  },
+]
+
+export async function getProjectDetails(
+  status?: string[],
+  managerId?: string,
+  search?: string,
+  sort?: SortConfig,
+  page: number = 1,
+  pageSize: number = 10
+): Promise<PaginatedResponse<ProjectDetail>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockProjectDetails]
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(p => status.includes(p.status))
+  }
+  
+  if (managerId) {
+    filtered = filtered.filter(p => p.managerId === managerId)
+  }
+  
+  if (search) {
+    const s = search.toLowerCase()
+    filtered = filtered.filter(p => 
+      p.name.toLowerCase().includes(s) ||
+      p.code.toLowerCase().includes(s) ||
+      (p.customerName && p.customerName.toLowerCase().includes(s))
+    )
+  }
+  
+  if (sort) {
+    filtered.sort((a, b) => {
+      const aVal = a[sort.key as keyof ProjectDetail]
+      const bVal = b[sort.key as keyof ProjectDetail]
+      if (aVal === undefined || bVal === undefined) return 0
+      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  }
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
+export async function getProjectDetailById(id: string): Promise<ProjectDetail | null> {
+  await delay(SIMULATED_DELAY)
+  return mockProjectDetails.find(p => p.id === id) || null
+}
+
+export async function updateProjectStatus(id: string, status: ProjectDetail['status']): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const project = mockProjectDetails.find(p => p.id === id)
+  if (project) {
+    project.status = status
+    if (status === 'completed') {
+      project.percentComplete = 100
+    }
+    return { success: true }
+  }
+  return { success: false }
+}
+
+// ============ TIME ENTRY SERVICES ============
+
+const mockTimeEntries: TimeEntry[] = [
+  {
+    id: 'te1',
+    employeeId: 'u3',
+    employeeName: 'Emily Davis',
+    projectId: 'proj1',
+    projectName: 'Project Alpha',
+    taskDescription: 'Development - API Integration',
+    date: new Date('2024-03-14'),
+    hours: 6,
+    billable: true,
+    rate: 150,
+    amount: 900,
+    status: 'approved',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-14'),
+  },
+  {
+    id: 'te2',
+    employeeId: 'u3',
+    employeeName: 'Emily Davis',
+    projectId: 'proj1',
+    projectName: 'Project Alpha',
+    taskDescription: 'Testing & QA',
+    date: new Date('2024-03-14'),
+    hours: 2,
+    billable: true,
+    rate: 150,
+    amount: 300,
+    status: 'approved',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-14'),
+  },
+  {
+    id: 'te3',
+    employeeId: 'u2',
+    employeeName: 'Michael Johnson',
+    projectId: 'proj2',
+    projectName: 'Project Beta',
+    taskDescription: 'Project Management',
+    date: new Date('2024-03-15'),
+    hours: 4,
+    billable: true,
+    rate: 200,
+    amount: 800,
+    status: 'submitted',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-15'),
+  },
+  {
+    id: 'te4',
+    employeeId: 'u4',
+    employeeName: 'James Wilson',
+    taskDescription: 'Internal Training',
+    date: new Date('2024-03-15'),
+    hours: 2,
+    billable: false,
+    rate: 0,
+    amount: 0,
+    status: 'draft',
+    entityId: 'e1',
+    notes: 'New software training session',
+    createdAt: new Date('2024-03-15'),
+  },
+  {
+    id: 'te5',
+    employeeId: 'u5',
+    employeeName: 'Lisa Brown',
+    projectId: 'proj4',
+    projectName: 'Marketing Campaign Q2',
+    taskDescription: 'Campaign Analysis',
+    date: new Date('2024-03-13'),
+    hours: 5,
+    billable: false,
+    rate: 0,
+    amount: 0,
+    status: 'approved',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-13'),
+  },
+]
+
+export async function getTimeEntries(
+  employeeId?: string,
+  projectId?: string,
+  status?: string[],
+  dateFrom?: Date,
+  dateTo?: Date,
+  page: number = 1,
+  pageSize: number = 20
+): Promise<PaginatedResponse<TimeEntry>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockTimeEntries]
+  
+  if (employeeId) {
+    filtered = filtered.filter(te => te.employeeId === employeeId)
+  }
+  
+  if (projectId) {
+    filtered = filtered.filter(te => te.projectId === projectId)
+  }
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(te => status.includes(te.status))
+  }
+  
+  if (dateFrom) {
+    filtered = filtered.filter(te => new Date(te.date) >= dateFrom)
+  }
+  
+  if (dateTo) {
+    filtered = filtered.filter(te => new Date(te.date) <= dateTo)
+  }
+  
+  filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
+export async function createTimeEntry(entry: Partial<TimeEntry>): Promise<{ success: boolean; timeEntry?: TimeEntry }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newEntry: TimeEntry = {
+    id: `te${mockTimeEntries.length + 1}`,
+    employeeId: entry.employeeId || 'u1',
+    employeeName: entry.employeeName || 'Current User',
+    projectId: entry.projectId,
+    projectName: entry.projectName,
+    taskDescription: entry.taskDescription || '',
+    date: entry.date || new Date(),
+    hours: entry.hours || 0,
+    billable: entry.billable || false,
+    rate: entry.rate || 0,
+    amount: (entry.hours || 0) * (entry.rate || 0),
+    status: 'draft',
+    entityId: entry.entityId || 'e1',
+    notes: entry.notes,
+    createdAt: new Date(),
+  }
+  
+  mockTimeEntries.push(newEntry)
+  return { success: true, timeEntry: newEntry }
+}
+
+export async function submitTimeEntry(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const entry = mockTimeEntries.find(te => te.id === id)
+  if (entry && entry.status === 'draft') {
+    entry.status = 'submitted'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function approveTimeEntry(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const entry = mockTimeEntries.find(te => te.id === id)
+  if (entry && entry.status === 'submitted') {
+    entry.status = 'approved'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+// ============ EXPENSE ENTRY SERVICES ============
+
+const mockExpenseEntries: ExpenseEntry[] = [
+  {
+    id: 'exp1',
+    employeeId: 'u2',
+    employeeName: 'Michael Johnson',
+    category: 'Travel',
+    description: 'Client visit - Flight to NYC',
+    date: new Date('2024-03-10'),
+    amount: 450,
+    currency: 'USD',
+    projectId: 'proj1',
+    projectName: 'Project Alpha',
+    customerId: 'c1',
+    billable: true,
+    status: 'approved',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-11'),
+  },
+  {
+    id: 'exp2',
+    employeeId: 'u2',
+    employeeName: 'Michael Johnson',
+    category: 'Meals',
+    description: 'Client dinner',
+    date: new Date('2024-03-10'),
+    amount: 185,
+    currency: 'USD',
+    projectId: 'proj1',
+    projectName: 'Project Alpha',
+    customerId: 'c1',
+    billable: true,
+    status: 'approved',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-11'),
+  },
+  {
+    id: 'exp3',
+    employeeId: 'u3',
+    employeeName: 'Emily Davis',
+    category: 'Software',
+    description: 'Development tools subscription',
+    date: new Date('2024-03-01'),
+    amount: 99,
+    currency: 'USD',
+    billable: false,
+    status: 'reimbursed',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-02'),
+  },
+  {
+    id: 'exp4',
+    employeeId: 'u5',
+    employeeName: 'Lisa Brown',
+    category: 'Marketing',
+    description: 'Conference booth materials',
+    date: new Date('2024-03-12'),
+    amount: 1250,
+    currency: 'USD',
+    projectId: 'proj4',
+    projectName: 'Marketing Campaign Q2',
+    billable: false,
+    status: 'submitted',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-13'),
+  },
+  {
+    id: 'exp5',
+    employeeId: 'u4',
+    employeeName: 'James Wilson',
+    category: 'Office Supplies',
+    description: 'Printer cartridges',
+    date: new Date('2024-03-14'),
+    amount: 75,
+    currency: 'USD',
+    billable: false,
+    status: 'draft',
+    entityId: 'e1',
+    createdAt: new Date('2024-03-14'),
+  },
+]
+
+export async function getExpenseEntries(
+  employeeId?: string,
+  projectId?: string,
+  status?: string[],
+  category?: string,
+  dateFrom?: Date,
+  dateTo?: Date,
+  page: number = 1,
+  pageSize: number = 20
+): Promise<PaginatedResponse<ExpenseEntry>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockExpenseEntries]
+  
+  if (employeeId) {
+    filtered = filtered.filter(e => e.employeeId === employeeId)
+  }
+  
+  if (projectId) {
+    filtered = filtered.filter(e => e.projectId === projectId)
+  }
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(e => status.includes(e.status))
+  }
+  
+  if (category) {
+    filtered = filtered.filter(e => e.category === category)
+  }
+  
+  if (dateFrom) {
+    filtered = filtered.filter(e => new Date(e.date) >= dateFrom)
+  }
+  
+  if (dateTo) {
+    filtered = filtered.filter(e => new Date(e.date) <= dateTo)
+  }
+  
+  filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
+export async function createExpenseEntry(expense: Partial<ExpenseEntry>): Promise<{ success: boolean; expense?: ExpenseEntry }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newExpense: ExpenseEntry = {
+    id: `exp${mockExpenseEntries.length + 1}`,
+    employeeId: expense.employeeId || 'u1',
+    employeeName: expense.employeeName || 'Current User',
+    category: expense.category || 'Other',
+    description: expense.description || '',
+    date: expense.date || new Date(),
+    amount: expense.amount || 0,
+    currency: expense.currency || 'USD',
+    receipt: expense.receipt,
+    projectId: expense.projectId,
+    projectName: expense.projectName,
+    customerId: expense.customerId,
+    billable: expense.billable || false,
+    status: 'draft',
+    entityId: expense.entityId || 'e1',
+    notes: expense.notes,
+    createdAt: new Date(),
+  }
+  
+  mockExpenseEntries.push(newExpense)
+  return { success: true, expense: newExpense }
+}
+
+export async function submitExpenseEntry(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const expense = mockExpenseEntries.find(e => e.id === id)
+  if (expense && expense.status === 'draft') {
+    expense.status = 'submitted'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function approveExpenseEntry(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const expense = mockExpenseEntries.find(e => e.id === id)
+  if (expense && expense.status === 'submitted') {
+    expense.status = 'approved'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function reimburseExpenseEntry(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const expense = mockExpenseEntries.find(e => e.id === id)
+  if (expense && expense.status === 'approved') {
+    expense.status = 'reimbursed'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+// ============ RECURRING JOURNAL SERVICES ============
+
+const mockRecurringJournals: RecurringJournal[] = [
+  {
+    id: 'rj1',
+    name: 'Monthly Depreciation',
+    description: 'Record monthly depreciation expense',
+    frequency: 'monthly',
+    startDate: new Date('2024-01-01'),
+    nextRunDate: new Date('2024-04-01'),
+    lastRunDate: new Date('2024-03-01'),
+    status: 'active',
+    templateLines: [
+      { accountId: 'acc20', accountName: 'Depreciation Expense', debit: 12500, credit: 0, description: 'Monthly depreciation' },
+      { accountId: 'acc21', accountName: 'Accumulated Depreciation', debit: 0, credit: 12500, description: 'Monthly depreciation' },
+    ],
+    entityId: 'e1',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2023-12-15'),
+    runCount: 3,
+  },
+  {
+    id: 'rj2',
+    name: 'Monthly Rent Accrual',
+    description: 'Accrue monthly office rent',
+    frequency: 'monthly',
+    startDate: new Date('2024-01-01'),
+    nextRunDate: new Date('2024-04-01'),
+    lastRunDate: new Date('2024-03-01'),
+    status: 'active',
+    templateLines: [
+      { accountId: 'acc22', accountName: 'Rent Expense', debit: 8500, credit: 0, description: 'Office rent' },
+      { accountId: 'acc23', accountName: 'Accrued Expenses', debit: 0, credit: 8500, description: 'Office rent accrual' },
+    ],
+    entityId: 'e1',
+    createdBy: 'Emily Davis',
+    createdAt: new Date('2023-12-20'),
+    runCount: 3,
+  },
+  {
+    id: 'rj3',
+    name: 'Quarterly Insurance Amortization',
+    description: 'Amortize prepaid insurance',
+    frequency: 'quarterly',
+    startDate: new Date('2024-01-01'),
+    nextRunDate: new Date('2024-04-01'),
+    lastRunDate: new Date('2024-01-01'),
+    status: 'active',
+    templateLines: [
+      { accountId: 'acc24', accountName: 'Insurance Expense', debit: 6000, credit: 0, description: 'Insurance amortization' },
+      { accountId: 'acc25', accountName: 'Prepaid Insurance', debit: 0, credit: 6000, description: 'Insurance amortization' },
+    ],
+    entityId: 'e1',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2023-12-28'),
+    runCount: 1,
+  },
+  {
+    id: 'rj4',
+    name: 'Weekly Payroll Accrual',
+    description: 'Accrue weekly payroll',
+    frequency: 'weekly',
+    startDate: new Date('2024-01-01'),
+    nextRunDate: new Date('2024-03-22'),
+    lastRunDate: new Date('2024-03-15'),
+    status: 'active',
+    templateLines: [
+      { accountId: 'acc26', accountName: 'Salaries Expense', debit: 45000, credit: 0, description: 'Weekly payroll' },
+      { accountId: 'acc27', accountName: 'Accrued Payroll', debit: 0, credit: 45000, description: 'Weekly payroll accrual' },
+    ],
+    entityId: 'e1',
+    createdBy: 'Michael Johnson',
+    createdAt: new Date('2024-01-02'),
+    runCount: 11,
+  },
+  {
+    id: 'rj5',
+    name: 'Annual License Amortization',
+    description: 'Amortize annual software licenses',
+    frequency: 'yearly',
+    startDate: new Date('2024-01-01'),
+    endDate: new Date('2024-12-31'),
+    nextRunDate: new Date('2025-01-01'),
+    lastRunDate: new Date('2024-01-01'),
+    status: 'paused',
+    templateLines: [
+      { accountId: 'acc28', accountName: 'Software License Expense', debit: 36000, credit: 0, description: 'Annual license' },
+      { accountId: 'acc29', accountName: 'Prepaid Software', debit: 0, credit: 36000, description: 'Annual license amortization' },
+    ],
+    entityId: 'e1',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-01-05'),
+    runCount: 1,
+  },
+]
+
+export async function getRecurringJournals(
+  status?: string[],
+  frequency?: string[],
+  search?: string
+): Promise<RecurringJournal[]> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockRecurringJournals]
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(rj => status.includes(rj.status))
+  }
+  
+  if (frequency && frequency.length > 0) {
+    filtered = filtered.filter(rj => frequency.includes(rj.frequency))
+  }
+  
+  if (search) {
+    const s = search.toLowerCase()
+    filtered = filtered.filter(rj => 
+      rj.name.toLowerCase().includes(s) ||
+      (rj.description && rj.description.toLowerCase().includes(s))
+    )
+  }
+  
+  return filtered
+}
+
+export async function getRecurringJournalById(id: string): Promise<RecurringJournal | null> {
+  await delay(SIMULATED_DELAY)
+  return mockRecurringJournals.find(rj => rj.id === id) || null
+}
+
+export async function createRecurringJournal(rj: Partial<RecurringJournal>): Promise<{ success: boolean; recurringJournal?: RecurringJournal }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newRJ: RecurringJournal = {
+    id: `rj${mockRecurringJournals.length + 1}`,
+    name: rj.name || 'New Recurring Journal',
+    description: rj.description,
+    frequency: rj.frequency || 'monthly',
+    startDate: rj.startDate || new Date(),
+    endDate: rj.endDate,
+    nextRunDate: rj.startDate || new Date(),
+    status: 'active',
+    templateLines: rj.templateLines || [],
+    entityId: rj.entityId || 'e1',
+    createdBy: 'Current User',
+    createdAt: new Date(),
+    runCount: 0,
+  }
+  
+  mockRecurringJournals.push(newRJ)
+  return { success: true, recurringJournal: newRJ }
+}
+
+export async function runRecurringJournal(id: string): Promise<{ success: boolean; journalEntryId?: string }> {
+  await delay(SIMULATED_DELAY)
+  const rj = mockRecurringJournals.find(r => r.id === id)
+  if (rj && rj.status === 'active') {
+    rj.lastRunDate = new Date()
+    rj.runCount++
+    // Calculate next run date based on frequency
+    const next = new Date(rj.lastRunDate)
+    switch (rj.frequency) {
+      case 'daily': next.setDate(next.getDate() + 1); break
+      case 'weekly': next.setDate(next.getDate() + 7); break
+      case 'monthly': next.setMonth(next.getMonth() + 1); break
+      case 'quarterly': next.setMonth(next.getMonth() + 3); break
+      case 'yearly': next.setFullYear(next.getFullYear() + 1); break
+    }
+    rj.nextRunDate = next
+    return { success: true, journalEntryId: `je-auto-${Date.now()}` }
+  }
+  return { success: false }
+}
+
+export async function pauseRecurringJournal(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const rj = mockRecurringJournals.find(r => r.id === id)
+  if (rj && rj.status === 'active') {
+    rj.status = 'paused'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function resumeRecurringJournal(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const rj = mockRecurringJournals.find(r => r.id === id)
+  if (rj && rj.status === 'paused') {
+    rj.status = 'active'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+// ============ ALLOCATION SERVICES ============
+
+const mockAllocations: Allocation[] = [
+  {
+    id: 'alloc1',
+    name: 'IT Cost Allocation',
+    description: 'Allocate IT department costs to all departments',
+    sourceAccountId: 'acc30',
+    sourceAccountName: 'IT Department Expenses',
+    method: 'percentage',
+    targets: [
+      { id: 't1', accountId: 'acc31', accountName: 'Sales Dept Expense', departmentId: 'd1', departmentName: 'Sales', percentage: 35 },
+      { id: 't2', accountId: 'acc32', accountName: 'Marketing Dept Expense', departmentId: 'd2', departmentName: 'Marketing', percentage: 25 },
+      { id: 't3', accountId: 'acc33', accountName: 'Engineering Dept Expense', departmentId: 'd3', departmentName: 'Engineering', percentage: 30 },
+      { id: 't4', accountId: 'acc34', accountName: 'Finance Dept Expense', departmentId: 'd4', departmentName: 'Finance', percentage: 10 },
+    ],
+    status: 'active',
+    frequency: 'monthly',
+    lastRunDate: new Date('2024-03-01'),
+    entityId: 'e1',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2023-06-01'),
+  },
+  {
+    id: 'alloc2',
+    name: 'Rent Allocation',
+    description: 'Allocate office rent by headcount',
+    sourceAccountId: 'acc35',
+    sourceAccountName: 'Office Rent',
+    method: 'statistical',
+    basis: 'headcount',
+    targets: [
+      { id: 't5', accountId: 'acc31', accountName: 'Sales Dept Expense', departmentId: 'd1', departmentName: 'Sales', percentage: 40 },
+      { id: 't6', accountId: 'acc32', accountName: 'Marketing Dept Expense', departmentId: 'd2', departmentName: 'Marketing', percentage: 15 },
+      { id: 't7', accountId: 'acc33', accountName: 'Engineering Dept Expense', departmentId: 'd3', departmentName: 'Engineering', percentage: 35 },
+      { id: 't8', accountId: 'acc34', accountName: 'Finance Dept Expense', departmentId: 'd4', departmentName: 'Finance', percentage: 10 },
+    ],
+    status: 'active',
+    frequency: 'monthly',
+    lastRunDate: new Date('2024-03-01'),
+    entityId: 'e1',
+    createdBy: 'Michael Johnson',
+    createdAt: new Date('2023-06-15'),
+  },
+  {
+    id: 'alloc3',
+    name: 'Shared Services Allocation',
+    description: 'Allocate shared services costs',
+    sourceAccountId: 'acc36',
+    sourceAccountName: 'Shared Services',
+    method: 'fixed',
+    targets: [
+      { id: 't9', accountId: 'acc31', accountName: 'Sales Dept Expense', departmentId: 'd1', departmentName: 'Sales', fixedAmount: 5000 },
+      { id: 't10', accountId: 'acc32', accountName: 'Marketing Dept Expense', departmentId: 'd2', departmentName: 'Marketing', fixedAmount: 3000 },
+      { id: 't11', accountId: 'acc33', accountName: 'Engineering Dept Expense', departmentId: 'd3', departmentName: 'Engineering', fixedAmount: 4500 },
+    ],
+    status: 'draft',
+    frequency: 'quarterly',
+    entityId: 'e1',
+    createdBy: 'Emily Davis',
+    createdAt: new Date('2024-02-01'),
+  },
+]
+
+export async function getAllocations(
+  status?: string[],
+  method?: string[]
+): Promise<Allocation[]> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockAllocations]
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(a => status.includes(a.status))
+  }
+  
+  if (method && method.length > 0) {
+    filtered = filtered.filter(a => method.includes(a.method))
+  }
+  
+  return filtered
+}
+
+export async function getAllocationById(id: string): Promise<Allocation | null> {
+  await delay(SIMULATED_DELAY)
+  return mockAllocations.find(a => a.id === id) || null
+}
+
+export async function createAllocation(alloc: Partial<Allocation>): Promise<{ success: boolean; allocation?: Allocation }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newAlloc: Allocation = {
+    id: `alloc${mockAllocations.length + 1}`,
+    name: alloc.name || 'New Allocation',
+    description: alloc.description,
+    sourceAccountId: alloc.sourceAccountId || '',
+    sourceAccountName: alloc.sourceAccountName || '',
+    method: alloc.method || 'percentage',
+    basis: alloc.basis,
+    targets: alloc.targets || [],
+    status: 'draft',
+    frequency: alloc.frequency || 'monthly',
+    entityId: alloc.entityId || 'e1',
+    createdBy: 'Current User',
+    createdAt: new Date(),
+  }
+  
+  mockAllocations.push(newAlloc)
+  return { success: true, allocation: newAlloc }
+}
+
+export async function runAllocation(id: string): Promise<{ success: boolean; journalEntryId?: string }> {
+  await delay(SIMULATED_DELAY)
+  const alloc = mockAllocations.find(a => a.id === id)
+  if (alloc && alloc.status === 'active') {
+    alloc.lastRunDate = new Date()
+    return { success: true, journalEntryId: `je-alloc-${Date.now()}` }
+  }
+  return { success: false }
+}
+
+export async function activateAllocation(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const alloc = mockAllocations.find(a => a.id === id)
+  if (alloc && alloc.status === 'draft') {
+    alloc.status = 'active'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function deactivateAllocation(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const alloc = mockAllocations.find(a => a.id === id)
+  if (alloc && alloc.status === 'active') {
+    alloc.status = 'inactive'
+    return { success: true }
+  }
+  return { success: false }
+}

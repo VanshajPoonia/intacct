@@ -403,31 +403,6 @@ export interface User {
 // Financial Statement Types
 export type { BalanceSheetData, IncomeStatementData } from './services'
 
-// Notification Types
-export interface Notification {
-  id: string
-  title: string
-  message: string
-  type: 'info' | 'warning' | 'success' | 'error'
-  read: boolean
-  createdAt: Date
-  link?: string
-}
-
-// Task Types
-export interface Task {
-  id: string
-  title: string
-  description?: string
-  dueDate?: Date
-  priority: 'low' | 'medium' | 'high' | 'urgent'
-  status: 'todo' | 'in_progress' | 'completed'
-  assignedTo?: string
-  relatedType?: string
-  relatedId?: string
-  createdAt: Date
-}
-
 // Payment Types
 export interface Payment {
   id: string
@@ -530,6 +505,176 @@ export interface ChartDataPoint {
   [key: string]: string | number
 }
 
+// Purchase Order Types
+export interface PurchaseOrder {
+  id: string
+  number: string
+  vendorId: string
+  vendorName: string
+  status: 'draft' | 'pending_approval' | 'approved' | 'sent' | 'partially_received' | 'received' | 'closed' | 'cancelled'
+  orderDate: Date
+  expectedDate?: Date
+  lines: PurchaseOrderLine[]
+  subtotal: number
+  tax: number
+  total: number
+  entityId: string
+  departmentId?: string
+  projectId?: string
+  notes?: string
+  createdBy: string
+  createdAt: Date
+}
+
+export interface PurchaseOrderLine {
+  id: string
+  description: string
+  quantity: number
+  unitPrice: number
+  amount: number
+  receivedQuantity: number
+  accountId: string
+}
+
+// Sales Order Types
+export interface SalesOrder {
+  id: string
+  number: string
+  customerId: string
+  customerName: string
+  status: 'draft' | 'pending_approval' | 'approved' | 'confirmed' | 'partially_shipped' | 'shipped' | 'invoiced' | 'closed' | 'cancelled'
+  orderDate: Date
+  requestedDate?: Date
+  lines: SalesOrderLine[]
+  subtotal: number
+  tax: number
+  total: number
+  entityId: string
+  salesRepId?: string
+  notes?: string
+  createdBy: string
+  createdAt: Date
+}
+
+export interface SalesOrderLine {
+  id: string
+  description: string
+  quantity: number
+  unitPrice: number
+  amount: number
+  shippedQuantity: number
+  accountId: string
+}
+
+// Project Types (extended)
+export interface ProjectDetail {
+  id: string
+  name: string
+  code: string
+  status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled'
+  customerId?: string
+  customerName?: string
+  managerId: string
+  managerName: string
+  startDate: Date
+  endDate?: Date
+  budget: number
+  actualCost: number
+  revenue: number
+  profitMargin: number
+  percentComplete: number
+  entityId: string
+  departmentId?: string
+  description?: string
+  createdAt: Date
+}
+
+// Time Entry Types
+export interface TimeEntry {
+  id: string
+  employeeId: string
+  employeeName: string
+  projectId?: string
+  projectName?: string
+  taskDescription: string
+  date: Date
+  hours: number
+  billable: boolean
+  rate: number
+  amount: number
+  status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'invoiced'
+  entityId: string
+  notes?: string
+  createdAt: Date
+}
+
+// Expense Entry Types
+export interface ExpenseEntry {
+  id: string
+  employeeId: string
+  employeeName: string
+  category: string
+  description: string
+  date: Date
+  amount: number
+  currency: string
+  receipt?: string
+  projectId?: string
+  projectName?: string
+  customerId?: string
+  billable: boolean
+  status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'reimbursed'
+  entityId: string
+  notes?: string
+  createdAt: Date
+}
+
+// Recurring Journal Types
+export interface RecurringJournal {
+  id: string
+  name: string
+  description?: string
+  frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+  startDate: Date
+  endDate?: Date
+  nextRunDate: Date
+  lastRunDate?: Date
+  status: 'active' | 'paused' | 'expired'
+  templateLines: JournalEntryLine[]
+  entityId: string
+  createdBy: string
+  createdAt: Date
+  runCount: number
+}
+
+// Allocation Types
+export interface Allocation {
+  id: string
+  name: string
+  description?: string
+  sourceAccountId: string
+  sourceAccountName: string
+  method: 'fixed' | 'percentage' | 'statistical'
+  basis?: string
+  targets: AllocationTarget[]
+  status: 'draft' | 'active' | 'inactive'
+  frequency: 'monthly' | 'quarterly' | 'yearly' | 'on_demand'
+  lastRunDate?: Date
+  entityId: string
+  createdBy: string
+  createdAt: Date
+}
+
+export interface AllocationTarget {
+  id: string
+  accountId: string
+  accountName: string
+  departmentId?: string
+  departmentName?: string
+  percentage?: number
+  fixedAmount?: number
+}
+
 // Admin Types
 export interface User {
   id: string
@@ -593,6 +738,101 @@ export interface ApiKey {
   permissions: string[]
   lastUsedAt?: Date
   expiresAt?: Date
+  createdBy: string
+  createdAt: Date
+}
+
+// Task Types
+export interface Task {
+  id: string
+  title: string
+  description?: string
+  type: 'approval' | 'review' | 'data_entry' | 'reconciliation' | 'follow_up' | 'other'
+  priority: 'high' | 'medium' | 'low'
+  status: 'todo' | 'in_progress' | 'completed' | 'cancelled'
+  dueDate?: Date
+  assigneeId: string
+  assigneeName: string
+  relatedType?: 'bill' | 'invoice' | 'journal_entry' | 'payment' | 'receipt' | 'reconciliation'
+  relatedId?: string
+  relatedNumber?: string
+  entityId: string
+  createdBy: string
+  createdAt: Date
+  completedAt?: Date
+}
+
+// Notification Types
+export interface Notification {
+  id: string
+  type: 'approval_required' | 'approval_completed' | 'task_assigned' | 'task_due' | 'payment_received' | 'invoice_overdue' | 'sync_error' | 'system' | 'mention'
+  title: string
+  message: string
+  read: boolean
+  actionUrl?: string
+  relatedType?: string
+  relatedId?: string
+  createdAt: Date
+}
+
+// Activity Timeline Types
+export interface ActivityItem {
+  id: string
+  type: 'create' | 'update' | 'delete' | 'approve' | 'reject' | 'post' | 'void' | 'payment' | 'login' | 'export' | 'import'
+  action: string
+  description: string
+  userId: string
+  userName: string
+  userAvatar?: string
+  relatedType?: string
+  relatedId?: string
+  relatedNumber?: string
+  entityId: string
+  metadata?: Record<string, unknown>
+  createdAt: Date
+}
+
+// Auth Types
+export interface AuthUser {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  role: 'admin' | 'controller' | 'accountant' | 'viewer' | 'ap_clerk' | 'ar_clerk'
+  avatar?: string
+  entityIds: string[]
+}
+
+export interface AuthSession {
+  user: AuthUser
+  accessToken: string
+  expiresAt: Date
+}
+
+// Preferences Types
+export interface UserPreferences {
+  theme: 'light' | 'dark' | 'system'
+  defaultEntity: string
+  defaultDateRange: 'today' | 'this_week' | 'this_month' | 'this_quarter' | 'this_year'
+  sidebarCollapsed: boolean
+  notifications: {
+    email: boolean
+    push: boolean
+    approvals: boolean
+    tasks: boolean
+  }
+}
+
+// Saved View Types
+export interface SavedView {
+  id: string
+  name: string
+  module: string
+  filters: Record<string, unknown>
+  columns?: string[]
+  sortBy?: string
+  sortDirection?: 'asc' | 'desc'
+  isDefault: boolean
   createdBy: string
   createdAt: Date
 }

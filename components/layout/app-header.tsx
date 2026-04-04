@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -27,7 +29,9 @@ import {
   User
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { entities, currentUser, notifications, tasks } from "@/lib/mock-data"
+import { useAuth } from "@/lib/auth/context"
+import { getEntities, getNotifications, getTasks } from "@/lib/services"
+import type { Entity, Notification, Task } from "@/lib/types"
 import type { DateRange } from "react-day-picker"
 import { format } from "date-fns"
 
@@ -37,7 +41,13 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ onSearchClick, className }: AppHeaderProps) {
-  const [selectedEntity, setSelectedEntity] = useState(entities[0])
+  const router = useRouter()
+  const { user, logout } = useAuth()
+  
+  const [entities, setEntities] = useState<Entity[]>([])
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null)
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: new Date(2024, 2, 1),
     to: new Date(2024, 2, 31),
@@ -45,8 +55,34 @@ export function AppHeader({ onSearchClick, className }: AppHeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false)
   const [showTasks, setShowTasks] = useState(false)
 
+  useEffect(() => {
+    const loadData = async () => {
+      const [entitiesData, notificationsData, tasksData] = await Promise.all([
+        getEntities(),
+        getNotifications(false, undefined, 1, 5),
+        getTasks(undefined, ['todo', 'in_progress'], undefined, undefined, undefined, 1, 5),
+      ])
+      setEntities(entitiesData)
+      setNotifications(notificationsData.data)
+      setTasks(tasksData.data)
+      if (entitiesData.length > 0) {
+        setSelectedEntity(entitiesData[0])
+      }
+    }
+    loadData()
+  }, [])
+
+  const handleLogout = async () => {
+    await logout()
+    router.push('/login')
+  }
+
   const unreadNotifications = notifications.filter(n => !n.read).length
   const pendingTasks = tasks.filter(t => t.status !== 'completed').length
+  
+  const userName = user ? `${user.firstName} ${user.lastName}` : 'User'
+  const userEmail = user?.email || 'user@company.com'
+  const userInitials = user ? `${user.firstName[0]}${user.lastName[0]}` : 'U'
 
   return (
     <header className={cn(
@@ -84,7 +120,7 @@ export function AppHeader({ onSearchClick, className }: AppHeaderProps) {
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-9 gap-1.5 border-border bg-background">
               <Building2 className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium hidden md:block">{selectedEntity.code}</span>
+              <span className="text-sm font-medium hidden md:block">{selectedEntity?.code || 'All'}</span>
               <ChevronDown className="h-3 w-3 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
@@ -95,10 +131,10 @@ export function AppHeader({ onSearchClick, className }: AppHeaderProps) {
               <DropdownMenuItem
                 key={entity.id}
                 onClick={() => setSelectedEntity(entity)}
-                className={cn(
-                  "cursor-pointer",
-                  selectedEntity.id === entity.id && "bg-accent"
-                )}
+className={cn(
+  "cursor-pointer",
+  selectedEntity?.id === entity.id && "bg-accent"
+  )}
               >
                 <div className="flex flex-col">
                   <span className="text-sm font-medium">{entity.name}</span>
@@ -179,8 +215,8 @@ export function AppHeader({ onSearchClick, className }: AppHeaderProps) {
               ))}
             </div>
             <div className="border-t border-border px-4 py-2">
-              <Button variant="ghost" size="sm" className="w-full text-xs">
-                View all notifications
+              <Button variant="ghost" size="sm" className="w-full text-xs" asChild>
+                <Link href="/notifications">View all notifications</Link>
               </Button>
             </div>
           </PopoverContent>
@@ -213,10 +249,9 @@ export function AppHeader({ onSearchClick, className }: AppHeaderProps) {
                 >
                   <div className={cn(
                     "mt-0.5 h-2 w-2 rounded-full",
-                    task.priority === 'urgent' && "bg-red-500",
-                    task.priority === 'high' && "bg-amber-500",
-                    task.priority === 'medium' && "bg-blue-500",
-                    task.priority === 'low' && "bg-gray-400"
+                    task.priority === 'high' && "bg-red-500",
+                    task.priority === 'medium' && "bg-amber-500",
+                    task.priority === 'low' && "bg-blue-500"
                   )} />
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-medium block truncate">{task.title}</span>
@@ -230,8 +265,8 @@ export function AppHeader({ onSearchClick, className }: AppHeaderProps) {
               ))}
             </div>
             <div className="border-t border-border px-4 py-2">
-              <Button variant="ghost" size="sm" className="w-full text-xs">
-                View all tasks
+              <Button variant="ghost" size="sm" className="w-full text-xs" asChild>
+                <Link href="/tasks">View all tasks</Link>
               </Button>
             </div>
           </PopoverContent>
@@ -243,13 +278,13 @@ export function AppHeader({ onSearchClick, className }: AppHeaderProps) {
           <span className="sr-only">Help</span>
         </Button>
 
-        {/* User Profile */}
+{/* User Profile */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="h-9 gap-2 pl-2 pr-1">
               <Avatar className="h-7 w-7">
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                  {currentUser.name.split(' ').map(n => n[0]).join('')}
+                  {userInitials}
                 </AvatarFallback>
               </Avatar>
               <ChevronDown className="h-3 w-3 text-muted-foreground" />
@@ -258,8 +293,8 @@ export function AppHeader({ onSearchClick, className }: AppHeaderProps) {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col">
-                <span className="font-medium">{currentUser.name}</span>
-                <span className="text-xs text-muted-foreground font-normal">{currentUser.email}</span>
+                <span className="font-medium">{userName}</span>
+                <span className="text-xs text-muted-foreground font-normal">{userEmail}</span>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -267,9 +302,19 @@ export function AppHeader({ onSearchClick, className }: AppHeaderProps) {
               <User className="mr-2 h-4 w-4" />
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem className="cursor-pointer">
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
+            <DropdownMenuItem className="cursor-pointer" asChild>
+              <Link href="/settings">
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              className="cursor-pointer text-destructive focus:text-destructive"
+              onClick={handleLogout}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Log out
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive">

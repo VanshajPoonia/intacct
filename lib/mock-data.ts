@@ -26,13 +26,27 @@ export const entities: Entity[] = [
 ]
 
 // Current User
-export const currentUser: User = {
+export const currentUser = {
   id: 'u1',
   name: 'Sarah Chen',
+  firstName: 'Sarah',
+  lastName: 'Chen',
   email: 'sarah.chen@acme.com',
   avatar: undefined,
-  role: 'Controller',
+  role: 'admin' as const,
   entityIds: ['e1', 'e2', 'e3', 'e4'],
+  preferences: {
+    theme: 'system' as const,
+    defaultEntity: 'e4',
+    defaultDateRange: 'this_month' as const,
+    sidebarCollapsed: false,
+    notifications: {
+      email: true,
+      push: true,
+      approvals: true,
+      tasks: true,
+    },
+  },
 }
 
 // Vendors
@@ -314,10 +328,11 @@ export const navModules: NavModule[] = [
 // Sidebar Items
 export const sidebarItems = [
   { id: 'home', label: 'Home', icon: 'Home', href: '/' },
-  { id: 'recent', label: 'Recent', icon: 'Clock', href: '/recent' },
+  { id: 'recent', label: 'Recent', icon: 'Clock', href: '/activity' },
   { id: 'favorites', label: 'Favorites', icon: 'Star', href: '/favorites' },
   { id: 'tasks', label: 'Tasks', icon: 'CheckSquare', href: '/tasks', badge: 3 },
   { id: 'approvals', label: 'Approvals', icon: 'UserCheck', href: '/approvals', badge: 5 },
+  { id: 'notifications', label: 'Notifications', icon: 'Bell', href: '/notifications', badge: 4 },
   { id: 'reports', label: 'Reports', icon: 'FileText', href: '/reports' },
   { id: 'settings', label: 'Settings', icon: 'Settings', href: '/settings' },
 ]
@@ -330,6 +345,12 @@ export const searchableItems = [
   { type: 'module', label: 'Accounts Payable', href: '/accounts-payable', icon: 'Receipt' },
   { type: 'module', label: 'Accounts Receivable', href: '/accounts-receivable', icon: 'CreditCard' },
   { type: 'module', label: 'Cash Management', href: '/cash-management', icon: 'Banknote' },
+  // Workflow
+  { type: 'module', label: 'Tasks', href: '/tasks', icon: 'CheckSquare' },
+  { type: 'module', label: 'Approvals', href: '/approvals', icon: 'UserCheck' },
+  { type: 'module', label: 'Notifications', href: '/notifications', icon: 'Bell' },
+  { type: 'module', label: 'Activity Timeline', href: '/activity', icon: 'Activity' },
+  { type: 'module', label: 'Settings', href: '/settings', icon: 'Settings' },
   // Reports
   { type: 'report', label: 'Trial Balance', href: '/general-ledger/reports/trial-balance', icon: 'FileText' },
   { type: 'report', label: 'AP Aging Report', href: '/accounts-payable/reports/aging', icon: 'FileText' },
@@ -347,4 +368,12 @@ export const searchableItems = [
   { type: 'transaction', label: 'Create Journal Entry', href: '/general-ledger/journal-entries/new', icon: 'Plus' },
   { type: 'transaction', label: 'Create Bill', href: '/accounts-payable/bills/new', icon: 'Plus' },
   { type: 'transaction', label: 'Create Invoice', href: '/accounts-receivable/invoices/new', icon: 'Plus' },
+]
+
+// Saved Views
+export const savedViews = [
+  { id: 'sv1', name: 'Overdue Bills', module: 'accounts-payable', filters: { status: ['overdue'], entityId: 'e1' }, isDefault: false, createdBy: 'u1', createdAt: new Date('2024-01-15') },
+  { id: 'sv2', name: 'High Priority Approvals', module: 'approvals', filters: { priority: ['high'] }, isDefault: true, createdBy: 'u1', createdAt: new Date('2024-02-01') },
+  { id: 'sv3', name: 'Open Invoices > $50k', module: 'accounts-receivable', filters: { status: ['sent', 'overdue'], minAmount: 50000 }, isDefault: false, createdBy: 'u1', createdAt: new Date('2024-02-15') },
+  { id: 'sv4', name: 'Q1 Journal Entries', module: 'general-ledger', filters: { dateRange: 'this_quarter' }, isDefault: false, createdBy: 'u1', createdAt: new Date('2024-03-01') },
 ]

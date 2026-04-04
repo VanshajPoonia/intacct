@@ -403,31 +403,6 @@ export interface User {
 // Financial Statement Types
 export type { BalanceSheetData, IncomeStatementData } from './services'
 
-// Notification Types
-export interface Notification {
-  id: string
-  title: string
-  message: string
-  type: 'info' | 'warning' | 'success' | 'error'
-  read: boolean
-  createdAt: Date
-  link?: string
-}
-
-// Task Types
-export interface Task {
-  id: string
-  title: string
-  description?: string
-  dueDate?: Date
-  priority: 'low' | 'medium' | 'high' | 'urgent'
-  status: 'todo' | 'in_progress' | 'completed'
-  assignedTo?: string
-  relatedType?: string
-  relatedId?: string
-  createdAt: Date
-}
-
 // Payment Types
 export interface Payment {
   id: string
@@ -644,5 +619,50 @@ export interface ActivityItem {
   relatedNumber?: string
   entityId: string
   metadata?: Record<string, unknown>
+  createdAt: Date
+}
+
+// Auth Types
+export interface AuthUser {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  role: 'admin' | 'controller' | 'accountant' | 'viewer' | 'ap_clerk' | 'ar_clerk'
+  avatar?: string
+  entityIds: string[]
+}
+
+export interface AuthSession {
+  user: AuthUser
+  accessToken: string
+  expiresAt: Date
+}
+
+// Preferences Types
+export interface UserPreferences {
+  theme: 'light' | 'dark' | 'system'
+  defaultEntity: string
+  defaultDateRange: 'today' | 'this_week' | 'this_month' | 'this_quarter' | 'this_year'
+  sidebarCollapsed: boolean
+  notifications: {
+    email: boolean
+    push: boolean
+    approvals: boolean
+    tasks: boolean
+  }
+}
+
+// Saved View Types
+export interface SavedView {
+  id: string
+  name: string
+  module: string
+  filters: Record<string, unknown>
+  columns?: string[]
+  sortBy?: string
+  sortDirection?: 'asc' | 'desc'
+  isDefault: boolean
+  createdBy: string
   createdAt: Date
 }

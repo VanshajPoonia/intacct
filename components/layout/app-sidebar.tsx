@@ -14,7 +14,8 @@ import {
   FileText, 
   Settings,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Bell
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { sidebarItems } from "@/lib/mock-data"
@@ -27,6 +28,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   UserCheck,
   FileText,
   Settings,
+  Bell,
 }
 
 interface AppSidebarProps {

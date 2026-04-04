@@ -3742,3 +3742,155 @@ export async function getActivityTimeline(
   
   return { data, total, page, pageSize, totalPages }
 }
+
+// ============ AUTH SERVICES ============
+
+import type { AuthUser, AuthSession, UserPreferences, SavedView } from '@/lib/types'
+import { currentUser, savedViews as mockSavedViews } from '@/lib/mock-data'
+
+// Simulated user credentials for demo
+const demoCredentials = [
+  { email: 'sarah.chen@company.com', password: 'demo123', userId: 'u1' },
+  { email: 'michael.johnson@company.com', password: 'demo123', userId: 'u2' },
+  { email: 'emily.davis@company.com', password: 'demo123', userId: 'u3' },
+  { email: 'demo@intacct.com', password: 'demo', userId: 'u1' },
+]
+
+export async function login(email: string, password: string): Promise<{ success: boolean; session?: AuthSession; error?: string }> {
+  await delay(SIMULATED_DELAY * 2)
+  
+  const cred = demoCredentials.find(c => c.email.toLowerCase() === email.toLowerCase() && c.password === password)
+  
+  if (!cred) {
+    return { success: false, error: 'Invalid email or password' }
+  }
+  
+  const user: AuthUser = {
+    id: currentUser.id,
+    email: currentUser.email,
+    firstName: currentUser.firstName,
+    lastName: currentUser.lastName,
+    role: currentUser.role,
+    avatar: currentUser.avatar,
+    entityIds: currentUser.entityIds,
+  }
+  
+  const session: AuthSession = {
+    user,
+    accessToken: `mock_token_${Date.now()}`,
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+  }
+  
+  return { success: true, session }
+}
+
+export async function logout(): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  return { success: true }
+}
+
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  await delay(SIMULATED_DELAY)
+  
+  // In a real app, this would validate the session token
+  return {
+    id: currentUser.id,
+    email: currentUser.email,
+    firstName: currentUser.firstName,
+    lastName: currentUser.lastName,
+    role: currentUser.role,
+    avatar: currentUser.avatar,
+    entityIds: currentUser.entityIds,
+  }
+}
+
+export async function validateSession(token: string): Promise<boolean> {
+  await delay(50)
+  return token.startsWith('mock_token_')
+}
+
+// ============ PREFERENCES SERVICES ============
+
+let userPreferences: UserPreferences = { ...currentUser.preferences }
+
+export async function getPreferences(): Promise<UserPreferences> {
+  await delay(SIMULATED_DELAY)
+  return { ...userPreferences }
+}
+
+export async function updatePreferences(updates: Partial<UserPreferences>): Promise<{ success: boolean; preferences: UserPreferences }> {
+  await delay(SIMULATED_DELAY)
+  userPreferences = { ...userPreferences, ...updates }
+  return { success: true, preferences: { ...userPreferences } }
+}
+
+export async function resetPreferences(): Promise<{ success: boolean; preferences: UserPreferences }> {
+  await delay(SIMULATED_DELAY)
+  userPreferences = { ...currentUser.preferences }
+  return { success: true, preferences: { ...userPreferences } }
+}
+
+// ============ SAVED VIEW SERVICES ============
+
+const savedViewsData = [...mockSavedViews]
+
+export async function getSavedViews(module?: string): Promise<SavedView[]> {
+  await delay(SIMULATED_DELAY)
+  
+  if (module) {
+    return savedViewsData.filter(v => v.module === module)
+  }
+  return [...savedViewsData]
+}
+
+export async function getSavedViewById(id: string): Promise<SavedView | null> {
+  await delay(SIMULATED_DELAY)
+  return savedViewsData.find(v => v.id === id) || null
+}
+
+export async function createSavedView(view: Omit<SavedView, 'id' | 'createdBy' | 'createdAt'>): Promise<{ success: boolean; view?: SavedView }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newView: SavedView = {
+    ...view,
+    id: `sv${savedViewsData.length + 1}`,
+    createdBy: currentUser.id,
+    createdAt: new Date(),
+  }
+  
+  savedViewsData.push(newView)
+  return { success: true, view: newView }
+}
+
+export async function updateSavedView(id: string, updates: Partial<SavedView>): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const index = savedViewsData.findIndex(v => v.id === id)
+  if (index !== -1) {
+    savedViewsData[index] = { ...savedViewsData[index], ...updates }
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function deleteSavedView(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const index = savedViewsData.findIndex(v => v.id === id)
+  if (index !== -1) {
+    savedViewsData.splice(index, 1)
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function setDefaultView(id: string, module: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  
+  // Remove default from other views in same module
+  savedViewsData.forEach(v => {
+    if (v.module === module) {
+      v.isDefault = v.id === id
+    }
+  })
+  
+  return { success: true }
+}

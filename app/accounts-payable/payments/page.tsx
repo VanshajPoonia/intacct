@@ -388,7 +388,7 @@ export default function PaymentsPage() {
                     </div>
                   </TableHead>
                   <TableHead>Method</TableHead>
-                  <TableHead>Reference</TableHead>
+                  <TableHead>Related Bills</TableHead>
                   <TableHead 
                     className="text-right cursor-pointer hover:bg-muted/50"
                     onClick={() => handleSort('amount')}

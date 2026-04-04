@@ -139,6 +139,18 @@ export function BillDrawer({
               >
                 Attachments
               </TabsTrigger>
+              <TabsTrigger 
+                value="approval" 
+                className="h-10 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0"
+              >
+                Approval
+              </TabsTrigger>
+              <TabsTrigger 
+                value="activity" 
+                className="h-10 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0"
+              >
+                Activity
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -192,6 +204,22 @@ export function BillDrawer({
                         <p className="text-xs text-muted-foreground">Due Date</p>
                         <p className="font-medium">{format(new Date(bill.dueDate), 'MMM d, yyyy')}</p>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Dimensions */}
+                  <div className="grid grid-cols-3 gap-4 p-4 rounded-lg bg-muted/30">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Department</p>
+                      <p className="text-sm font-medium">{bill.departmentName || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Location</p>
+                      <p className="text-sm font-medium">{bill.locationName || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Terms</p>
+                      <p className="text-sm font-medium">{bill.terms || '-'}</p>
                     </div>
                   </div>
 
@@ -305,6 +333,179 @@ export function BillDrawer({
                   Add Attachment
                 </Button>
               </div>
+            </TabsContent>
+
+            <TabsContent value="approval" className="p-6 m-0">
+              {bill && (
+                <div className="space-y-6">
+                  {/* Approval Status */}
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+                    <div>
+                      <p className="text-sm font-medium">Approval Status</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {bill.approvalStatus === 'not_submitted' && (
+                          <Badge variant="outline" className="bg-muted">Not Submitted</Badge>
+                        )}
+                        {bill.approvalStatus === 'pending_approval' && (
+                          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Pending Approval</Badge>
+                        )}
+                        {bill.approvalStatus === 'approved' && (
+                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Approved</Badge>
+                        )}
+                        {bill.approvalStatus === 'rejected' && (
+                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Rejected</Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium">Payment Status</p>
+                      <div className="flex items-center gap-2 mt-1 justify-end">
+                        {bill.paymentStatus === 'unpaid' && (
+                          <Badge variant="outline">Unpaid</Badge>
+                        )}
+                        {bill.paymentStatus === 'partial' && (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Partial</Badge>
+                        )}
+                        {bill.paymentStatus === 'paid' && (
+                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Paid</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Approval Timeline */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-4">Approval Timeline</h4>
+                    <div className="space-y-4">
+                      {bill.submittedAt && (
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                            <Clock className="h-4 w-4 text-blue-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">Submitted for Approval</p>
+                            <p className="text-xs text-muted-foreground">
+                              by {bill.submittedBy} on {format(new Date(bill.submittedAt), 'MMM d, yyyy h:mm a')}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {bill.approvedAt && (
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                            <CheckCircle className="h-4 w-4 text-emerald-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">Approved</p>
+                            <p className="text-xs text-muted-foreground">
+                              by {bill.approvedBy} on {format(new Date(bill.approvedAt), 'MMM d, yyyy h:mm a')}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {bill.rejectedAt && (
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                            <XCircle className="h-4 w-4 text-red-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">Rejected</p>
+                            <p className="text-xs text-muted-foreground">
+                              by {bill.rejectedBy} on {format(new Date(bill.rejectedAt), 'MMM d, yyyy h:mm a')}
+                            </p>
+                            {bill.rejectionReason && (
+                              <p className="text-sm mt-1 text-red-600 bg-red-50 p-2 rounded">{bill.rejectionReason}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {!bill.submittedAt && !bill.approvedAt && !bill.rejectedAt && (
+                        <p className="text-sm text-muted-foreground">No approval history yet</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="activity" className="p-6 m-0">
+              {bill && (
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium">Activity & Comments</h4>
+                  
+                  {/* Activity Feed */}
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <FileText className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm">Bill created</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(bill.createdAt), 'MMM d, yyyy h:mm a')}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {bill.submittedAt && (
+                      <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                          <Clock className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm">{bill.submittedBy} submitted bill for approval</p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(bill.submittedAt), 'MMM d, yyyy h:mm a')}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {bill.approvedAt && (
+                      <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                          <CheckCircle className="h-4 w-4 text-emerald-600" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm">{bill.approvedBy} approved the bill</p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(bill.approvedAt), 'MMM d, yyyy h:mm a')}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {bill.rejectedAt && (
+                      <div className="flex items-start gap-3 p-3 rounded-lg bg-red-50">
+                        <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                          <XCircle className="h-4 w-4 text-red-600" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm">{bill.rejectedBy} rejected the bill</p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(bill.rejectedAt), 'MMM d, yyyy h:mm a')}
+                          </p>
+                          {bill.rejectionReason && (
+                            <p className="text-sm mt-1 italic">&quot;{bill.rejectionReason}&quot;</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add Comment */}
+                  <div className="pt-4 border-t">
+                    <p className="text-sm font-medium mb-2">Add Comment</p>
+                    <div className="flex items-end gap-2">
+                      <textarea
+                        className="flex-1 min-h-[80px] p-3 text-sm border rounded-md resize-none"
+                        placeholder="Write a comment..."
+                      />
+                      <Button size="sm">Post</Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </TabsContent>
           </ScrollArea>
         </Tabs>

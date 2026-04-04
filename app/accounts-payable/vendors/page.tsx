@@ -50,6 +50,7 @@ import {
 } from "lucide-react"
 import { getVendors } from "@/lib/services"
 import { VendorDrawer } from "@/components/accounts-payable/vendor-drawer"
+import { CreateVendorModal } from "@/components/accounts-payable/create-vendor-modal"
 import type { Vendor, SortConfig, PaginatedResponse } from "@/lib/types"
 
 function formatCurrency(value: number) {
@@ -119,6 +120,8 @@ export default function VendorsPage() {
   const [page, setPage] = useState(1)
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [editingVendor, setEditingVendor] = useState<Vendor | null>(null)
   const pageSize = 10
 
   const fetchVendors = useCallback(async () => {
@@ -178,10 +181,10 @@ export default function VendorsPage() {
                 <Download className="h-4 w-4 mr-2" />
                 Export
               </Button>
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Vendor
-              </Button>
+<Button size="sm" onClick={() => setCreateModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Vendor
+            </Button>
             </div>
           </div>
 
@@ -401,7 +404,21 @@ export default function VendorsPage() {
         vendor={selectedVendor}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
+        onEdit={(v) => {
+          setEditingVendor(v)
+          setCreateModalOpen(true)
+        }}
         onUpdate={fetchVendors}
+      />
+
+      <CreateVendorModal
+        open={createModalOpen}
+        onClose={() => {
+          setCreateModalOpen(false)
+          setEditingVendor(null)
+        }}
+        onSuccess={fetchVendors}
+        vendor={editingVendor}
       />
     </AppShell>
   )

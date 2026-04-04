@@ -21,6 +21,12 @@ export interface Vendor {
   balance: number
   currency: string
   createdAt: Date
+  // Remittance info
+  bankName?: string
+  bankAccountNumber?: string
+  bankRoutingNumber?: string
+  preferredPaymentMethod?: 'check' | 'ach' | 'wire'
+  remittanceEmail?: string
 }
 
 export interface Customer {
@@ -77,10 +83,24 @@ export interface Bill {
   amount: number
   currency: string
   status: 'draft' | 'pending' | 'approved' | 'paid' | 'voided'
+  approvalStatus: 'not_submitted' | 'pending_approval' | 'approved' | 'rejected'
+  paymentStatus: 'unpaid' | 'partial' | 'paid'
   description?: string
   lineItems: BillLineItem[]
   entityId: string
+  departmentId?: string
+  departmentName?: string
+  locationId?: string
+  locationName?: string
+  terms?: string
   createdAt: Date
+  submittedAt?: Date
+  submittedBy?: string
+  approvedAt?: Date
+  approvedBy?: string
+  rejectedAt?: Date
+  rejectedBy?: string
+  rejectionReason?: string
 }
 
 export interface BillLineItem {
@@ -91,6 +111,25 @@ export interface BillLineItem {
   amount: number
   quantity: number
   unitPrice: number
+  taxAmount?: number
+  departmentId?: string
+  departmentName?: string
+  locationId?: string
+  locationName?: string
+  projectId?: string
+  projectName?: string
+}
+
+export interface BillApprovalHistory {
+  id: string
+  billId: string
+  action: 'submitted' | 'approved' | 'rejected' | 'reassigned' | 'commented'
+  userId: string
+  userName: string
+  timestamp: Date
+  comment?: string
+  fromUser?: string
+  toUser?: string
 }
 
 export interface Invoice {

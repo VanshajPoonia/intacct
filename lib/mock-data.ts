@@ -51,11 +51,11 @@ export const currentUser = {
 
 // Vendors
 export const vendors: Vendor[] = [
-  { id: 'v1', name: 'Office Supply Co', code: 'OSC001', email: 'ap@officesupply.com', paymentTerms: 'Net 30', status: 'active', balance: 12500, currency: 'USD', createdAt: new Date('2024-01-15') },
-  { id: 'v2', name: 'Tech Solutions Inc', code: 'TSI002', email: 'billing@techsolutions.com', paymentTerms: 'Net 45', status: 'active', balance: 87300, currency: 'USD', createdAt: new Date('2024-02-20') },
-  { id: 'v3', name: 'CloudHost Services', code: 'CHS003', email: 'invoices@cloudhost.io', paymentTerms: 'Net 15', status: 'active', balance: 4200, currency: 'USD', createdAt: new Date('2024-03-10') },
-  { id: 'v4', name: 'Marketing Agency Plus', code: 'MAP004', email: 'accounts@mapagency.com', paymentTerms: 'Net 30', status: 'active', balance: 35000, currency: 'USD', createdAt: new Date('2024-01-25') },
-  { id: 'v5', name: 'Logistics Partners', code: 'LP005', email: 'ap@logisticspartners.com', paymentTerms: 'Net 60', status: 'active', balance: 22800, currency: 'USD', createdAt: new Date('2024-04-05') },
+  { id: 'v1', name: 'Office Supply Co', code: 'OSC001', email: 'ap@officesupply.com', phone: '(555) 123-4567', address: '123 Supply St, Chicago, IL 60601', taxId: '12-3456789', paymentTerms: 'Net 30', status: 'active', balance: 12500, currency: 'USD', createdAt: new Date('2024-01-15'), bankName: 'Chase Bank', bankAccountNumber: '****4567', bankRoutingNumber: '****1234', preferredPaymentMethod: 'ach', remittanceEmail: 'remittance@officesupply.com' },
+  { id: 'v2', name: 'Tech Solutions Inc', code: 'TSI002', email: 'billing@techsolutions.com', phone: '(555) 234-5678', address: '456 Tech Blvd, San Francisco, CA 94105', taxId: '23-4567890', paymentTerms: 'Net 45', status: 'active', balance: 87300, currency: 'USD', createdAt: new Date('2024-02-20'), bankName: 'Bank of America', bankAccountNumber: '****8901', bankRoutingNumber: '****5678', preferredPaymentMethod: 'wire', remittanceEmail: 'ap@techsolutions.com' },
+  { id: 'v3', name: 'CloudHost Services', code: 'CHS003', email: 'invoices@cloudhost.io', phone: '(555) 345-6789', address: '789 Cloud Ave, Seattle, WA 98101', taxId: '34-5678901', paymentTerms: 'Net 15', status: 'active', balance: 4200, currency: 'USD', createdAt: new Date('2024-03-10'), bankName: 'Wells Fargo', bankAccountNumber: '****2345', bankRoutingNumber: '****9012', preferredPaymentMethod: 'ach', remittanceEmail: 'payments@cloudhost.io' },
+  { id: 'v4', name: 'Marketing Agency Plus', code: 'MAP004', email: 'accounts@mapagency.com', phone: '(555) 456-7890', address: '321 Creative Way, New York, NY 10001', taxId: '45-6789012', paymentTerms: 'Net 30', status: 'active', balance: 35000, currency: 'USD', createdAt: new Date('2024-01-25'), bankName: 'Citibank', bankAccountNumber: '****6789', bankRoutingNumber: '****3456', preferredPaymentMethod: 'check' },
+  { id: 'v5', name: 'Logistics Partners', code: 'LP005', email: 'ap@logisticspartners.com', phone: '(555) 567-8901', address: '567 Shipping Ln, Dallas, TX 75201', taxId: '56-7890123', paymentTerms: 'Net 60', status: 'active', balance: 22800, currency: 'USD', createdAt: new Date('2024-04-05'), bankName: 'US Bank', bankAccountNumber: '****0123', bankRoutingNumber: '****7890', preferredPaymentMethod: 'ach', remittanceEmail: 'remittance@logisticspartners.com' },
 ]
 
 // Customers
@@ -103,16 +103,28 @@ export const transactions: Transaction[] = [
 // Bills
 export const bills: Bill[] = [
   {
-    id: 'b1', number: 'BILL-2024-001', vendorId: 'v1', vendorName: 'Office Supply Co', date: new Date('2024-03-01'), dueDate: new Date('2024-03-31'), amount: 2500, currency: 'USD', status: 'pending', description: 'Office supplies for Q1', entityId: 'e1', createdAt: new Date('2024-03-01'),
-    lineItems: [{ id: 'bl1', description: 'Paper and printing supplies', accountId: 'a15', accountName: 'Office Supplies', amount: 1500, quantity: 1, unitPrice: 1500 }, { id: 'bl2', description: 'Desk accessories', accountId: 'a15', accountName: 'Office Supplies', amount: 1000, quantity: 1, unitPrice: 1000 }]
+    id: 'b1', number: 'BILL-2024-001', vendorId: 'v1', vendorName: 'Office Supply Co', date: new Date('2024-03-01'), dueDate: new Date('2024-03-31'), amount: 2500, currency: 'USD', status: 'pending', approvalStatus: 'pending_approval', paymentStatus: 'unpaid', description: 'Office supplies for Q1', entityId: 'e1', departmentId: 'd1', departmentName: 'Operations', terms: 'Net 30', createdAt: new Date('2024-03-01'), submittedAt: new Date('2024-03-01'), submittedBy: 'John Smith',
+    lineItems: [{ id: 'bl1', description: 'Paper and printing supplies', accountId: 'a15', accountName: 'Office Supplies', amount: 1500, quantity: 1, unitPrice: 1500, departmentId: 'd1', departmentName: 'Operations' }, { id: 'bl2', description: 'Desk accessories', accountId: 'a15', accountName: 'Office Supplies', amount: 1000, quantity: 1, unitPrice: 1000, departmentId: 'd1', departmentName: 'Operations' }]
   },
   {
-    id: 'b2', number: 'BILL-2024-002', vendorId: 'v2', vendorName: 'Tech Solutions Inc', date: new Date('2024-03-05'), dueDate: new Date('2024-04-19'), amount: 15000, currency: 'USD', status: 'approved', description: 'Software licenses renewal', entityId: 'e1', createdAt: new Date('2024-03-05'),
-    lineItems: [{ id: 'bl3', description: 'Annual software subscription', accountId: 'a14', accountName: 'Software Expense', amount: 15000, quantity: 1, unitPrice: 15000 }]
+    id: 'b2', number: 'BILL-2024-002', vendorId: 'v2', vendorName: 'Tech Solutions Inc', date: new Date('2024-03-05'), dueDate: new Date('2024-04-19'), amount: 15000, currency: 'USD', status: 'approved', approvalStatus: 'approved', paymentStatus: 'unpaid', description: 'Software licenses renewal', entityId: 'e1', departmentId: 'd2', departmentName: 'Engineering', terms: 'Net 45', createdAt: new Date('2024-03-05'), submittedAt: new Date('2024-03-05'), submittedBy: 'Emily Davis', approvedAt: new Date('2024-03-07'), approvedBy: 'Sarah Chen',
+    lineItems: [{ id: 'bl3', description: 'Annual software subscription', accountId: 'a14', accountName: 'Software Expense', amount: 15000, quantity: 1, unitPrice: 15000, departmentId: 'd2', departmentName: 'Engineering' }]
   },
   {
-    id: 'b3', number: 'BILL-2024-003', vendorId: 'v3', vendorName: 'CloudHost Services', date: new Date('2024-03-10'), dueDate: new Date('2024-03-25'), amount: 4200, currency: 'USD', status: 'paid', description: 'Monthly hosting fees', entityId: 'e1', createdAt: new Date('2024-03-10'),
-    lineItems: [{ id: 'bl4', description: 'Cloud hosting - March', accountId: 'a15', accountName: 'Hosting Expense', amount: 4200, quantity: 1, unitPrice: 4200 }]
+    id: 'b3', number: 'BILL-2024-003', vendorId: 'v3', vendorName: 'CloudHost Services', date: new Date('2024-03-10'), dueDate: new Date('2024-03-25'), amount: 4200, currency: 'USD', status: 'paid', approvalStatus: 'approved', paymentStatus: 'paid', description: 'Monthly hosting fees', entityId: 'e1', departmentId: 'd2', departmentName: 'Engineering', terms: 'Net 15', createdAt: new Date('2024-03-10'), submittedAt: new Date('2024-03-10'), submittedBy: 'Michael Johnson', approvedAt: new Date('2024-03-11'), approvedBy: 'Sarah Chen',
+    lineItems: [{ id: 'bl4', description: 'Cloud hosting - March', accountId: 'a15', accountName: 'Hosting Expense', amount: 4200, quantity: 1, unitPrice: 4200, departmentId: 'd2', departmentName: 'Engineering' }]
+  },
+  {
+    id: 'b4', number: 'BILL-2024-004', vendorId: 'v1', vendorName: 'Office Supply Co', date: new Date('2024-03-15'), dueDate: new Date('2024-04-14'), amount: 3800, currency: 'USD', status: 'pending', approvalStatus: 'pending_approval', paymentStatus: 'unpaid', description: 'Furniture order', entityId: 'e1', departmentId: 'd3', departmentName: 'HR', terms: 'Net 30', createdAt: new Date('2024-03-15'), submittedAt: new Date('2024-03-15'), submittedBy: 'Lisa Wong',
+    lineItems: [{ id: 'bl5', description: 'Office chairs (5)', accountId: 'a3', accountName: 'Furniture & Equipment', amount: 2500, quantity: 5, unitPrice: 500, departmentId: 'd3', departmentName: 'HR' }, { id: 'bl6', description: 'Standing desks (2)', accountId: 'a3', accountName: 'Furniture & Equipment', amount: 1300, quantity: 2, unitPrice: 650, departmentId: 'd3', departmentName: 'HR' }]
+  },
+  {
+    id: 'b5', number: 'BILL-2024-005', vendorId: 'v4', vendorName: 'Marketing Agency', date: new Date('2024-03-18'), dueDate: new Date('2024-04-17'), amount: 25000, currency: 'USD', status: 'draft', approvalStatus: 'not_submitted', paymentStatus: 'unpaid', description: 'Q2 Marketing Campaign', entityId: 'e1', departmentId: 'd4', departmentName: 'Marketing', terms: 'Net 30', createdAt: new Date('2024-03-18'),
+    lineItems: [{ id: 'bl7', description: 'Digital advertising', accountId: 'a13', accountName: 'Marketing Expense', amount: 15000, quantity: 1, unitPrice: 15000, departmentId: 'd4', departmentName: 'Marketing' }, { id: 'bl8', description: 'Content creation', accountId: 'a13', accountName: 'Marketing Expense', amount: 10000, quantity: 1, unitPrice: 10000, departmentId: 'd4', departmentName: 'Marketing' }]
+  },
+  {
+    id: 'b6', number: 'BILL-2024-006', vendorId: 'v2', vendorName: 'Tech Solutions Inc', date: new Date('2024-03-20'), dueDate: new Date('2024-04-04'), amount: 8500, currency: 'USD', status: 'pending', approvalStatus: 'rejected', paymentStatus: 'unpaid', description: 'Hardware maintenance', entityId: 'e1', departmentId: 'd2', departmentName: 'Engineering', terms: 'Net 15', createdAt: new Date('2024-03-20'), submittedAt: new Date('2024-03-20'), submittedBy: 'David Kim', rejectedAt: new Date('2024-03-21'), rejectedBy: 'Sarah Chen', rejectionReason: 'Please provide itemized breakdown and attach quote',
+    lineItems: [{ id: 'bl9', description: 'Server maintenance', accountId: 'a14', accountName: 'IT Expense', amount: 8500, quantity: 1, unitPrice: 8500, departmentId: 'd2', departmentName: 'Engineering' }]
   },
 ]
 

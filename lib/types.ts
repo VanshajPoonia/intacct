@@ -163,7 +163,30 @@ export interface JournalEntryLine {
   credit: number
   description?: string
   departmentId?: string
+  departmentName?: string
   locationId?: string
+  locationName?: string
+  projectId?: string
+  projectName?: string
+  customerId?: string
+  customerName?: string
+  vendorId?: string
+  vendorName?: string
+}
+
+export interface AccountingPeriod {
+  id: string
+  name: string
+  fiscalYear: number
+  periodNumber: number
+  startDate: Date
+  endDate: Date
+  status: 'open' | 'closed' | 'locked' | 'future'
+  entityId: string
+  closedBy?: string
+  closedAt?: Date
+  lockedBy?: string
+  lockedAt?: Date
 }
 
 export interface ApprovalItem {

@@ -36,6 +36,7 @@ import {
   Search, 
   Filter, 
   Download, 
+  Upload,
   MoreHorizontal,
   ChevronLeft,
   ChevronRight,
@@ -45,7 +46,13 @@ import {
   Pencil,
   RotateCcw,
   CheckCircle,
+  CalendarIcon,
+  User,
+  Building2,
 } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { toast } from "sonner"
 import type { 
   JournalEntry, 
   DashboardFilters, 
@@ -90,6 +97,10 @@ export default function JournalEntriesPage() {
   const [filters, setFilters] = useState<DashboardFilters>(defaultFilters)
   const [entities, setEntities] = useState<Entity[]>([])
   const [statusFilter, setStatusFilter] = useState<string[]>([])
+  const [sourceFilter, setSourceFilter] = useState<string>('all')
+  const [createdByFilter, setCreatedByFilter] = useState<string>('all')
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined)
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined)
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState<SortConfig | undefined>(undefined)
   const [page, setPage] = useState(1)
@@ -206,6 +217,10 @@ export default function JournalEntriesPage() {
           description="Create and manage journal entries"
           actions={
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => toast.info('Import feature coming soon')}>
+                <Upload className="h-4 w-4 mr-1.5" />
+                Import
+              </Button>
               <Button variant="outline" size="sm">
                 <Download className="h-4 w-4 mr-1.5" />
                 Export
@@ -265,10 +280,84 @@ export default function JournalEntriesPage() {
                 />
               </div>
 
-              <Button variant="outline" size="sm" className="ml-auto">
-                <Filter className="h-4 w-4 mr-1.5" />
-                More Filters
-              </Button>
+              {/* Date Range */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9">
+                    <CalendarIcon className="h-4 w-4 mr-1.5" />
+                    {startDate ? format(startDate, 'MMM d') : 'Start'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={startDate}
+                    onSelect={(date) => { setStartDate(date); setPage(1); }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9">
+                    <CalendarIcon className="h-4 w-4 mr-1.5" />
+                    {endDate ? format(endDate, 'MMM d') : 'End'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={endDate}
+                    onSelect={(date) => { setEndDate(date); setPage(1); }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              {/* Source Filter */}
+              <Select value={sourceFilter} onValueChange={(v) => { setSourceFilter(v); setPage(1); }}>
+                <SelectTrigger className="w-[130px] h-9">
+                  <SelectValue placeholder="Source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sources</SelectItem>
+                  <SelectItem value="manual">Manual</SelectItem>
+                  <SelectItem value="import">Import</SelectItem>
+                  <SelectItem value="recurring">Recurring</SelectItem>
+                  <SelectItem value="allocation">Allocation</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Created By Filter */}
+              <Select value={createdByFilter} onValueChange={(v) => { setCreatedByFilter(v); setPage(1); }}>
+                <SelectTrigger className="w-[140px] h-9">
+                  <User className="h-4 w-4 mr-1.5" />
+                  <SelectValue placeholder="Created By" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  <SelectItem value="sarah">Sarah Chen</SelectItem>
+                  <SelectItem value="michael">Michael Johnson</SelectItem>
+                  <SelectItem value="emily">Emily Davis</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {(startDate || endDate || sourceFilter !== 'all' || createdByFilter !== 'all') && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    setStartDate(undefined)
+                    setEndDate(undefined)
+                    setSourceFilter('all')
+                    setCreatedByFilter('all')
+                    setPage(1)
+                  }}
+                >
+                  Clear
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

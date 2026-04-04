@@ -297,8 +297,9 @@ export default function ChartOfAccountsPage() {
                       <ArrowUpDown className="ml-1 h-3.5 w-3.5" />
                     </Button>
                   </TableHead>
-                  <TableHead className="w-[120px]">Type</TableHead>
+                  <TableHead className="w-[100px]">Type</TableHead>
                   <TableHead>Category</TableHead>
+                  <TableHead className="w-[80px]">Normal</TableHead>
                   <TableHead className="text-right w-[140px]">
                     <Button
                       variant="ghost"
@@ -322,6 +323,7 @@ export default function ChartOfAccountsPage() {
                       <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-14" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-8" /></TableCell>
@@ -329,7 +331,7 @@ export default function ChartOfAccountsPage() {
                   ))
                 ) : accounts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center">
+                    <TableCell colSpan={8} className="h-32 text-center">
                       <div className="flex flex-col items-center gap-2 text-muted-foreground">
                         <Folder className="h-8 w-8" />
                         <p>No accounts found</p>
@@ -358,6 +360,9 @@ export default function ChartOfAccountsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{account.category}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {['asset', 'expense'].includes(account.type) ? 'Debit' : 'Credit'}
+                      </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(account.balance)}
                       </TableCell>

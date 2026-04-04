@@ -81,6 +81,457 @@ export async function getBankAccounts(): Promise<BankAccount[]> {
   return bankAccounts
 }
 
+export async function getBankAccountById(id: string): Promise<BankAccount | null> {
+  await delay(SIMULATED_DELAY)
+  return bankAccounts.find(a => a.id === id) || null
+}
+
+// ============ CASH POSITION SERVICES ============
+
+import type { CashPositionData, Transfer, ReconciliationItem, ReconciliationSummary } from '@/lib/types'
+
+export async function getCashPosition(filters: DashboardFilters): Promise<CashPositionData> {
+  await delay(SIMULATED_DELAY)
+  
+  const multiplier = filters.entityId === 'e4' ? 1 : filters.entityId === 'e1' ? 0.6 : 0.2
+  
+  const accountBreakdown = bankAccounts
+    .filter(a => filters.entityId === 'e4' || a.entityId === filters.entityId)
+    .map(a => ({
+      accountId: a.id,
+      accountName: a.name,
+      balance: Math.round(a.balance * multiplier),
+      available: Math.round(a.balance * multiplier * 0.95),
+    }))
+  
+  const totalCash = accountBreakdown.reduce((sum, a) => sum + a.balance, 0)
+  const availableCash = accountBreakdown.reduce((sum, a) => sum + a.available, 0)
+  
+  // Generate 7-day forecast
+  const dailyForecast = []
+  let runningBalance = totalCash
+  for (let i = 0; i < 7; i++) {
+    const date = new Date()
+    date.setDate(date.getDate() + i)
+    const inflows = Math.round((Math.random() * 50000 + 20000) * multiplier)
+    const outflows = Math.round((Math.random() * 40000 + 15000) * multiplier)
+    dailyForecast.push({
+      date: date.toISOString().split('T')[0],
+      opening: runningBalance,
+      inflows,
+      outflows,
+      closing: runningBalance + inflows - outflows,
+    })
+    runningBalance = runningBalance + inflows - outflows
+  }
+  
+  return {
+    totalCash,
+    availableCash,
+    pendingInflows: Math.round(125000 * multiplier),
+    pendingOutflows: Math.round(85000 * multiplier),
+    projectedBalance: runningBalance,
+    accountBreakdown,
+    dailyForecast,
+  }
+}
+
+// ============ TRANSFER SERVICES ============
+
+const mockTransfers: Transfer[] = [
+  {
+    id: 'tr1',
+    number: 'TRF-2024-001',
+    date: new Date('2024-03-10'),
+    amount: 50000,
+    currency: 'USD',
+    fromAccountId: 'ba1',
+    fromAccountName: 'Operating Account',
+    toAccountId: 'ba2',
+    toAccountName: 'Payroll Account',
+    status: 'completed',
+    memo: 'Payroll funding',
+    entityId: 'e1',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-03-10'),
+  },
+  {
+    id: 'tr2',
+    number: 'TRF-2024-002',
+    date: new Date('2024-03-12'),
+    amount: 100000,
+    currency: 'USD',
+    fromAccountId: 'ba1',
+    fromAccountName: 'Operating Account',
+    toAccountId: 'ba3',
+    toAccountName: 'Investment Account',
+    status: 'completed',
+    memo: 'Excess cash investment',
+    entityId: 'e1',
+    createdBy: 'Michael Johnson',
+    createdAt: new Date('2024-03-12'),
+  },
+  {
+    id: 'tr3',
+    number: 'TRF-2024-003',
+    date: new Date('2024-03-14'),
+    amount: 25000,
+    currency: 'USD',
+    fromAccountId: 'ba3',
+    fromAccountName: 'Investment Account',
+    toAccountId: 'ba1',
+    toAccountName: 'Operating Account',
+    status: 'processing',
+    memo: 'Cash needs',
+    entityId: 'e1',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-03-14'),
+  },
+  {
+    id: 'tr4',
+    number: 'TRF-2024-004',
+    date: new Date('2024-03-15'),
+    amount: 15000,
+    currency: 'USD',
+    fromAccountId: 'ba1',
+    fromAccountName: 'Operating Account',
+    toAccountId: 'ba2',
+    toAccountName: 'Payroll Account',
+    status: 'pending',
+    memo: 'Bonus funding',
+    entityId: 'e1',
+    createdBy: 'Emily Davis',
+    createdAt: new Date('2024-03-15'),
+  },
+]
+
+export async function getTransfers(
+  filters: DashboardFilters,
+  search?: string,
+  status?: string[],
+  sort?: SortConfig,
+  page: number = 1,
+  pageSize: number = 10
+): Promise<PaginatedResponse<Transfer>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockTransfers]
+  
+  if (filters.entityId && filters.entityId !== 'e4') {
+    filtered = filtered.filter(t => t.entityId === filters.entityId)
+  }
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(t => status.includes(t.status))
+  }
+  
+  if (search) {
+    const s = search.toLowerCase()
+    filtered = filtered.filter(t => 
+      t.number.toLowerCase().includes(s) ||
+      t.fromAccountName.toLowerCase().includes(s) ||
+      t.toAccountName.toLowerCase().includes(s) ||
+      t.memo?.toLowerCase().includes(s)
+    )
+  }
+  
+  if (sort) {
+    filtered.sort((a, b) => {
+      const aVal = a[sort.key as keyof Transfer]
+      const bVal = b[sort.key as keyof Transfer]
+      if (aVal === undefined || bVal === undefined) return 0
+      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  }
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
+export async function createTransfer(transfer: Partial<Transfer>): Promise<{ success: boolean; transfer?: Transfer }> {
+  await delay(SIMULATED_DELAY)
+  
+  const fromAccount = bankAccounts.find(a => a.id === transfer.fromAccountId)
+  const toAccount = bankAccounts.find(a => a.id === transfer.toAccountId)
+  
+  const newTransfer: Transfer = {
+    id: `tr${mockTransfers.length + 1}`,
+    number: `TRF-2024-${String(mockTransfers.length + 1).padStart(3, '0')}`,
+    date: transfer.date || new Date(),
+    amount: transfer.amount || 0,
+    currency: 'USD',
+    fromAccountId: transfer.fromAccountId || '',
+    fromAccountName: fromAccount?.name || '',
+    toAccountId: transfer.toAccountId || '',
+    toAccountName: toAccount?.name || '',
+    status: 'pending',
+    reference: transfer.reference,
+    memo: transfer.memo,
+    entityId: transfer.entityId || 'e1',
+    createdBy: 'Current User',
+    createdAt: new Date(),
+  }
+  
+  mockTransfers.push(newTransfer)
+  return { success: true, transfer: newTransfer }
+}
+
+export async function processTransfer(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const transfer = mockTransfers.find(t => t.id === id)
+  if (transfer && transfer.status === 'pending') {
+    transfer.status = 'processing'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function completeTransfer(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const transfer = mockTransfers.find(t => t.id === id)
+  if (transfer && (transfer.status === 'pending' || transfer.status === 'processing')) {
+    transfer.status = 'completed'
+    // Update account balances
+    const fromAccount = bankAccounts.find(a => a.id === transfer.fromAccountId)
+    const toAccount = bankAccounts.find(a => a.id === transfer.toAccountId)
+    if (fromAccount) fromAccount.balance -= transfer.amount
+    if (toAccount) toAccount.balance += transfer.amount
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function cancelTransfer(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const transfer = mockTransfers.find(t => t.id === id)
+  if (transfer && transfer.status === 'pending') {
+    transfer.status = 'cancelled'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+// ============ RECONCILIATION SERVICES ============
+
+const mockReconciliationItems: ReconciliationItem[] = [
+  {
+    id: 'rec1',
+    date: new Date('2024-03-01'),
+    description: 'ACH Deposit - Customer Payment',
+    reference: 'ACH-12345',
+    bankAmount: 15000,
+    bookAmount: 15000,
+    difference: 0,
+    status: 'matched',
+    type: 'deposit',
+    bankAccountId: 'ba1',
+    transactionId: 't1',
+    matchedAt: new Date('2024-03-02'),
+    matchedBy: 'Sarah Chen',
+  },
+  {
+    id: 'rec2',
+    date: new Date('2024-03-02'),
+    description: 'Wire Transfer - Vendor Payment',
+    reference: 'WIRE-67890',
+    bankAmount: -25000,
+    bookAmount: -25000,
+    difference: 0,
+    status: 'matched',
+    type: 'withdrawal',
+    bankAccountId: 'ba1',
+    transactionId: 't2',
+    matchedAt: new Date('2024-03-03'),
+    matchedBy: 'Michael Johnson',
+  },
+  {
+    id: 'rec3',
+    date: new Date('2024-03-05'),
+    description: 'Check Deposit - Customer',
+    reference: 'CHK-5678',
+    bankAmount: 8500,
+    bookAmount: 8500,
+    difference: 0,
+    status: 'cleared',
+    type: 'deposit',
+    bankAccountId: 'ba1',
+  },
+  {
+    id: 'rec4',
+    date: new Date('2024-03-08'),
+    description: 'Bank Service Fee',
+    reference: 'FEE-MAR',
+    bankAmount: -45,
+    bookAmount: 0,
+    difference: -45,
+    status: 'unmatched',
+    type: 'fee',
+    bankAccountId: 'ba1',
+  },
+  {
+    id: 'rec5',
+    date: new Date('2024-03-10'),
+    description: 'Interest Earned',
+    reference: 'INT-MAR',
+    bankAmount: 125,
+    bookAmount: 0,
+    difference: 125,
+    status: 'unmatched',
+    type: 'interest',
+    bankAccountId: 'ba1',
+  },
+  {
+    id: 'rec6',
+    date: new Date('2024-03-12'),
+    description: 'ACH Payment - Payroll',
+    reference: 'ACH-PR-001',
+    bankAmount: -85000,
+    bookAmount: -85000,
+    difference: 0,
+    status: 'matched',
+    type: 'withdrawal',
+    bankAccountId: 'ba1',
+    transactionId: 't3',
+    matchedAt: new Date('2024-03-12'),
+    matchedBy: 'Emily Davis',
+  },
+  {
+    id: 'rec7',
+    date: new Date('2024-03-14'),
+    description: 'Wire Deposit - Customer',
+    reference: 'WIRE-IN-002',
+    bankAmount: 45000,
+    bookAmount: 45000,
+    difference: 0,
+    status: 'cleared',
+    type: 'deposit',
+    bankAccountId: 'ba1',
+  },
+  {
+    id: 'rec8',
+    date: new Date('2024-03-15'),
+    description: 'Check #10234 - Vendor',
+    reference: 'CHK-10234',
+    bankAmount: -12500,
+    bookAmount: -12500,
+    difference: 0,
+    status: 'unmatched',
+    type: 'withdrawal',
+    bankAccountId: 'ba1',
+  },
+]
+
+export async function getReconciliationItems(
+  bankAccountId: string,
+  status?: string[],
+  sort?: SortConfig,
+  page: number = 1,
+  pageSize: number = 20
+): Promise<PaginatedResponse<ReconciliationItem>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = mockReconciliationItems.filter(r => r.bankAccountId === bankAccountId)
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(r => status.includes(r.status))
+  }
+  
+  if (sort) {
+    filtered.sort((a, b) => {
+      const aVal = a[sort.key as keyof ReconciliationItem]
+      const bVal = b[sort.key as keyof ReconciliationItem]
+      if (aVal === undefined || bVal === undefined) return 0
+      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  } else {
+    filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
+export async function getReconciliationSummary(bankAccountId: string): Promise<ReconciliationSummary> {
+  await delay(SIMULATED_DELAY)
+  
+  const account = bankAccounts.find(a => a.id === bankAccountId)
+  const items = mockReconciliationItems.filter(r => r.bankAccountId === bankAccountId)
+  
+  const outstandingDeposits = items
+    .filter(i => i.status === 'unmatched' && i.bankAmount > 0)
+    .reduce((sum, i) => sum + i.bankAmount, 0)
+  
+  const outstandingWithdrawals = items
+    .filter(i => i.status === 'unmatched' && i.bankAmount < 0)
+    .reduce((sum, i) => sum + Math.abs(i.bankAmount), 0)
+  
+  const adjustments = items
+    .filter(i => i.status === 'adjusted')
+    .reduce((sum, i) => sum + i.difference, 0)
+  
+  const bankBalance = account?.balance || 0
+  const bookBalance = bankBalance - outstandingDeposits + outstandingWithdrawals - adjustments
+  
+  const hasUnmatched = items.some(i => i.status === 'unmatched')
+  
+  return {
+    bankBalance,
+    bookBalance,
+    outstandingDeposits,
+    outstandingWithdrawals,
+    adjustments,
+    reconciledBalance: bookBalance + adjustments,
+    lastReconciledDate: new Date('2024-02-29'),
+    status: hasUnmatched ? 'needs_review' : 'completed',
+  }
+}
+
+export async function matchReconciliationItem(id: string, transactionId: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const item = mockReconciliationItems.find(r => r.id === id)
+  if (item && item.status === 'unmatched') {
+    item.status = 'matched'
+    item.transactionId = transactionId
+    item.matchedAt = new Date()
+    item.matchedBy = 'Current User'
+    item.difference = 0
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function clearReconciliationItem(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const item = mockReconciliationItems.find(r => r.id === id)
+  if (item && (item.status === 'unmatched' || item.status === 'matched')) {
+    item.status = 'cleared'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function adjustReconciliationItem(id: string, adjustment: number): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const item = mockReconciliationItems.find(r => r.id === id)
+  if (item && item.status === 'unmatched') {
+    item.status = 'adjusted'
+    item.bookAmount = item.bankAmount
+    item.difference = adjustment
+    return { success: true }
+  }
+  return { success: false }
+}
+
 // ============ FILTER OPTION SERVICES ============
 
 export async function getEntities(): Promise<Entity[]> {

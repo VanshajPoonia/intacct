@@ -465,6 +465,64 @@ export interface BankAccount {
   entityId: string
 }
 
+// Transfer Types
+export interface Transfer {
+  id: string
+  number: string
+  date: Date
+  amount: number
+  currency: string
+  fromAccountId: string
+  fromAccountName: string
+  toAccountId: string
+  toAccountName: string
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
+  reference?: string
+  memo?: string
+  entityId: string
+  createdBy: string
+  createdAt: Date
+}
+
+// Reconciliation Types
+export interface ReconciliationItem {
+  id: string
+  date: Date
+  description: string
+  reference?: string
+  bankAmount: number
+  bookAmount: number
+  difference: number
+  status: 'matched' | 'unmatched' | 'adjusted' | 'cleared'
+  type: 'deposit' | 'withdrawal' | 'transfer' | 'fee' | 'interest'
+  bankAccountId: string
+  transactionId?: string
+  matchedAt?: Date
+  matchedBy?: string
+}
+
+export interface ReconciliationSummary {
+  bankBalance: number
+  bookBalance: number
+  outstandingDeposits: number
+  outstandingWithdrawals: number
+  adjustments: number
+  reconciledBalance: number
+  lastReconciledDate?: Date
+  status: 'in_progress' | 'completed' | 'needs_review'
+}
+
+// Cash Position Types
+export interface CashPositionData {
+  totalCash: number
+  availableCash: number
+  pendingInflows: number
+  pendingOutflows: number
+  projectedBalance: number
+  accountBreakdown: { accountId: string; accountName: string; balance: number; available: number }[]
+  dailyForecast: { date: string; opening: number; inflows: number; outflows: number; closing: number }[]
+}
+
 // Chart Data Types
 export interface ChartDataPoint {
   name: string

@@ -10,11 +10,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { 
   Plus, 
   Play, 
-  Save, 
+  Save,
   Star,
   StarOff,
   Trash2,
@@ -25,30 +29,74 @@ import {
   Calendar,
   Clock,
   MoreHorizontal,
+  LineChart,
+  TrendingUp,
+  Grid3X3,
+  Layers,
+  Filter,
+  SortAsc,
+  Eye,
+  Settings2,
+  ArrowRight,
+  GripVertical,
+  X,
 } from "lucide-react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { getSavedReports, saveReport, deleteReport, toggleReportFavorite, getEntities, type SavedReport } from "@/lib/services"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+import { getSavedReports, saveReport, deleteReport, toggleReportFavorite, getEntities, getDepartments, type SavedReport, type Department } from "@/lib/services"
 import type { Entity } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 
 const REPORT_TYPES = [
-  { value: 'balance_sheet', label: 'Balance Sheet', icon: FileText, path: '/reports/balance-sheet' },
-  { value: 'income_statement', label: 'Income Statement', icon: BarChart3, path: '/reports/income-statement' },
-  { value: 'cash_flow', label: 'Cash Flow Statement', icon: PieChart, path: '/reports/cash-flow' },
-  { value: 'budget_vs_actual', label: 'Budget vs Actual', icon: Table2, path: '/reports/budget-vs-actual' },
-  { value: 'trial_balance', label: 'Trial Balance', icon: FileText, path: '/general-ledger/reports/trial-balance' },
+  { value: 'balance_sheet', label: 'Balance Sheet', icon: FileText, path: '/reports/balance-sheet', description: 'Assets, liabilities, and equity' },
+  { value: 'income_statement', label: 'Income Statement', icon: BarChart3, path: '/reports/income-statement', description: 'Revenue and expenses' },
+  { value: 'cash_flow', label: 'Cash Flow Statement', icon: TrendingUp, path: '/reports/cash-flow', description: 'Cash inflows and outflows' },
+  { value: 'budget_vs_actual', label: 'Budget vs Actual', icon: Table2, path: '/reports/budget-vs-actual', description: 'Variance analysis' },
+  { value: 'trial_balance', label: 'Trial Balance', icon: Grid3X3, path: '/general-ledger/reports/trial-balance', description: 'Account balances' },
+  { value: 'custom', label: 'Custom Report', icon: Settings2, path: '/reports/builder', description: 'Build your own' },
+]
+
+const BASE_DATASETS = [
+  { value: 'gl_transactions', label: 'General Ledger Transactions', description: 'All GL transaction details' },
+  { value: 'chart_of_accounts', label: 'Chart of Accounts', description: 'Account master data' },
+  { value: 'ap_transactions', label: 'AP Transactions', description: 'Accounts payable details' },
+  { value: 'ar_transactions', label: 'AR Transactions', description: 'Accounts receivable details' },
+  { value: 'budget_data', label: 'Budget Data', description: 'Budget vs actual by period' },
+  { value: 'cash_transactions', label: 'Cash Transactions', description: 'Bank and cash movements' },
 ]
 
 const COLUMN_OPTIONS = [
-  { value: 'account', label: 'Account Name' },
-  { value: 'current', label: 'Current Period' },
-  { value: 'previous', label: 'Previous Period' },
-  { value: 'variance', label: 'Variance ($)' },
-  { value: 'variance_pct', label: 'Variance (%)' },
-  { value: 'budget', label: 'Budget' },
-  { value: 'actual', label: 'Actual' },
-  { value: 'ytd', label: 'Year to Date' },
+  { value: 'account', label: 'Account Name', group: 'Dimensions' },
+  { value: 'account_number', label: 'Account Number', group: 'Dimensions' },
+  { value: 'department', label: 'Department', group: 'Dimensions' },
+  { value: 'entity', label: 'Entity', group: 'Dimensions' },
+  { value: 'project', label: 'Project', group: 'Dimensions' },
+  { value: 'current', label: 'Current Period', group: 'Measures' },
+  { value: 'previous', label: 'Previous Period', group: 'Measures' },
+  { value: 'variance', label: 'Variance ($)', group: 'Measures' },
+  { value: 'variance_pct', label: 'Variance (%)', group: 'Measures' },
+  { value: 'budget', label: 'Budget', group: 'Measures' },
+  { value: 'actual', label: 'Actual', group: 'Measures' },
+  { value: 'ytd', label: 'Year to Date', group: 'Measures' },
+  { value: 'mtd', label: 'Month to Date', group: 'Measures' },
+  { value: 'qtd', label: 'Quarter to Date', group: 'Measures' },
+]
+
+const GROUPING_OPTIONS = [
+  { value: 'none', label: 'No Grouping' },
+  { value: 'account_type', label: 'Account Type' },
+  { value: 'department', label: 'Department' },
+  { value: 'entity', label: 'Entity' },
+  { value: 'project', label: 'Project' },
+  { value: 'period', label: 'Period' },
+]
+
+const CHART_TYPES = [
+  { value: 'none', label: 'No Chart', icon: Table2 },
+  { value: 'bar', label: 'Bar Chart', icon: BarChart3 },
+  { value: 'line', label: 'Line Chart', icon: LineChart },
+  { value: 'pie', label: 'Pie Chart', icon: PieChart },
+  { value: 'stacked_bar', label: 'Stacked Bar', icon: Layers },
 ]
 
 const DATE_PRESETS = [
@@ -74,26 +122,37 @@ export default function ReportBuilderPage() {
   // Data state
   const [savedReports, setSavedReports] = useState<SavedReport[]>([])
   const [entities, setEntities] = useState<Entity[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
   const [loading, setLoading] = useState(true)
   
   // Modal state
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [builderStep, setBuilderStep] = useState<1 | 2 | 3>(1)
   const [newReportName, setNewReportName] = useState("")
+  const [newReportDescription, setNewReportDescription] = useState("")
   const [newReportType, setNewReportType] = useState<string>("")
+  const [newBaseDataset, setNewBaseDataset] = useState<string>("gl_transactions")
   const [newReportEntity, setNewReportEntity] = useState("e4")
   const [newReportPeriod, setNewReportPeriod] = useState("this_year")
   const [newReportColumns, setNewReportColumns] = useState<string[]>(['account', 'current', 'previous', 'variance'])
+  const [newReportGroupBy, setNewReportGroupBy] = useState<string>("none")
+  const [newReportSortBy, setNewReportSortBy] = useState<string>("account")
+  const [newChartType, setNewChartType] = useState<string>("none")
+  const [showSubtotals, setShowSubtotals] = useState(true)
+  const [showGrandTotal, setShowGrandTotal] = useState(true)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     
-    const [reportsData, entitiesData] = await Promise.all([
+    const [reportsData, entitiesData, departmentsData] = await Promise.all([
       getSavedReports(),
       getEntities(),
+      getDepartments(),
     ])
     
     setSavedReports(reportsData)
     setEntities(entitiesData)
+    setDepartments(departmentsData)
     setLoading(false)
   }, [])
 
@@ -116,13 +175,27 @@ export default function ReportBuilderPage() {
         },
       },
       columns: newReportColumns,
+      groupBy: newReportGroupBy,
+      sortBy: newReportSortBy,
     })
     
     setCreateModalOpen(false)
-    setNewReportName("")
-    setNewReportType("")
-    setNewReportColumns(['account', 'current', 'previous', 'variance'])
+    resetBuilderForm()
     fetchData()
+  }
+
+  const resetBuilderForm = () => {
+    setBuilderStep(1)
+    setNewReportName("")
+    setNewReportDescription("")
+    setNewReportType("")
+    setNewBaseDataset("gl_transactions")
+    setNewReportColumns(['account', 'current', 'previous', 'variance'])
+    setNewReportGroupBy("none")
+    setNewReportSortBy("account")
+    setNewChartType("none")
+    setShowSubtotals(true)
+    setShowGrandTotal(true)
   }
 
   const handleRunReport = (report: SavedReport) => {
@@ -397,103 +470,350 @@ export default function ReportBuilderPage() {
         </Card>
       </div>
 
-      {/* Create Report Modal */}
-      <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-        <DialogContent className="max-w-lg">
+      {/* Create Report Modal - Enhanced Builder */}
+      <Dialog open={createModalOpen} onOpenChange={(open) => {
+        setCreateModalOpen(open)
+        if (!open) resetBuilderForm()
+      }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create New Report</DialogTitle>
+            <DialogTitle>Report Builder</DialogTitle>
+            <DialogDescription>
+              Create a custom report with your own columns, grouping, and visualizations
+            </DialogDescription>
           </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Report Name</Label>
-              <Input
-                placeholder="e.g., Monthly P&L Report"
-                value={newReportName}
-                onChange={(e) => setNewReportName(e.target.value)}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Report Type</Label>
-              <Select value={newReportType} onValueChange={setNewReportType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select report type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {REPORT_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
+
+          {/* Step Indicator */}
+          <div className="flex items-center justify-center gap-2 py-4">
+            {[1, 2, 3].map((step) => (
+              <div key={step} className="flex items-center gap-2">
+                <div className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
+                  builderStep >= step 
+                    ? "bg-primary text-primary-foreground" 
+                    : "bg-muted text-muted-foreground"
+                )}>
+                  {step}
+                </div>
+                {step < 3 && (
+                  <ArrowRight className={cn(
+                    "h-4 w-4",
+                    builderStep > step ? "text-primary" : "text-muted-foreground"
+                  )} />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Step 1: Basic Info */}
+          {builderStep === 1 && (
+            <div className="space-y-6 py-4">
               <div className="space-y-2">
-                <Label>Entity</Label>
-                <Select value={newReportEntity} onValueChange={setNewReportEntity}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {entities.map((entity) => (
-                      <SelectItem key={entity.id} value={entity.id}>
-                        {entity.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Report Name *</Label>
+                <Input
+                  placeholder="e.g., Monthly P&L by Department"
+                  value={newReportName}
+                  onChange={(e) => setNewReportName(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea
+                  placeholder="Optional description of what this report shows..."
+                  value={newReportDescription}
+                  onChange={(e) => setNewReportDescription(e.target.value)}
+                  rows={2}
+                />
               </div>
               
               <div className="space-y-2">
-                <Label>Period</Label>
-                <Select value={newReportPeriod} onValueChange={setNewReportPeriod}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DATE_PRESETS.map((preset) => (
-                      <SelectItem key={preset.value} value={preset.value}>
-                        {preset.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Report Type *</Label>
+                <div className="grid grid-cols-3 gap-3">
+                  {REPORT_TYPES.map((type) => {
+                    const Icon = type.icon
+                    return (
+                      <div
+                        key={type.value}
+                        className={cn(
+                          "flex flex-col items-center p-4 border rounded-lg cursor-pointer transition-all",
+                          newReportType === type.value 
+                            ? "border-primary bg-primary/5" 
+                            : "hover:border-muted-foreground/50"
+                        )}
+                        onClick={() => setNewReportType(type.value)}
+                      >
+                        <Icon className={cn(
+                          "h-6 w-6 mb-2",
+                          newReportType === type.value ? "text-primary" : "text-muted-foreground"
+                        )} />
+                        <span className="text-sm font-medium text-center">{type.label}</span>
+                        <span className="text-xs text-muted-foreground text-center mt-1">{type.description}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {newReportType === 'custom' && (
+                <div className="space-y-2">
+                  <Label>Base Dataset</Label>
+                  <Select value={newBaseDataset} onValueChange={setNewBaseDataset}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BASE_DATASETS.map((ds) => (
+                        <SelectItem key={ds.value} value={ds.value}>
+                          <div>
+                            <div className="font-medium">{ds.label}</div>
+                            <div className="text-xs text-muted-foreground">{ds.description}</div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Entity</Label>
+                  <Select value={newReportEntity} onValueChange={setNewReportEntity}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {entities.map((entity) => (
+                        <SelectItem key={entity.id} value={entity.id}>
+                          {entity.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Period</Label>
+                  <Select value={newReportPeriod} onValueChange={setNewReportPeriod}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DATE_PRESETS.map((preset) => (
+                        <SelectItem key={preset.value} value={preset.value}>
+                          {preset.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
-            
-            <div className="space-y-2">
-              <Label>Columns to Include</Label>
-              <div className="grid grid-cols-2 gap-2 p-3 border rounded-lg">
-                {COLUMN_OPTIONS.map((col) => (
-                  <div key={col.value} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={col.value}
-                      checked={newReportColumns.includes(col.value)}
-                      onCheckedChange={() => handleColumnToggle(col.value)}
-                    />
-                    <label
-                      htmlFor={col.value}
-                      className="text-sm cursor-pointer"
-                    >
-                      {col.label}
-                    </label>
+          )}
+
+          {/* Step 2: Columns & Grouping */}
+          {builderStep === 2 && (
+            <div className="space-y-6 py-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Grid3X3 className="h-4 w-4" />
+                  Columns to Include
+                </Label>
+                <div className="border rounded-lg p-4">
+                  <div className="mb-3">
+                    <span className="text-xs font-medium text-muted-foreground uppercase">Dimensions</span>
                   </div>
-                ))}
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    {COLUMN_OPTIONS.filter(c => c.group === 'Dimensions').map((col) => (
+                      <div key={col.value} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={col.value}
+                          checked={newReportColumns.includes(col.value)}
+                          onCheckedChange={() => handleColumnToggle(col.value)}
+                        />
+                        <label htmlFor={col.value} className="text-sm cursor-pointer">
+                          {col.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  <Separator className="my-3" />
+                  <div className="mb-3">
+                    <span className="text-xs font-medium text-muted-foreground uppercase">Measures</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {COLUMN_OPTIONS.filter(c => c.group === 'Measures').map((col) => (
+                      <div key={col.value} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={col.value}
+                          checked={newReportColumns.includes(col.value)}
+                          onCheckedChange={() => handleColumnToggle(col.value)}
+                        />
+                        <label htmlFor={col.value} className="text-sm cursor-pointer">
+                          {col.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Layers className="h-4 w-4" />
+                    Row Grouping
+                  </Label>
+                  <Select value={newReportGroupBy} onValueChange={setNewReportGroupBy}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {GROUPING_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <SortAsc className="h-4 w-4" />
+                    Sort By
+                  </Label>
+                  <Select value={newReportSortBy} onValueChange={setNewReportSortBy}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COLUMN_OPTIONS.map((col) => (
+                        <SelectItem key={col.value} value={col.value}>
+                          {col.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="show-subtotals"
+                    checked={showSubtotals}
+                    onCheckedChange={setShowSubtotals}
+                  />
+                  <Label htmlFor="show-subtotals">Show Subtotals</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="show-grand-total"
+                    checked={showGrandTotal}
+                    onCheckedChange={setShowGrandTotal}
+                  />
+                  <Label htmlFor="show-grand-total">Show Grand Total</Label>
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* Step 3: Visualization */}
+          {builderStep === 3 && (
+            <div className="space-y-6 py-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Chart Type
+                </Label>
+                <div className="grid grid-cols-5 gap-3">
+                  {CHART_TYPES.map((chart) => {
+                    const Icon = chart.icon
+                    return (
+                      <div
+                        key={chart.value}
+                        className={cn(
+                          "flex flex-col items-center p-4 border rounded-lg cursor-pointer transition-all",
+                          newChartType === chart.value 
+                            ? "border-primary bg-primary/5" 
+                            : "hover:border-muted-foreground/50"
+                        )}
+                        onClick={() => setNewChartType(chart.value)}
+                      >
+                        <Icon className={cn(
+                          "h-6 w-6 mb-2",
+                          newChartType === chart.value ? "text-primary" : "text-muted-foreground"
+                        )} />
+                        <span className="text-xs font-medium text-center">{chart.label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Preview Summary */}
+              <Card className="bg-muted/30">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Report Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Name:</span>
+                    <span className="font-medium">{newReportName || 'Untitled'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Type:</span>
+                    <span className="font-medium">{REPORT_TYPES.find(t => t.value === newReportType)?.label || '-'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Columns:</span>
+                    <span className="font-medium">{newReportColumns.length} selected</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Grouping:</span>
+                    <span className="font-medium">{GROUPING_OPTIONS.find(g => g.value === newReportGroupBy)?.label}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Chart:</span>
+                    <span className="font-medium">{CHART_TYPES.find(c => c.value === newChartType)?.label}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
           
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreateReport} disabled={!newReportName || !newReportType}>
-              <Save className="h-4 w-4 mr-2" />
-              Save Report
-            </Button>
+          <DialogFooter className="flex justify-between">
+            <div>
+              {builderStep > 1 && (
+                <Button variant="outline" onClick={() => setBuilderStep((builderStep - 1) as 1 | 2 | 3)}>
+                  Back
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => {
+                setCreateModalOpen(false)
+                resetBuilderForm()
+              }}>
+                Cancel
+              </Button>
+              {builderStep < 3 ? (
+                <Button 
+                  onClick={() => setBuilderStep((builderStep + 1) as 1 | 2 | 3)}
+                  disabled={builderStep === 1 && (!newReportName || !newReportType)}
+                >
+                  Next
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              ) : (
+                <Button onClick={handleCreateReport} disabled={!newReportName || !newReportType}>
+                  <Save className="h-4 w-4 mr-2" />
+                  Create Report
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

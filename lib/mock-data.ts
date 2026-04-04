@@ -298,7 +298,14 @@ export const arAgingData: ChartDataPoint[] = [
 export const navModules: NavModule[] = [
   { id: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard', href: '/' },
   { id: 'reports', label: 'Reports', icon: 'FileText', href: '/reports' },
-  { id: 'company', label: 'Company', icon: 'Building2', href: '/company' },
+  {
+    id: 'company', label: 'Company', icon: 'Building2',
+    megaMenu: [
+      { label: 'Structure', items: [{ label: 'Entities', href: '/company/entities' }, { label: 'Departments', href: '/company/departments' }, { label: 'Locations', href: '/company/locations' }] },
+      { label: 'People', items: [{ label: 'Employees', href: '/company/employees' }] },
+      { label: 'Configuration', items: [{ label: 'Dimensions', href: '/company/dimensions' }, { label: 'Fiscal Calendar', href: '/company/calendar' }] }
+    ]
+  },
   {
     id: 'cash-management', label: 'Cash Management', icon: 'Banknote',
     megaMenu: [
@@ -375,7 +382,9 @@ export const navModules: NavModule[] = [
     id: 'admin', label: 'Admin', icon: 'Settings',
     megaMenu: [
       { label: 'Users & Security', items: [{ label: 'Users', href: '/admin/users' }, { label: 'Roles', href: '/admin/roles' }, { label: 'Permissions', href: '/admin/permissions' }] },
-      { label: 'Configuration', items: [{ label: 'Company Settings', href: '/admin/settings' }, { label: 'Integrations', href: '/admin/integrations' }, { label: 'Audit Log', href: '/admin/audit-log' }] }
+      { label: 'Configuration', items: [{ label: 'Company Settings', href: '/admin/settings' }, { label: 'Custom Fields', href: '/admin/custom-fields' }, { label: 'Integrations', href: '/admin/integrations' }, { label: 'API Keys', href: '/admin/api-keys' }] },
+      { label: 'Automation', items: [{ label: 'Workflows', href: '/admin/workflows' }, { label: 'Notifications', href: '/admin/notifications' }] },
+      { label: 'Compliance', items: [{ label: 'Audit Settings', href: '/admin/audit' }, { label: 'Audit Log', href: '/admin/audit-log' }] }
     ]
   },
 ]
@@ -405,6 +414,20 @@ export const searchableItems = [
   { type: 'module', label: 'Projects', href: '/projects', icon: 'FolderKanban' },
   { type: 'module', label: 'Time & Expenses', href: '/time-expenses', icon: 'Clock' },
   { type: 'module', label: 'Multi-Entity', href: '/multi-entity', icon: 'Network' },
+  // Company Sub-modules
+  { type: 'module', label: 'Entities', href: '/company/entities', icon: 'Building2' },
+  { type: 'module', label: 'Departments', href: '/company/departments', icon: 'Users' },
+  { type: 'module', label: 'Locations', href: '/company/locations', icon: 'MapPin' },
+  { type: 'module', label: 'Employees', href: '/company/employees', icon: 'Users' },
+  { type: 'module', label: 'Dimensions', href: '/company/dimensions', icon: 'Layers' },
+  // Admin Sub-modules
+  { type: 'module', label: 'Users Management', href: '/admin/users', icon: 'Users' },
+  { type: 'module', label: 'Custom Fields', href: '/admin/custom-fields', icon: 'Settings' },
+  { type: 'module', label: 'Integrations', href: '/admin/integrations', icon: 'Link' },
+  { type: 'module', label: 'API Keys', href: '/admin/api-keys', icon: 'Key' },
+  { type: 'module', label: 'Workflows', href: '/admin/workflows', icon: 'GitBranch' },
+  { type: 'module', label: 'Notifications Settings', href: '/admin/notifications', icon: 'Bell' },
+  { type: 'module', label: 'Audit Settings', href: '/admin/audit', icon: 'Shield' },
   // GL Sub-modules
   { type: 'module', label: 'Journal Entries', href: '/general-ledger/journal-entries', icon: 'FileText' },
   { type: 'module', label: 'Recurring Journals', href: '/general-ledger/recurring-journals', icon: 'RefreshCcw' },

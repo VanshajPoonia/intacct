@@ -1,0 +1,112 @@
+import type { Contract, Customer, Document, Invoice } from '@/lib/types'
+
+export const customers: Customer[] = [
+  { id: 'c-apex', name: 'Apex Retail Group', code: 'APEX', email: 'ap@apexretail.com', phone: '(646) 555-1001', creditLimit: 250000, paymentTerms: 'Net 30', status: 'active', balance: 128000, lifetimeRevenue: 1680000, currency: 'USD', createdAt: new Date('2024-05-10'), lastPaymentDate: new Date('2026-03-31'), lastPaymentAmount: 128000 },
+  { id: 'c-luma', name: 'Luma Health Systems', code: 'LUMA', email: 'payments@lumahealth.com', phone: '(404) 555-3390', creditLimit: 350000, paymentTerms: 'Net 45', status: 'active', balance: 94000, lifetimeRevenue: 2210000, currency: 'USD', createdAt: new Date('2024-09-02') },
+  { id: 'c-berger', name: 'Berger Industrial GmbH', code: 'BERGER', email: 'finance@berger-industrial.de', creditLimit: 200000, paymentTerms: 'Net 30', status: 'active', balance: 41000, lifetimeRevenue: 640000, currency: 'EUR', createdAt: new Date('2025-01-12'), collectionPriority: 'medium' },
+  { id: 'c-trident', name: 'Trident Foods', code: 'TRIDENT', email: 'billing@tridentfoods.com', phone: '(312) 555-7810', creditLimit: 150000, paymentTerms: 'Net 15', status: 'hold', balance: 76500, lifetimeRevenue: 540000, currency: 'USD', createdAt: new Date('2025-03-05'), collectionNotes: 'Late payer in Q1 close review', assignedCollector: 'Owen Price', collectionPriority: 'high' },
+]
+
+export const invoices: Invoice[] = [
+  {
+    id: 'inv-1101',
+    number: 'INV-1101',
+    customerId: 'c-apex',
+    customerName: 'Apex Retail Group',
+    date: new Date('2026-03-01'),
+    dueDate: new Date('2026-03-31'),
+    amount: 128000,
+    amountPaid: 128000,
+    openBalance: 0,
+    currency: 'USD',
+    status: 'paid',
+    collectionStatus: 'none',
+    description: 'Implementation milestone billing',
+    entityId: 'e1',
+    departmentId: 'd-sales',
+    departmentName: 'Sales',
+    createdAt: new Date('2026-03-01T09:00:00'),
+    sentAt: new Date('2026-03-01T09:10:00'),
+    paidAt: new Date('2026-03-31T09:00:00'),
+    lineItems: [
+      { id: 'ili-1', description: 'Implementation milestone 3', accountId: 'a-service', accountName: 'Service Revenue', amount: 128000, quantity: 1, unitPrice: 128000, projectId: 'p-close', projectName: 'Q1 Close Acceleration' },
+    ],
+  },
+  {
+    id: 'inv-1102',
+    number: 'INV-1102',
+    customerId: 'c-luma',
+    customerName: 'Luma Health Systems',
+    date: new Date('2026-03-17'),
+    dueDate: new Date('2026-05-01'),
+    amount: 94000,
+    openBalance: 94000,
+    currency: 'USD',
+    status: 'sent',
+    collectionStatus: 'none',
+    description: 'Platform license expansion',
+    entityId: 'e1',
+    departmentId: 'd-sales',
+    departmentName: 'Sales',
+    createdAt: new Date('2026-03-17T10:15:00'),
+    sentAt: new Date('2026-03-17T10:20:00'),
+    lineItems: [
+      { id: 'ili-2', description: 'Platform license seats', accountId: 'a-sales', accountName: 'Product Revenue', amount: 94000, quantity: 94, unitPrice: 1000 },
+    ],
+  },
+  {
+    id: 'inv-1103',
+    number: 'INV-1103',
+    customerId: 'c-trident',
+    customerName: 'Trident Foods',
+    date: new Date('2026-03-27'),
+    dueDate: new Date('2026-04-11'),
+    amount: 76500,
+    openBalance: 76500,
+    currency: 'USD',
+    status: 'overdue',
+    collectionStatus: 'in_collections',
+    description: 'Hardware shipment and setup',
+    entityId: 'e1',
+    departmentId: 'd-sales',
+    departmentName: 'Sales',
+    createdAt: new Date('2026-03-27T11:00:00'),
+    sentAt: new Date('2026-03-27T11:05:00'),
+    lineItems: [
+      { id: 'ili-3', description: 'Hardware shipment', accountId: 'a-sales', accountName: 'Product Revenue', amount: 68000, quantity: 68, unitPrice: 1000 },
+      { id: 'ili-4', description: 'Setup services', accountId: 'a-service', accountName: 'Service Revenue', amount: 8500, quantity: 17, unitPrice: 500 },
+    ],
+  },
+  {
+    id: 'inv-1104',
+    number: 'INV-1104',
+    customerId: 'c-berger',
+    customerName: 'Berger Industrial GmbH',
+    date: new Date('2026-03-20'),
+    dueDate: new Date('2026-04-19'),
+    amount: 41000,
+    openBalance: 41000,
+    currency: 'EUR',
+    status: 'sent',
+    collectionStatus: 'reminder_sent',
+    description: 'EU shared service fee',
+    entityId: 'e3',
+    departmentId: 'd-fin',
+    departmentName: 'Finance',
+    createdAt: new Date('2026-03-20T08:45:00'),
+    sentAt: new Date('2026-03-20T08:50:00'),
+    lineItems: [
+      { id: 'ili-5', description: 'Shared service billing', accountId: 'a-service', accountName: 'Service Revenue', amount: 41000, quantity: 1, unitPrice: 41000, projectId: 'p-eu', projectName: 'EU Shared Services' },
+    ],
+  },
+]
+
+export const contracts: Contract[] = [
+  { id: 'ctr-9001', number: 'CTR-9001', name: 'Apex multi-year implementation', customerId: 'c-apex', customerName: 'Apex Retail Group', entityId: 'e1', projectId: 'p-close', startDate: new Date('2025-08-01'), endDate: new Date('2027-07-31'), contractValue: 1250000, recognizedRevenue: 812000, deferredRevenue: 182000, billingFrequency: 'milestone', status: 'active', createdAt: new Date('2025-07-15') },
+  { id: 'ctr-9002', number: 'CTR-9002', name: 'Berger shared services agreement', customerId: 'c-berger', customerName: 'Berger Industrial GmbH', entityId: 'e3', projectId: 'p-eu', startDate: new Date('2025-11-01'), endDate: new Date('2026-10-31'), contractValue: 240000, recognizedRevenue: 82000, deferredRevenue: 38000, billingFrequency: 'monthly', status: 'active', createdAt: new Date('2025-10-18') },
+]
+
+export const receivableDocuments: Document[] = [
+  { id: 'doc-inv-1102', number: 'DOC-1102', type: 'invoice', module: 'ar', title: 'Luma Health invoice package', status: 'approved', entityId: 'e1', relatedEntityType: 'invoice', relatedEntityId: 'inv-1102', fileName: 'inv-1102.pdf', fileSizeBytes: 201440, mimeType: 'application/pdf', createdAt: new Date('2026-03-17T10:15:00'), updatedAt: new Date('2026-03-17T10:20:00'), version: 1 },
+  { id: 'doc-inv-1103', number: 'DOC-1103', type: 'invoice', module: 'ar', title: 'Trident invoice support docs', status: 'pending', entityId: 'e1', relatedEntityType: 'invoice', relatedEntityId: 'inv-1103', fileName: 'inv-1103.pdf', fileSizeBytes: 246210, mimeType: 'application/pdf', createdAt: new Date('2026-03-27T11:00:00'), updatedAt: new Date('2026-03-27T11:05:00'), version: 1 },
+]

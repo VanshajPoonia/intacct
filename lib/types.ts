@@ -68,16 +68,60 @@ export interface Account {
 export interface Transaction {
   id: string
   date: Date
-  type: 'debit' | 'credit'
+  type: 'deposit' | 'withdrawal' | 'transfer' | 'fee' | 'interest'
   amount: number
   currency: string
   accountId: string
   accountName: string
+  bankAccountId?: string
+  bankAccountName?: string
   description: string
+  merchant?: string
   reference?: string
-  status: 'posted' | 'pending' | 'voided'
+  source: 'bank_feed' | 'manual' | 'import' | 'api'
+  category?: string
+  tags?: string[]
+  departmentId?: string
+  departmentName?: string
+  status: 'completed' | 'pending' | 'cleared' | 'failed'
+  reconciliationStatus: 'unmatched' | 'matched' | 'reconciled' | 'exception'
   entityId: string
+  entityName?: string
+  attachments?: string[]
+  matchedTransactionId?: string
+  ruleId?: string
+  ruleName?: string
   createdBy: string
+  createdAt: Date
+}
+
+export interface CorporateCardTransaction {
+  id: string
+  cardId: string
+  cardLastFour: string
+  cardholderName: string
+  merchantName: string
+  merchantCategory: string
+  transactionDate: Date
+  postDate: Date
+  amount: number
+  currency: string
+  status: 'pending' | 'posted' | 'declined' | 'disputed'
+  receiptStatus: 'missing' | 'uploaded' | 'matched' | 'not_required'
+  receiptUrl?: string
+  codingStatus: 'uncoded' | 'suggested' | 'coded' | 'reviewed'
+  suggestedCategory?: string
+  suggestedAccountId?: string
+  suggestedAccountName?: string
+  actualCategory?: string
+  actualAccountId?: string
+  actualAccountName?: string
+  departmentId?: string
+  departmentName?: string
+  projectId?: string
+  projectName?: string
+  memo?: string
+  entityId: string
   createdAt: Date
 }
 
@@ -517,12 +561,14 @@ export interface BankAccount {
   accountNumber: string
   routingNumber?: string
   bankName: string
-  type: 'checking' | 'savings' | 'credit'
+  type: 'checking' | 'savings' | 'credit' | 'corporate_card'
   balance: number
+  availableBalance: number
   currency: string
-  status: 'active' | 'inactive'
+  status: 'active' | 'inactive' | 'frozen'
   lastSyncedAt?: Date
   entityId: string
+  entityName?: string
 }
 
 // Transfer Types

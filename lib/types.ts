@@ -178,7 +178,162 @@ export interface ReportFilter {
   locationIds?: string[]
   vendorIds?: string[]
   customerIds?: string[]
+  projectIds?: string[]
+  employeeIds?: string[]
   status?: string[]
+}
+
+// Dashboard Filter State
+export interface DashboardFilters {
+  entityId: string
+  departmentId?: string
+  locationId?: string
+  projectId?: string
+  customerId?: string
+  vendorId?: string
+  employeeId?: string
+  dateRange: {
+    startDate: Date
+    endDate: Date
+    preset?: 'today' | 'this_week' | 'this_month' | 'this_quarter' | 'this_year' | 'last_month' | 'last_quarter' | 'last_year' | 'custom'
+  }
+}
+
+// Enhanced Dashboard Metrics Response
+export interface DashboardMetricsResponse {
+  totalRevenue: DashboardMetric
+  totalExpenses: DashboardMetric
+  netIncome: DashboardMetric
+  cashBalance: DashboardMetric
+  arOutstanding: DashboardMetric
+  apOutstanding: DashboardMetric
+  budgetVariance: DashboardMetric
+  pendingApprovals: DashboardMetric
+}
+
+// Chart Data Response Types
+export interface RevenueByChannelData {
+  channel: string
+  direct: number
+  partner: number
+  online: number
+}
+
+export interface RevenueTrendData {
+  year: number
+  data: { month: string; value: number }[]
+}
+
+export interface DepartmentExpenseData {
+  department: string
+  salary: number
+  benefits: number
+  travel: number
+  supplies: number
+}
+
+export interface CashWeeklyData {
+  week: string
+  opening: number
+  inflow: number
+  outflow: number
+  closing: number
+}
+
+export interface ContractExpenseData {
+  rep: string
+  value: number
+  color: string
+}
+
+export interface AgingData {
+  bucket: string
+  amount: number
+  count: number
+}
+
+export interface BudgetActualData {
+  category: string
+  budget: number
+  actual: number
+  variance: number
+  variancePercent: number
+}
+
+export interface EntityPerformanceData {
+  entityId: string
+  entityName: string
+  revenue: number
+  expenses: number
+  netIncome: number
+  cashBalance: number
+}
+
+export interface AIInsight {
+  id: string
+  type: 'anomaly' | 'duplicate' | 'missing_receipt' | 'budget_variance' | 'recommendation'
+  severity: 'info' | 'warning' | 'critical'
+  title: string
+  description: string
+  relatedIds?: string[]
+  actionLabel?: string
+  actionHref?: string
+  createdAt: Date
+}
+
+// Pagination
+export interface PaginatedResponse<T> {
+  data: T[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export interface SortConfig {
+  key: string
+  direction: 'asc' | 'desc'
+}
+
+// Department and Location types
+export interface Department {
+  id: string
+  name: string
+  code: string
+  managerId?: string
+  parentId?: string
+  status: 'active' | 'inactive'
+}
+
+export interface Location {
+  id: string
+  name: string
+  code: string
+  address?: string
+  status: 'active' | 'inactive'
+}
+
+export interface Project {
+  id: string
+  name: string
+  code: string
+  customerId?: string
+  managerId?: string
+  budget: number
+  spent: number
+  status: 'active' | 'completed' | 'on_hold'
+  startDate: Date
+  endDate?: Date
+}
+
+export interface Employee {
+  id: string
+  name: string
+  email: string
+  departmentId: string
+  locationId?: string
+  role: string
+  status: 'active' | 'inactive'
 }
 
 export interface DashboardMetric {

@@ -53,6 +53,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { getUsers, createUser, updateUser, deactivateUser, getEntities } from "@/lib/services"
 import type { User, Entity } from "@/lib/types"
+import { RoleDrawer } from "@/components/admin/role-drawer"
 
 const roles = [
   { value: "admin", label: "Administrator", description: "Full access to all features" },
@@ -73,6 +74,8 @@ export default function UsersPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [editUser, setEditUser] = useState<User | null>(null)
   const [totalUsers, setTotalUsers] = useState(0)
+  const [roleDrawerOpen, setRoleDrawerOpen] = useState(false)
+  const [selectedRole, setSelectedRole] = useState<string | null>(null)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -134,6 +137,16 @@ export default function UsersPage() {
   const handleReactivate = async (userId: string) => {
     await updateUser(userId, { status: "active" })
     fetchData()
+  }
+
+  const handleRoleClick = (role: string) => {
+    setSelectedRole(role)
+    setRoleDrawerOpen(true)
+  }
+
+  const handleRoleSave = (roleData: { name: string; description: string; permissions: string[] }) => {
+    console.log("Saving role:", roleData)
+    // In a real app, this would save to the backend
   }
 
   const getRoleColor = (role: User["role"]) => {
@@ -309,11 +322,15 @@ export default function UsersPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={getRoleColor(user.role)}>
-                          {roles.find(r => r.value === user.role)?.label || user.role}
-                        </Badge>
-                      </TableCell>
+<TableCell>
+                                        <Badge 
+                                          variant="outline" 
+                                          className={`${getRoleColor(user.role)} cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all`}
+                                          onClick={() => handleRoleClick(user.role)}
+                                        >
+                                          {roles.find(r => r.value === user.role)?.label || user.role}
+                                        </Badge>
+                                      </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={getStatusColor(user.status)}>
                           {user.status}
@@ -504,6 +521,16 @@ export default function UsersPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Role Drawer */}
+        <RoleDrawer
+          open={roleDrawerOpen}
+          onOpenChange={setRoleDrawerOpen}
+          role={selectedRole}
+          users={users}
+          entities={entities}
+          onSave={handleRoleSave}
+        />
       </div>
     </AppShell>
   )

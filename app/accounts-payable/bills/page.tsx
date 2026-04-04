@@ -1,14 +1,85 @@
 "use client"
 
-import { ModulePage } from "@/components/layout/module-page"
-import { DataTable, type Column } from "@/components/tables/data-table"
-import { StatusBadge } from "@/components/finance/status-badge"
+import { useState, useEffect, useCallback } from "react"
+import { startOfYear, format } from "date-fns"
+import { AppShell } from "@/components/layout/app-shell"
+import { PageHeader } from "@/components/finance/page-header"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { bills } from "@/lib/mock-data"
-import type { Bill } from "@/lib/types"
-import { Plus, Search, Filter, Download } from "lucide-react"
-import { format } from "date-fns"
+import { Badge } from "@/components/ui/badge"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Skeleton } from "@/components/ui/skeleton"
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  Download, 
+  MoreHorizontal,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  FileText,
+  Eye,
+  Pencil,
+  CheckCircle,
+  DollarSign,
+  XCircle,
+  Clock,
+  AlertCircle,
+} from "lucide-react"
+import type { 
+  Bill, 
+  DashboardFilters, 
+  PaginatedResponse,
+  SortConfig,
+  Entity,
+  Vendor,
+} from "@/lib/types"
+import { 
+  getBills, 
+  getEntities,
+  getVendors,
+} from "@/lib/services"
+import { BillDrawer } from "@/components/accounts-payable/bill-drawer"
+
+const statusColors: Record<string, string> = {
+  draft: "bg-muted text-muted-foreground",
+  pending: "bg-yellow-100 text-yellow-800",
+  approved: "bg-blue-100 text-blue-800",
+  paid: "bg-green-100 text-green-800",
+  voided: "bg-red-100 text-red-800",
+}
+
+const defaultFilters: DashboardFilters = {
+  entityId: 'e4',
+  dateRange: {
+    startDate: startOfYear(new Date()),
+    endDate: new Date(),
+    preset: 'this_year'
+  }
+}
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-US', {
@@ -18,88 +89,512 @@ const formatCurrency = (value: number) => {
   }).format(value)
 }
 
-const columns: Column<Bill>[] = [
-  {
-    key: 'number',
-    header: 'Bill #',
-    cell: (item) => (
-      <span className="font-medium text-primary">{item.number}</span>
-    )
-  },
-  {
-    key: 'vendorName',
-    header: 'Vendor',
-    cell: (item) => (
-      <span className="font-medium">{item.vendorName}</span>
-    )
-  },
-  {
-    key: 'date',
-    header: 'Bill Date',
-    cell: (item) => (
-      <span className="tabular-nums">{format(item.date, 'MMM d, yyyy')}</span>
-    )
-  },
-  {
-    key: 'dueDate',
-    header: 'Due Date',
-    cell: (item) => (
-      <span className="tabular-nums">{format(item.dueDate, 'MMM d, yyyy')}</span>
-    )
-  },
-  {
-    key: 'amount',
-    header: 'Amount',
-    align: 'right',
-    cell: (item) => (
-      <span className="tabular-nums font-medium">{formatCurrency(item.amount)}</span>
-    )
-  },
-  {
-    key: 'status',
-    header: 'Status',
-    cell: (item) => <StatusBadge status={item.status} />
-  }
-]
-
 export default function BillsPage() {
-  return (
-    <ModulePage
-      title="Bills"
-      description="Manage vendor bills and payments"
-      breadcrumbs={[
-        { label: 'Accounts Payable', href: '/accounts-payable' },
-        { label: 'Bills' }
-      ]}
-      actions={
-        <>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-1.5" />
-            Export
-          </Button>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-1.5" />
-            New Bill
-          </Button>
-        </>
+  // Filter state
+  const [filters, setFilters] = useState<DashboardFilters>(defaultFilters)
+  const [entities, setEntities] = useState<Entity[]>([])
+  const [vendors, setVendors] = useState<Vendor[]>([])
+  const [statusFilter, setStatusFilter] = useState<string[]>([])
+  const [search, setSearch] = useState("")
+  const [sort, setSort] = useState<SortConfig | undefined>(undefined)
+  const [page, setPage] = useState(1)
+  const pageSize = 10
+  
+  // Data state
+  const [data, setData] = useState<PaginatedResponse<Bill> | null>(null)
+  const [loading, setLoading] = useState(true)
+  
+  // UI state
+  const [selectedBill, setSelectedBill] = useState<Bill | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+
+  // Load entities and vendors on mount
+  useEffect(() => {
+    Promise.all([getEntities(), getVendors()]).then(([e, v]) => {
+      setEntities(e)
+      setVendors(v)
+    })
+  }, [])
+
+  // Fetch bills
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const result = await getBills(
+        filters,
+        search || undefined,
+        statusFilter.length > 0 ? statusFilter : undefined,
+        sort,
+        page,
+        pageSize
+      )
+      setData(result)
+    } catch (error) {
+      console.error('Error fetching bills:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [filters, search, statusFilter, sort, page])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  // Handle entity change
+  const handleEntityChange = (entityId: string) => {
+    setFilters(prev => ({ ...prev, entityId }))
+    setPage(1)
+  }
+
+  // Handle vendor change
+  const handleVendorChange = (vendorId: string) => {
+    setFilters(prev => ({ ...prev, vendorId: vendorId === 'all' ? undefined : vendorId }))
+    setPage(1)
+  }
+
+  // Handle status filter change
+  const handleStatusChange = (status: string) => {
+    if (status === 'all') {
+      setStatusFilter([])
+    } else {
+      setStatusFilter([status])
+    }
+    setPage(1)
+  }
+
+  // Handle search
+  const handleSearch = (value: string) => {
+    setSearch(value)
+    setPage(1)
+  }
+
+  // Handle sort
+  const handleSort = (key: string) => {
+    setSort(prev => {
+      if (prev?.key === key) {
+        return prev.direction === 'asc' 
+          ? { key, direction: 'desc' } 
+          : undefined
       }
-    >
-      <div className="space-y-4">
-        {/* Filters */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search bills..." className="pl-9 h-9" />
-          </div>
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-1.5" />
-            Filters
-          </Button>
+      return { key, direction: 'asc' }
+    })
+  }
+
+  // Handle row click
+  const handleRowClick = (bill: Bill) => {
+    setSelectedBill(bill)
+    setDrawerOpen(true)
+  }
+
+  // Handle approve
+  const handleApprove = async (id: string) => {
+    // In real app, call API
+    console.log('Approving bill:', id)
+    fetchData()
+  }
+
+  // Handle pay
+  const handlePay = async (id: string) => {
+    // In real app, call API
+    console.log('Paying bill:', id)
+    fetchData()
+  }
+
+  // Handle void
+  const handleVoid = async (id: string) => {
+    // In real app, call API
+    console.log('Voiding bill:', id)
+    fetchData()
+  }
+
+  // Calculate summary metrics
+  const summaryMetrics = data?.data.reduce((acc, bill) => {
+    acc.total += bill.amount
+    if (bill.status === 'pending') acc.pending += bill.amount
+    if (bill.status === 'approved') acc.approved += bill.amount
+    if (new Date(bill.dueDate) < new Date() && bill.status !== 'paid') acc.overdue += bill.amount
+    return acc
+  }, { total: 0, pending: 0, approved: 0, overdue: 0 }) || { total: 0, pending: 0, approved: 0, overdue: 0 }
+
+  return (
+    <AppShell>
+      <div className="space-y-6">
+        <PageHeader
+          title="Bills"
+          description="Manage vendor bills and payments"
+          actions={
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-1.5" />
+                Export
+              </Button>
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-1.5" />
+                New Bill
+              </Button>
+            </div>
+          }
+        />
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Pending Approval</p>
+                  <p className="text-xl font-semibold text-yellow-600">
+                    {formatCurrency(summaryMetrics.pending)}
+                  </p>
+                </div>
+                <div className="p-2 rounded-lg bg-yellow-100">
+                  <Clock className="h-4 w-4 text-yellow-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Approved to Pay</p>
+                  <p className="text-xl font-semibold text-blue-600">
+                    {formatCurrency(summaryMetrics.approved)}
+                  </p>
+                </div>
+                <div className="p-2 rounded-lg bg-blue-100">
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Overdue</p>
+                  <p className="text-xl font-semibold text-red-600">
+                    {formatCurrency(summaryMetrics.overdue)}
+                  </p>
+                </div>
+                <div className="p-2 rounded-lg bg-red-100">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Outstanding</p>
+                  <p className="text-xl font-semibold">
+                    {formatCurrency(summaryMetrics.total)}
+                  </p>
+                </div>
+                <div className="p-2 rounded-lg bg-muted">
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
+        {/* Filters */}
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Select value={filters.entityId} onValueChange={handleEntityChange}>
+                <SelectTrigger className="w-[200px] h-9">
+                  <SelectValue placeholder="Select entity" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="e4">All Entities (Consolidated)</SelectItem>
+                  {entities.map(entity => (
+                    <SelectItem key={entity.id} value={entity.id}>
+                      {entity.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={filters.vendorId || 'all'} onValueChange={handleVendorChange}>
+                <SelectTrigger className="w-[180px] h-9">
+                  <SelectValue placeholder="All Vendors" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Vendors</SelectItem>
+                  {vendors.map(vendor => (
+                    <SelectItem key={vendor.id} value={vendor.id}>
+                      {vendor.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select 
+                value={statusFilter.length === 0 ? 'all' : statusFilter[0]} 
+                onValueChange={handleStatusChange}
+              >
+                <SelectTrigger className="w-[140px] h-9">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="voided">Voided</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search bills..."
+                  value={search}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="pl-9 h-9"
+                />
+              </div>
+
+              <Button variant="outline" size="sm" className="ml-auto">
+                <Filter className="h-4 w-4 mr-1.5" />
+                More Filters
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Table */}
-        <DataTable columns={columns} data={bills} />
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[120px]">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-ml-3 h-8"
+                      onClick={() => handleSort('number')}
+                    >
+                      Bill #
+                      <ArrowUpDown className="ml-1 h-3.5 w-3.5" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>Vendor</TableHead>
+                  <TableHead className="w-[100px]">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-ml-3 h-8"
+                      onClick={() => handleSort('date')}
+                    >
+                      Date
+                      <ArrowUpDown className="ml-1 h-3.5 w-3.5" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="w-[100px]">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-ml-3 h-8"
+                      onClick={() => handleSort('dueDate')}
+                    >
+                      Due Date
+                      <ArrowUpDown className="ml-1 h-3.5 w-3.5" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="text-right w-[120px]">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-mr-3 h-8"
+                      onClick={() => handleSort('amount')}
+                    >
+                      Amount
+                      <ArrowUpDown className="ml-1 h-3.5 w-3.5" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="w-[100px]">Status</TableHead>
+                  <TableHead className="w-[60px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : data?.data.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-32 text-center">
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <FileText className="h-8 w-8" />
+                        <p>No bills found</p>
+                        <Button variant="outline" size="sm">
+                          Create Bill
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  data?.data.map((bill) => {
+                    const isOverdue = new Date(bill.dueDate) < new Date() && bill.status !== 'paid'
+                    return (
+                      <TableRow 
+                        key={bill.id} 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => handleRowClick(bill)}
+                      >
+                        <TableCell className="font-medium">{bill.number}</TableCell>
+                        <TableCell>{bill.vendorName}</TableCell>
+                        <TableCell>{format(new Date(bill.date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>
+                          <span className={isOverdue ? 'text-red-600 font-medium' : ''}>
+                            {format(new Date(bill.dueDate), 'MMM d, yyyy')}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatCurrency(bill.amount)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className={statusColors[bill.status]}>
+                            {bill.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation()
+                                handleRowClick(bill)
+                              }}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              {(bill.status === 'draft' || bill.status === 'pending') && (
+                                <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              {bill.status === 'pending' && (
+                                <DropdownMenuItem 
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleApprove(bill.id)
+                                  }}
+                                  className="text-green-600"
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Approve
+                                </DropdownMenuItem>
+                              )}
+                              {bill.status === 'approved' && (
+                                <DropdownMenuItem 
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handlePay(bill.id)
+                                  }}
+                                  className="text-blue-600"
+                                >
+                                  <DollarSign className="h-4 w-4 mr-2" />
+                                  Pay
+                                </DropdownMenuItem>
+                              )}
+                              {(bill.status === 'draft' || bill.status === 'pending') && (
+                                <DropdownMenuItem 
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleVoid(bill.id)
+                                  }}
+                                  className="text-red-600"
+                                >
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                  Void
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+
+            {/* Pagination */}
+            {data && data.totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t">
+                <p className="text-sm text-muted-foreground">
+                  Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, data.total)} of {data.total} bills
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    disabled={page === 1}
+                    onClick={() => setPage(p => p - 1)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  {Array.from({ length: Math.min(5, data.totalPages) }, (_, i) => {
+                    const pageNum = i + 1
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={page === pageNum ? "default" : "outline"}
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setPage(pageNum)}
+                      >
+                        {pageNum}
+                      </Button>
+                    )
+                  })}
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    disabled={page === data.totalPages}
+                    onClick={() => setPage(p => p + 1)}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
-    </ModulePage>
+
+      {/* Bill Drawer */}
+      <BillDrawer
+        bill={selectedBill}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onApprove={handleApprove}
+        onPay={handlePay}
+        onVoid={handleVoid}
+      />
+    </AppShell>
   )
 }

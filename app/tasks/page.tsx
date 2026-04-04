@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Select,
   SelectContent,
@@ -24,8 +25,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Separator } from "@/components/ui/separator"
 import { 
   CheckSquare, 
   Plus, 
@@ -39,8 +47,18 @@ import {
   MoreHorizontal,
   Flag,
   ExternalLink,
+  Bell,
+  BellOff,
+  UserPlus,
+  ArrowRight,
+  Building2,
+  FileText,
+  Receipt,
+  CreditCard,
+  MessageSquare,
+  Paperclip,
 } from "lucide-react"
-import { format, isAfter, isBefore, addDays } from "date-fns"
+import { format, isAfter, isBefore, addDays, addHours } from "date-fns"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,8 +66,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { getTasks, createTask, updateTaskStatus, getUsers } from "@/lib/services"
-import type { Task, User, PaginatedResponse } from "@/lib/types"
+import Link from "next/link"
+import { getTasks, createTask, updateTaskStatus, getUsers, getEntities } from "@/lib/services"
+import type { Task, User, Entity, PaginatedResponse } from "@/lib/types"
 
 function PriorityBadge({ priority }: { priority: string }) {
   const variants: Record<string, { className: string; icon: React.ReactNode }> = {
@@ -74,6 +93,7 @@ function StatusBadge({ status }: { status: string }) {
     in_progress: { className: 'bg-blue-100 text-blue-700 border-blue-200', label: 'In Progress' },
     completed: { className: 'bg-emerald-100 text-emerald-700 border-emerald-200', label: 'Completed' },
     cancelled: { className: 'bg-red-100 text-red-700 border-red-200', label: 'Cancelled' },
+    snoozed: { className: 'bg-purple-100 text-purple-700 border-purple-200', label: 'Snoozed' },
   }
   
   const variant = variants[status] || { className: 'bg-gray-100 text-gray-700', label: status }
@@ -86,32 +106,84 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function TypeBadge({ type }: { type: string }) {
-  const labels: Record<string, string> = {
-    approval: 'Approval',
-    review: 'Review',
-    data_entry: 'Data Entry',
-    reconciliation: 'Reconciliation',
-    follow_up: 'Follow Up',
-    other: 'Other',
+  const config: Record<string, { label: string; icon: React.ReactNode; className: string }> = {
+    approval: { label: 'Approval', icon: <CheckSquare className="h-3 w-3" />, className: 'bg-amber-50 text-amber-700' },
+    review: { label: 'Review', icon: <FileText className="h-3 w-3" />, className: 'bg-blue-50 text-blue-700' },
+    data_entry: { label: 'Data Entry', icon: <FileText className="h-3 w-3" />, className: 'bg-gray-50 text-gray-700' },
+    reconciliation: { label: 'Reconciliation', icon: <Receipt className="h-3 w-3" />, className: 'bg-purple-50 text-purple-700' },
+    follow_up: { label: 'Follow Up', icon: <Bell className="h-3 w-3" />, className: 'bg-emerald-50 text-emerald-700' },
+    other: { label: 'Other', icon: <FileText className="h-3 w-3" />, className: 'bg-gray-50 text-gray-700' },
   }
   
+  const c = config[type] || config.other
+  
   return (
-    <Badge variant="secondary" className="text-xs font-medium">
-      {labels[type] || type}
+    <Badge variant="secondary" className={`text-xs font-medium gap-1 ${c.className}`}>
+      {c.icon}
+      {c.label}
     </Badge>
   )
 }
 
+function RelatedObjectLink({ type, number, id }: { type?: string; number?: string; id?: string }) {
+  if (!type || !number) return null
+
+  const config: Record<string, { href: string; icon: React.ReactNode; label: string }> = {
+    bill: { href: `/accounts-payable/bills/${id}`, icon: <Receipt className="h-3 w-3" />, label: 'Bill' },
+    invoice: { href: `/accounts-receivable/invoices/${id}`, icon: <FileText className="h-3 w-3" />, label: 'Invoice' },
+    journal_entry: { href: `/general-ledger/journal-entries/${id}`, icon: <FileText className="h-3 w-3" />, label: 'Journal' },
+    payment: { href: `/accounts-payable/payments/${id}`, icon: <CreditCard className="h-3 w-3" />, label: 'Payment' },
+    receipt: { href: `/accounts-receivable/receipts/${id}`, icon: <Receipt className="h-3 w-3" />, label: 'Receipt' },
+    reconciliation: { href: `/cash-management/reconciliation`, icon: <Receipt className="h-3 w-3" />, label: 'Reconciliation' },
+  }
+
+  const c = config[type] || { href: '#', icon: <FileText className="h-3 w-3" />, label: type }
+
+  return (
+    <Link href={c.href}>
+      <Badge variant="outline" className="text-xs gap-1 cursor-pointer hover:bg-muted">
+        {c.icon}
+        {number}
+        <ExternalLink className="h-2.5 w-2.5 ml-0.5" />
+      </Badge>
+    </Link>
+  )
+}
+
+const snoozeOptions = [
+  { value: '1h', label: '1 hour', hours: 1 },
+  { value: '4h', label: '4 hours', hours: 4 },
+  { value: '1d', label: 'Tomorrow', hours: 24 },
+  { value: '3d', label: '3 days', hours: 72 },
+  { value: '1w', label: '1 week', hours: 168 },
+]
+
 export default function TasksPage() {
   const [tasks, setTasks] = useState<PaginatedResponse<Task> | null>(null)
   const [users, setUsers] = useState<User[]>([])
+  const [entities, setEntities] = useState<Entity[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<string>("active")
   const [search, setSearch] = useState("")
   const [priorityFilter, setPriorityFilter] = useState<string>("all")
   const [typeFilter, setTypeFilter] = useState<string>("all")
+  const [entityFilter, setEntityFilter] = useState<string>("all")
   const [createOpen, setCreateOpen] = useState(false)
   const [creating, setCreating] = useState(false)
+  
+  // Task detail drawer
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  
+  // Snooze dialog
+  const [snoozeTask, setSnoozeTask] = useState<Task | null>(null)
+  const [snoozeOpen, setSnoozeOpen] = useState(false)
+  const [snoozeDuration, setSnoozeDuration] = useState("")
+  
+  // Reassign dialog
+  const [reassignTask, setReassignTask] = useState<Task | null>(null)
+  const [reassignOpen, setReassignOpen] = useState(false)
+  const [reassignUserId, setReassignUserId] = useState("")
   
   // New task form
   const [newTask, setNewTask] = useState({
@@ -121,6 +193,8 @@ export default function TasksPage() {
     priority: "medium" as Task['priority'],
     assigneeId: "",
     dueDate: "",
+    relatedType: "",
+    relatedNumber: "",
   })
 
   const fetchTasks = useCallback(async () => {
@@ -148,18 +222,48 @@ export default function TasksPage() {
     }
   }, [tab, priorityFilter, typeFilter])
 
-  const fetchUsers = useCallback(async () => {
-    const result = await getUsers(undefined, undefined, ["active"])
-    setUsers(result.data)
+  const fetchFilters = useCallback(async () => {
+    const [usersResult, entitiesResult] = await Promise.all([
+      getUsers(undefined, undefined, ["active"]),
+      getEntities()
+    ])
+    setUsers(usersResult.data)
+    setEntities(entitiesResult)
   }, [])
 
   useEffect(() => {
     fetchTasks()
-    fetchUsers()
-  }, [fetchTasks, fetchUsers])
+  }, [fetchTasks])
+
+  useEffect(() => {
+    fetchFilters()
+  }, [fetchFilters])
 
   const handleStatusChange = async (taskId: string, newStatus: Task['status']) => {
     await updateTaskStatus(taskId, newStatus)
+    fetchTasks()
+  }
+
+  const handleSnooze = async () => {
+    if (!snoozeTask || !snoozeDuration) return
+    const option = snoozeOptions.find(o => o.value === snoozeDuration)
+    if (!option) return
+    
+    console.log(`Snoozing task ${snoozeTask.id} for ${option.label}`)
+    // In a real app, this would call an API
+    setSnoozeOpen(false)
+    setSnoozeTask(null)
+    setSnoozeDuration("")
+  }
+
+  const handleReassign = async () => {
+    if (!reassignTask || !reassignUserId) return
+    const user = users.find(u => u.id === reassignUserId)
+    console.log(`Reassigning task ${reassignTask.id} to ${user?.firstName} ${user?.lastName}`)
+    // In a real app, this would call an API
+    setReassignOpen(false)
+    setReassignTask(null)
+    setReassignUserId("")
     fetchTasks()
   }
 
@@ -177,6 +281,8 @@ export default function TasksPage() {
         assigneeId: newTask.assigneeId || 'u1',
         assigneeName: assignee ? `${assignee.firstName} ${assignee.lastName}` : 'Sarah Chen',
         dueDate: newTask.dueDate ? new Date(newTask.dueDate) : undefined,
+        relatedType: newTask.relatedType || undefined,
+        relatedNumber: newTask.relatedNumber || undefined,
       })
       setCreateOpen(false)
       setNewTask({
@@ -186,6 +292,8 @@ export default function TasksPage() {
         priority: "medium",
         assigneeId: "",
         dueDate: "",
+        relatedType: "",
+        relatedNumber: "",
       })
       fetchTasks()
     } finally {
@@ -193,13 +301,30 @@ export default function TasksPage() {
     }
   }
 
-  // Filter by search
+  const openSnooze = (task: Task) => {
+    setSnoozeTask(task)
+    setSnoozeOpen(true)
+  }
+
+  const openReassign = (task: Task) => {
+    setReassignTask(task)
+    setReassignOpen(true)
+  }
+
+  const openTaskDetail = (task: Task) => {
+    setSelectedTask(task)
+    setDrawerOpen(true)
+  }
+
+  // Filter by search and entity
   const filteredTasks = tasks?.data.filter(task => {
+    if (entityFilter !== "all" && task.entityId !== entityFilter) return false
     if (!search) return true
     const s = search.toLowerCase()
     return task.title.toLowerCase().includes(s) ||
            task.description?.toLowerCase().includes(s) ||
-           task.assigneeName.toLowerCase().includes(s)
+           task.assigneeName.toLowerCase().includes(s) ||
+           task.relatedNumber?.toLowerCase().includes(s)
   }) || []
 
   // Summary counts
@@ -225,8 +350,8 @@ export default function TasksPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Tasks</h1>
-            <p className="text-sm text-muted-foreground">Manage and track your workflow tasks</p>
+            <h1 className="text-2xl font-semibold text-foreground">Task Center</h1>
+            <p className="text-sm text-muted-foreground">Manage and track your workflow tasks across all modules</p>
           </div>
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
@@ -291,12 +416,17 @@ export default function TasksPage() {
         </div>
 
         {/* Filters and Tabs */}
-        <Card>
+        <Card className="sticky top-0 z-10">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <Tabs value={tab} onValueChange={setTab}>
                 <TabsList>
-                  <TabsTrigger value="active">Active</TabsTrigger>
+                  <TabsTrigger value="active">
+                    Active
+                    <Badge variant="secondary" className="ml-1.5 h-5 px-1.5">
+                      {todoCount + inProgressCount}
+                    </Badge>
+                  </TabsTrigger>
                   <TabsTrigger value="completed">Completed</TabsTrigger>
                   <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
                   <TabsTrigger value="all">All</TabsTrigger>
@@ -312,6 +442,18 @@ export default function TasksPage() {
                     onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
+                <Select value={entityFilter} onValueChange={setEntityFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <Building2 className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Entity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Entities</SelectItem>
+                    {entities.map((entity) => (
+                      <SelectItem key={entity.id} value={entity.id}>{entity.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
                   <SelectTrigger className="w-[130px]">
                     <SelectValue placeholder="Priority" />
@@ -371,17 +513,20 @@ export default function TasksPage() {
                   return (
                     <div 
                       key={task.id} 
-                      className={`flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors ${
+                      className={`flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer ${
                         isOverdue ? 'border-red-200 bg-red-50/50' : ''
                       }`}
+                      onClick={() => openTaskDetail(task)}
                     >
-                      <Checkbox 
-                        checked={task.status === 'completed'}
-                        onCheckedChange={(checked) => {
-                          handleStatusChange(task.id, checked ? 'completed' : 'todo')
-                        }}
-                        disabled={task.status === 'cancelled'}
-                      />
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Checkbox 
+                          checked={task.status === 'completed'}
+                          onCheckedChange={(checked) => {
+                            handleStatusChange(task.id, checked ? 'completed' : 'todo')
+                          }}
+                          disabled={task.status === 'cancelled'}
+                        />
+                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className={`font-medium truncate ${
@@ -390,10 +535,13 @@ export default function TasksPage() {
                             {task.title}
                           </p>
                           {task.relatedNumber && (
-                            <Badge variant="outline" className="text-xs">
-                              <ExternalLink className="h-3 w-3 mr-1" />
-                              {task.relatedNumber}
-                            </Badge>
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <RelatedObjectLink 
+                                type={task.relatedType} 
+                                number={task.relatedNumber}
+                                id={task.relatedId}
+                              />
+                            </div>
                           )}
                         </div>
                         <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
@@ -408,44 +556,59 @@ export default function TasksPage() {
                               {format(new Date(task.dueDate), 'MMM d, yyyy')}
                             </span>
                           )}
+                          <span className="flex items-center gap-1">
+                            <Building2 className="h-3 w-3" />
+                            {entities.find(e => e.id === task.entityId)?.name || 'Unknown'}
+                          </span>
                         </div>
                       </div>
                       <TypeBadge type={task.type} />
                       <PriorityBadge priority={task.priority} />
                       <StatusBadge status={task.status} />
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {task.status === 'todo' && (
-                            <DropdownMenuItem onClick={() => handleStatusChange(task.id, 'in_progress')}>
-                              <Clock className="h-4 w-4 mr-2" />
-                              Start Task
-                            </DropdownMenuItem>
-                          )}
-                          {task.status === 'in_progress' && (
-                            <DropdownMenuItem onClick={() => handleStatusChange(task.id, 'completed')}>
-                              <CheckCircle2 className="h-4 w-4 mr-2" />
-                              Complete
-                            </DropdownMenuItem>
-                          )}
-                          {task.status !== 'completed' && task.status !== 'cancelled' && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                onClick={() => handleStatusChange(task.id, 'cancelled')}
-                                className="text-red-600"
-                              >
-                                <XCircle className="h-4 w-4 mr-2" />
-                                Cancel Task
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {task.status === 'todo' && (
+                              <DropdownMenuItem onClick={() => handleStatusChange(task.id, 'in_progress')}>
+                                <Clock className="h-4 w-4 mr-2" />
+                                Start Task
                               </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                            )}
+                            {task.status === 'in_progress' && (
+                              <DropdownMenuItem onClick={() => handleStatusChange(task.id, 'completed')}>
+                                <CheckCircle2 className="h-4 w-4 mr-2" />
+                                Complete
+                              </DropdownMenuItem>
+                            )}
+                            {task.status !== 'completed' && task.status !== 'cancelled' && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => openSnooze(task)}>
+                                  <BellOff className="h-4 w-4 mr-2" />
+                                  Snooze
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openReassign(task)}>
+                                  <UserPlus className="h-4 w-4 mr-2" />
+                                  Reassign
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onClick={() => handleStatusChange(task.id, 'cancelled')}
+                                  className="text-red-600"
+                                >
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                  Cancel Task
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                   )
                 })}
@@ -457,7 +620,7 @@ export default function TasksPage() {
 
       {/* Create Task Modal */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Create New Task</DialogTitle>
             <DialogDescription>Add a new task to your workflow</DialogDescription>
@@ -538,23 +701,243 @@ export default function TasksPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Due Date</Label>
+                <Label htmlFor="dueDate">Due Date</Label>
                 <Input 
+                  id="dueDate" 
                   type="date"
                   value={newTask.dueDate}
                   onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
                 />
               </div>
             </div>
+            <Separator />
+            <div className="space-y-2">
+              <Label>Link to Related Object (Optional)</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <Select 
+                  value={newTask.relatedType} 
+                  onValueChange={(value) => setNewTask({ ...newTask, relatedType: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Object type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bill">Bill</SelectItem>
+                    <SelectItem value="invoice">Invoice</SelectItem>
+                    <SelectItem value="journal_entry">Journal Entry</SelectItem>
+                    <SelectItem value="payment">Payment</SelectItem>
+                    <SelectItem value="reconciliation">Reconciliation</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input 
+                  placeholder="Document number"
+                  value={newTask.relatedNumber}
+                  onChange={(e) => setNewTask({ ...newTask, relatedNumber: e.target.value })}
+                />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateTask} disabled={!newTask.title.trim() || creating}>
+            <Button onClick={handleCreateTask} disabled={creating || !newTask.title.trim()}>
               {creating ? "Creating..." : "Create Task"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Snooze Dialog */}
+      <Dialog open={snoozeOpen} onOpenChange={setSnoozeOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Snooze Task</DialogTitle>
+            <DialogDescription>
+              Choose how long to snooze this task
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-2">
+            {snoozeOptions.map((option) => (
+              <Button
+                key={option.value}
+                variant={snoozeDuration === option.value ? "default" : "outline"}
+                className="justify-start"
+                onClick={() => setSnoozeDuration(option.value)}
+              >
+                <BellOff className="h-4 w-4 mr-2" />
+                {option.label}
+              </Button>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSnoozeOpen(false)}>Cancel</Button>
+            <Button onClick={handleSnooze} disabled={!snoozeDuration}>
+              Snooze
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reassign Dialog */}
+      <Dialog open={reassignOpen} onOpenChange={setReassignOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reassign Task</DialogTitle>
+            <DialogDescription>
+              Select a new assignee for this task
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={reassignUserId} onValueChange={setReassignUserId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select new assignee" />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-[10px]">
+                          {user.firstName[0]}{user.lastName[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      {user.firstName} {user.lastName}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReassignOpen(false)}>Cancel</Button>
+            <Button onClick={handleReassign} disabled={!reassignUserId}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Reassign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task Detail Drawer */}
+      <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <SheetContent className="w-[500px] sm:max-w-[500px]">
+          {selectedTask && (
+            <>
+              <SheetHeader>
+                <div className="flex items-center gap-2 mb-2">
+                  <TypeBadge type={selectedTask.type} />
+                  <PriorityBadge priority={selectedTask.priority} />
+                  <StatusBadge status={selectedTask.status} />
+                </div>
+                <SheetTitle>{selectedTask.title}</SheetTitle>
+              </SheetHeader>
+              <div className="mt-6 space-y-6">
+                {selectedTask.description && (
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Description</h4>
+                    <p className="text-sm text-muted-foreground">{selectedTask.description}</p>
+                  </div>
+                )}
+
+                <Separator />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Assignee</p>
+                      <p className="text-sm font-medium">{selectedTask.assigneeName}</p>
+                    </div>
+                  </div>
+                  {selectedTask.dueDate && (
+                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Due Date</p>
+                        <p className="text-sm font-medium">{format(new Date(selectedTask.dueDate), 'MMM d, yyyy')}</p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Entity</p>
+                      <p className="text-sm font-medium">{entities.find(e => e.id === selectedTask.entityId)?.name || 'Unknown'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Created</p>
+                      <p className="text-sm font-medium">{format(new Date(selectedTask.createdAt), 'MMM d, yyyy')}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedTask.relatedNumber && (
+                  <>
+                    <Separator />
+                    <div>
+                      <h4 className="text-sm font-medium mb-3">Related Object</h4>
+                      <RelatedObjectLink 
+                        type={selectedTask.relatedType} 
+                        number={selectedTask.relatedNumber}
+                        id={selectedTask.relatedId}
+                      />
+                    </div>
+                  </>
+                )}
+
+                <Separator />
+
+                {/* Quick Actions */}
+                {selectedTask.status !== 'completed' && selectedTask.status !== 'cancelled' && (
+                  <div className="flex gap-2">
+                    {selectedTask.status === 'todo' && (
+                      <Button 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={() => handleStatusChange(selectedTask.id, 'in_progress')}
+                      >
+                        <Clock className="h-4 w-4 mr-2" />
+                        Start Task
+                      </Button>
+                    )}
+                    {selectedTask.status === 'in_progress' && (
+                      <Button 
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                        onClick={() => handleStatusChange(selectedTask.id, 'completed')}
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Complete
+                      </Button>
+                    )}
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        setDrawerOpen(false)
+                        openSnooze(selectedTask)
+                      }}
+                    >
+                      <BellOff className="h-4 w-4 mr-2" />
+                      Snooze
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        setDrawerOpen(false)
+                        openReassign(selectedTask)
+                      }}
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Reassign
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </AppShell>
   )
 }

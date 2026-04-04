@@ -299,6 +299,13 @@ export const navModules: NavModule[] = [
   { id: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard', href: '/' },
   { id: 'reports', label: 'Reports', icon: 'FileText', href: '/reports' },
   {
+    id: 'workflow', label: 'Workflow', icon: 'CheckSquare',
+    megaMenu: [
+      { label: 'Work', items: [{ label: 'Approvals', href: '/approvals' }, { label: 'Tasks', href: '/tasks' }] },
+      { label: 'Updates', items: [{ label: 'Notifications', href: '/notifications' }, { label: 'Activity', href: '/activity' }] }
+    ]
+  },
+  {
     id: 'company', label: 'Company', icon: 'Building2',
     megaMenu: [
       { label: 'Structure', items: [{ label: 'Entities', href: '/company/entities' }, { label: 'Departments', href: '/company/departments' }, { label: 'Locations', href: '/company/locations' }] },

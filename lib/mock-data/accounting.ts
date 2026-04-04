@@ -93,6 +93,21 @@ export const journalEntries: JournalEntry[] = [
     ],
   },
   {
+    id: 'je-1005',
+    number: 'JE-2026-1005',
+    date: new Date('2026-04-03'),
+    description: 'Accrue close support spend',
+    status: 'draft',
+    entityId: 'e1',
+    periodId: 'per-2026-03',
+    createdBy: 'u1',
+    createdAt: new Date('2026-04-03T09:35:00'),
+    lines: [
+      { id: 'jel-9', accountId: 'a-prof', accountNumber: '6400', accountName: 'Professional Services', debit: 12400, credit: 0, departmentId: 'd-fin', departmentName: 'Finance', projectId: 'p-close', projectName: 'Q1 Close Acceleration' },
+      { id: 'jel-10', accountId: 'a-accrual', accountNumber: '2100', accountName: 'Accrued Expenses', debit: 0, credit: 12400, departmentId: 'd-fin', departmentName: 'Finance', projectId: 'p-close', projectName: 'Q1 Close Acceleration' },
+    ],
+  },
+  {
     id: 'je-1004',
     number: 'JE-2026-1004',
     date: new Date('2026-03-26'),

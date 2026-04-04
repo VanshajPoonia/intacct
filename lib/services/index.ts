@@ -627,6 +627,362 @@ export async function getJournalEntries(
   return { data, total, page, pageSize, totalPages }
 }
 
+// ============ JOURNAL ENTRY DETAIL SERVICES ============
+
+export async function getJournalEntryById(id: string): Promise<JournalEntry | null> {
+  await delay(SIMULATED_DELAY)
+  return mockJournalEntries.find(j => j.id === id) || null
+}
+
+export async function saveJournalEntry(entry: Partial<JournalEntry>): Promise<{ success: boolean; entry?: JournalEntry }> {
+  await delay(SIMULATED_DELAY)
+  
+  if (entry.id) {
+    // Update existing
+    const index = mockJournalEntries.findIndex(j => j.id === entry.id)
+    if (index !== -1) {
+      mockJournalEntries[index] = { ...mockJournalEntries[index], ...entry } as JournalEntry
+      return { success: true, entry: mockJournalEntries[index] }
+    }
+    return { success: false }
+  } else {
+    // Create new
+    const newEntry: JournalEntry = {
+      id: `je${mockJournalEntries.length + 1}`,
+      number: `JE-2024-${String(mockJournalEntries.length + 1).padStart(3, '0')}`,
+      date: entry.date || new Date(),
+      description: entry.description || '',
+      status: 'draft',
+      lines: entry.lines || [],
+      entityId: entry.entityId || 'e1',
+      createdBy: 'Current User',
+      createdAt: new Date(),
+    }
+    mockJournalEntries.push(newEntry)
+    return { success: true, entry: newEntry }
+  }
+}
+
+export async function postJournalEntry(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const entry = mockJournalEntries.find(j => j.id === id)
+  if (entry && entry.status === 'draft') {
+    entry.status = 'posted'
+    entry.postedAt = new Date()
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function reverseJournalEntry(id: string): Promise<{ success: boolean; reversalEntry?: JournalEntry }> {
+  await delay(SIMULATED_DELAY)
+  const entry = mockJournalEntries.find(j => j.id === id)
+  if (entry && entry.status === 'posted') {
+    entry.status = 'reversed'
+    // Create reversal entry
+    const reversalEntry: JournalEntry = {
+      id: `je${mockJournalEntries.length + 1}`,
+      number: `JE-2024-${String(mockJournalEntries.length + 1).padStart(3, '0')}-REV`,
+      date: new Date(),
+      description: `Reversal of ${entry.number}: ${entry.description}`,
+      status: 'posted',
+      lines: entry.lines.map(line => ({
+        ...line,
+        id: `${line.id}-rev`,
+        debit: line.credit,
+        credit: line.debit,
+      })),
+      entityId: entry.entityId,
+      createdBy: 'Current User',
+      createdAt: new Date(),
+      postedAt: new Date(),
+    }
+    mockJournalEntries.push(reversalEntry)
+    return { success: true, reversalEntry }
+  }
+  return { success: false }
+}
+
+// ============ CHART OF ACCOUNTS SERVICES ============
+
+export async function getChartOfAccounts(
+  search?: string,
+  type?: string[],
+  status?: string[],
+  sort?: SortConfig
+): Promise<Account[]> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...accounts]
+  
+  if (type && type.length > 0) {
+    filtered = filtered.filter(a => type.includes(a.type))
+  }
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(a => status.includes(a.status))
+  }
+  
+  if (search) {
+    const s = search.toLowerCase()
+    filtered = filtered.filter(a => 
+      a.number.toLowerCase().includes(s) ||
+      a.name.toLowerCase().includes(s) ||
+      a.category.toLowerCase().includes(s)
+    )
+  }
+  
+  if (sort) {
+    filtered.sort((a, b) => {
+      const aVal = a[sort.key as keyof Account]
+      const bVal = b[sort.key as keyof Account]
+      if (aVal === undefined || bVal === undefined) return 0
+      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  } else {
+    // Default sort by account number
+    filtered.sort((a, b) => a.number.localeCompare(b.number))
+  }
+  
+  return filtered
+}
+
+export async function getAccountById(id: string): Promise<Account | null> {
+  await delay(SIMULATED_DELAY)
+  return accounts.find(a => a.id === id) || null
+}
+
+export async function saveAccount(account: Partial<Account>): Promise<{ success: boolean; account?: Account }> {
+  await delay(SIMULATED_DELAY)
+  
+  if (account.id) {
+    const index = accounts.findIndex(a => a.id === account.id)
+    if (index !== -1) {
+      accounts[index] = { ...accounts[index], ...account } as Account
+      return { success: true, account: accounts[index] }
+    }
+    return { success: false }
+  } else {
+    const newAccount: Account = {
+      id: `acc${accounts.length + 1}`,
+      number: account.number || '',
+      name: account.name || '',
+      type: account.type || 'expense',
+      category: account.category || '',
+      balance: 0,
+      currency: 'USD',
+      status: 'active',
+    }
+    accounts.push(newAccount)
+    return { success: true, account: newAccount }
+  }
+}
+
+export async function deleteAccount(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const index = accounts.findIndex(a => a.id === id)
+  if (index !== -1) {
+    accounts[index].status = 'inactive'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+// ============ TRIAL BALANCE SERVICES ============
+
+export interface TrialBalanceRow {
+  accountId: string
+  accountNumber: string
+  accountName: string
+  accountType: string
+  openingDebit: number
+  openingCredit: number
+  periodDebit: number
+  periodCredit: number
+  closingDebit: number
+  closingCredit: number
+}
+
+export async function getTrialBalance(filters: DashboardFilters): Promise<TrialBalanceRow[]> {
+  await delay(SIMULATED_DELAY)
+  
+  const multiplier = filters.entityId === 'e4' ? 1 : filters.entityId === 'e1' ? 0.6 : 0.2
+  
+  // Generate trial balance data based on accounts
+  const trialBalance: TrialBalanceRow[] = accounts
+    .filter(a => a.status === 'active')
+    .map(account => {
+      const isDebitNormal = ['asset', 'expense'].includes(account.type)
+      const baseAmount = Math.abs(account.balance) * multiplier
+      
+      let openingDebit = 0, openingCredit = 0, periodDebit = 0, periodCredit = 0
+      
+      if (isDebitNormal) {
+        openingDebit = Math.round(baseAmount * 0.8)
+        periodDebit = Math.round(baseAmount * 0.3)
+        periodCredit = Math.round(baseAmount * 0.1)
+      } else {
+        openingCredit = Math.round(baseAmount * 0.8)
+        periodCredit = Math.round(baseAmount * 0.3)
+        periodDebit = Math.round(baseAmount * 0.1)
+      }
+      
+      return {
+        accountId: account.id,
+        accountNumber: account.number,
+        accountName: account.name,
+        accountType: account.type,
+        openingDebit,
+        openingCredit,
+        periodDebit,
+        periodCredit,
+        closingDebit: openingDebit + periodDebit - periodCredit,
+        closingCredit: openingCredit + periodCredit - periodDebit > 0 ? openingCredit + periodCredit - periodDebit : 0,
+      }
+    })
+  
+  return trialBalance
+}
+
+// ============ AUDIT LOG SERVICES ============
+
+export interface AuditLogEntry {
+  id: string
+  timestamp: Date
+  action: 'create' | 'update' | 'delete' | 'post' | 'reverse' | 'approve' | 'reject'
+  entityType: 'journal_entry' | 'bill' | 'invoice' | 'account' | 'vendor' | 'customer'
+  entityId: string
+  entityNumber: string
+  userId: string
+  userName: string
+  changes?: { field: string; oldValue: string; newValue: string }[]
+  ipAddress: string
+}
+
+export async function getAuditLogs(
+  entityType?: string,
+  entityId?: string,
+  startDate?: Date,
+  endDate?: Date,
+  page: number = 1,
+  pageSize: number = 20
+): Promise<PaginatedResponse<AuditLogEntry>> {
+  await delay(SIMULATED_DELAY)
+  
+  // Generate mock audit logs
+  const allLogs: AuditLogEntry[] = [
+    {
+      id: 'log1',
+      timestamp: new Date('2024-03-15T14:30:00'),
+      action: 'post',
+      entityType: 'journal_entry',
+      entityId: 'je1',
+      entityNumber: 'JE-2024-001',
+      userId: 'emp4',
+      userName: 'Sarah Chen',
+      ipAddress: '192.168.1.100'
+    },
+    {
+      id: 'log2',
+      timestamp: new Date('2024-03-15T14:25:00'),
+      action: 'update',
+      entityType: 'journal_entry',
+      entityId: 'je1',
+      entityNumber: 'JE-2024-001',
+      userId: 'emp4',
+      userName: 'Sarah Chen',
+      changes: [
+        { field: 'description', oldValue: 'Monthly accruals', newValue: 'Monthly accruals - March 2024' }
+      ],
+      ipAddress: '192.168.1.100'
+    },
+    {
+      id: 'log3',
+      timestamp: new Date('2024-03-15T14:20:00'),
+      action: 'create',
+      entityType: 'journal_entry',
+      entityId: 'je1',
+      entityNumber: 'JE-2024-001',
+      userId: 'emp3',
+      userName: 'Michael Johnson',
+      ipAddress: '192.168.1.105'
+    },
+    {
+      id: 'log4',
+      timestamp: new Date('2024-03-14T16:45:00'),
+      action: 'approve',
+      entityType: 'bill',
+      entityId: 'b1',
+      entityNumber: 'BILL-2024-001',
+      userId: 'emp4',
+      userName: 'Sarah Chen',
+      ipAddress: '192.168.1.100'
+    },
+    {
+      id: 'log5',
+      timestamp: new Date('2024-03-14T10:30:00'),
+      action: 'create',
+      entityType: 'bill',
+      entityId: 'b1',
+      entityNumber: 'BILL-2024-001',
+      userId: 'emp3',
+      userName: 'Michael Johnson',
+      ipAddress: '192.168.1.105'
+    },
+    {
+      id: 'log6',
+      timestamp: new Date('2024-03-13T11:00:00'),
+      action: 'update',
+      entityType: 'account',
+      entityId: 'acc1',
+      entityNumber: '1000',
+      userId: 'emp4',
+      userName: 'Sarah Chen',
+      changes: [
+        { field: 'name', oldValue: 'Cash', newValue: 'Cash and Equivalents' }
+      ],
+      ipAddress: '192.168.1.100'
+    },
+    {
+      id: 'log7',
+      timestamp: new Date('2024-03-12T15:20:00'),
+      action: 'reverse',
+      entityType: 'journal_entry',
+      entityId: 'je5',
+      entityNumber: 'JE-2024-005',
+      userId: 'emp4',
+      userName: 'Sarah Chen',
+      ipAddress: '192.168.1.100'
+    },
+  ]
+  
+  let filtered = [...allLogs]
+  
+  if (entityType) {
+    filtered = filtered.filter(l => l.entityType === entityType)
+  }
+  
+  if (entityId) {
+    filtered = filtered.filter(l => l.entityId === entityId)
+  }
+  
+  if (startDate) {
+    filtered = filtered.filter(l => l.timestamp >= startDate)
+  }
+  
+  if (endDate) {
+    filtered = filtered.filter(l => l.timestamp <= endDate)
+  }
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
 // ============ AI INSIGHTS ============
 
 export async function getAIInsights(filters: DashboardFilters): Promise<AIInsight[]> {

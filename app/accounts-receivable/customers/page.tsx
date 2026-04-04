@@ -48,8 +48,10 @@ import {
   ArrowUp,
   ArrowDown
 } from "lucide-react"
+import { format } from "date-fns"
 import { getCustomers } from "@/lib/services"
 import { CustomerDrawer } from "@/components/accounts-receivable/customer-drawer"
+import { CreateCustomerModal } from "@/components/accounts-receivable/create-customer-modal"
 import type { Customer, SortConfig, PaginatedResponse } from "@/lib/types"
 
 function formatCurrency(value: number) {
@@ -120,6 +122,7 @@ export default function CustomersPage() {
   const [page, setPage] = useState(1)
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
   const pageSize = 10
 
   const fetchCustomers = useCallback(async () => {
@@ -179,7 +182,7 @@ export default function CustomersPage() {
                 <Download className="h-4 w-4 mr-2" />
                 Export
               </Button>
-              <Button size="sm">
+              <Button size="sm" onClick={() => setCreateModalOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Customer
               </Button>
@@ -266,12 +269,14 @@ export default function CustomersPage() {
                     <TableHead className="text-right">Credit Limit</TableHead>
                     <TableHead className="text-right">
                       <SortableHeader 
-                        label="Balance" 
+                        label="AR Balance" 
                         sortKey="balance" 
                         currentSort={sort}
                         onSort={handleSort}
                       />
                     </TableHead>
+                    <TableHead className="text-right">Lifetime Revenue</TableHead>
+                    <TableHead>Last Payment</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
@@ -286,13 +291,15 @@ export default function CustomersPage() {
                         <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-8" /></TableCell>
                       </TableRow>
                     ))
                   ) : customers?.data.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="h-32 text-center">
+                      <TableCell colSpan={10} className="h-32 text-center">
                         <div className="flex flex-col items-center justify-center text-muted-foreground">
                           <Users className="h-8 w-8 mb-2" />
                           <p>No customers found</p>
@@ -332,6 +339,19 @@ export default function CustomersPage() {
                         </TableCell>
                         <TableCell className={`text-right font-medium tabular-nums ${customer.balance > customer.creditLimit ? 'text-red-600' : customer.balance > 0 ? 'text-amber-600' : ''}`}>
                           {formatCurrency(customer.balance)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {customer.lifetimeRevenue ? formatCurrency(customer.lifetimeRevenue) : '-'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {customer.lastPaymentDate ? (
+                            <div>
+                              <div>{format(new Date(customer.lastPaymentDate), 'MMM d, yyyy')}</div>
+                              {customer.lastPaymentAmount && (
+                                <div className="text-xs">{formatCurrency(customer.lastPaymentAmount)}</div>
+                              )}
+                            </div>
+                          ) : '-'}
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={customer.status} />
@@ -409,6 +429,12 @@ export default function CustomersPage() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onUpdate={fetchCustomers}
+      />
+
+      <CreateCustomerModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSuccess={fetchCustomers}
       />
     </AppShell>
   )

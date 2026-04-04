@@ -36,12 +36,20 @@ export interface Customer {
   email: string
   phone?: string
   address?: string
+  billingAddress?: string
   creditLimit: number
   paymentTerms: string
-  status: 'active' | 'inactive' | 'pending'
+  status: 'active' | 'inactive' | 'pending' | 'hold'
   balance: number
+  lifetimeRevenue: number
+  lastPaymentDate?: Date
+  lastPaymentAmount?: number
   currency: string
   createdAt: Date
+  // Collection info
+  collectionNotes?: string
+  assignedCollector?: string
+  collectionPriority?: 'low' | 'medium' | 'high' | 'critical'
 }
 
 export interface Account {
@@ -140,12 +148,20 @@ export interface Invoice {
   date: Date
   dueDate: Date
   amount: number
+  openBalance: number
   currency: string
-  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'voided'
+  status: 'draft' | 'sent' | 'paid' | 'partial' | 'overdue' | 'voided'
+  collectionStatus: 'none' | 'reminder_sent' | 'in_collections' | 'escalated' | 'written_off'
   description?: string
   lineItems: InvoiceLineItem[]
   entityId: string
+  departmentId?: string
+  departmentName?: string
+  billingAddress?: string
+  memo?: string
   createdAt: Date
+  sentAt?: Date
+  paidAt?: Date
 }
 
 export interface InvoiceLineItem {
@@ -156,6 +172,13 @@ export interface InvoiceLineItem {
   amount: number
   quantity: number
   unitPrice: number
+  taxAmount?: number
+  departmentId?: string
+  departmentName?: string
+  projectId?: string
+  projectName?: string
+  classId?: string
+  className?: string
 }
 
 // Receipt Types (Cash Receipts / AR Payments)

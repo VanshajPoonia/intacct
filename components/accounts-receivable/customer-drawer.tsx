@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
+import { format } from "date-fns"
 import { 
   Building2, 
   Mail, 
@@ -25,7 +26,8 @@ import {
   User,
   Calendar,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Clock,
 } from "lucide-react"
 import type { Customer } from "@/lib/types"
 
@@ -108,9 +110,10 @@ export function CustomerDrawer({ customer, open, onClose, onUpdate }: CustomerDr
         </SheetHeader>
 
         <Tabs defaultValue="details" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="financial">Financial</TabsTrigger>
+            <TabsTrigger value="collections">Collections</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
           </TabsList>
 
@@ -312,6 +315,81 @@ export function CustomerDrawer({ customer, open, onClose, onUpdate }: CustomerDr
                 </div>
               </>
             )}
+          </TabsContent>
+
+          <TabsContent value="collections" className="space-y-6 mt-4">
+            {/* Collection Status */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium">Collection Status</h3>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 border rounded-lg">
+                  <p className="text-xs text-muted-foreground">Priority</p>
+                  <p className="text-sm font-medium mt-1">
+                    {customer.collectionPriority ? (
+                      <Badge variant="outline" className={`${
+                        customer.collectionPriority === 'critical' ? 'bg-red-100 text-red-700 border-red-200' :
+                        customer.collectionPriority === 'high' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                        customer.collectionPriority === 'medium' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                        'bg-gray-100 text-gray-700 border-gray-200'
+                      }`}>
+                        {customer.collectionPriority.charAt(0).toUpperCase() + customer.collectionPriority.slice(1)}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">Not assigned</span>
+                    )}
+                  </p>
+                </div>
+                <div className="p-3 border rounded-lg">
+                  <p className="text-xs text-muted-foreground">Assigned Collector</p>
+                  <p className="text-sm font-medium mt-1">
+                    {customer.assignedCollector || <span className="text-muted-foreground">Unassigned</span>}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Collection Notes */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">Collection Notes</h3>
+              {customer.collectionNotes ? (
+                <div className="p-3 border rounded-lg bg-muted/30">
+                  <p className="text-sm whitespace-pre-wrap">{customer.collectionNotes}</p>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground border rounded-lg border-dashed">
+                  <AlertCircle className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No collection notes</p>
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Collection Actions */}
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium mb-3">Collection Actions</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" size="sm" className="justify-start">
+                  <Phone className="h-4 w-4 mr-2" />
+                  Log Call
+                </Button>
+                <Button variant="outline" size="sm" className="justify-start">
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Email
+                </Button>
+                <Button variant="outline" size="sm" className="justify-start">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Add Note
+                </Button>
+                <Button variant="outline" size="sm" className="justify-start">
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  Escalate
+                </Button>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="activity" className="mt-4">

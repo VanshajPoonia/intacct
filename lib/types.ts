@@ -505,6 +505,176 @@ export interface ChartDataPoint {
   [key: string]: string | number
 }
 
+// Purchase Order Types
+export interface PurchaseOrder {
+  id: string
+  number: string
+  vendorId: string
+  vendorName: string
+  status: 'draft' | 'pending_approval' | 'approved' | 'sent' | 'partially_received' | 'received' | 'closed' | 'cancelled'
+  orderDate: Date
+  expectedDate?: Date
+  lines: PurchaseOrderLine[]
+  subtotal: number
+  tax: number
+  total: number
+  entityId: string
+  departmentId?: string
+  projectId?: string
+  notes?: string
+  createdBy: string
+  createdAt: Date
+}
+
+export interface PurchaseOrderLine {
+  id: string
+  description: string
+  quantity: number
+  unitPrice: number
+  amount: number
+  receivedQuantity: number
+  accountId: string
+}
+
+// Sales Order Types
+export interface SalesOrder {
+  id: string
+  number: string
+  customerId: string
+  customerName: string
+  status: 'draft' | 'pending_approval' | 'approved' | 'confirmed' | 'partially_shipped' | 'shipped' | 'invoiced' | 'closed' | 'cancelled'
+  orderDate: Date
+  requestedDate?: Date
+  lines: SalesOrderLine[]
+  subtotal: number
+  tax: number
+  total: number
+  entityId: string
+  salesRepId?: string
+  notes?: string
+  createdBy: string
+  createdAt: Date
+}
+
+export interface SalesOrderLine {
+  id: string
+  description: string
+  quantity: number
+  unitPrice: number
+  amount: number
+  shippedQuantity: number
+  accountId: string
+}
+
+// Project Types (extended)
+export interface ProjectDetail {
+  id: string
+  name: string
+  code: string
+  status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled'
+  customerId?: string
+  customerName?: string
+  managerId: string
+  managerName: string
+  startDate: Date
+  endDate?: Date
+  budget: number
+  actualCost: number
+  revenue: number
+  profitMargin: number
+  percentComplete: number
+  entityId: string
+  departmentId?: string
+  description?: string
+  createdAt: Date
+}
+
+// Time Entry Types
+export interface TimeEntry {
+  id: string
+  employeeId: string
+  employeeName: string
+  projectId?: string
+  projectName?: string
+  taskDescription: string
+  date: Date
+  hours: number
+  billable: boolean
+  rate: number
+  amount: number
+  status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'invoiced'
+  entityId: string
+  notes?: string
+  createdAt: Date
+}
+
+// Expense Entry Types
+export interface ExpenseEntry {
+  id: string
+  employeeId: string
+  employeeName: string
+  category: string
+  description: string
+  date: Date
+  amount: number
+  currency: string
+  receipt?: string
+  projectId?: string
+  projectName?: string
+  customerId?: string
+  billable: boolean
+  status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'reimbursed'
+  entityId: string
+  notes?: string
+  createdAt: Date
+}
+
+// Recurring Journal Types
+export interface RecurringJournal {
+  id: string
+  name: string
+  description?: string
+  frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+  startDate: Date
+  endDate?: Date
+  nextRunDate: Date
+  lastRunDate?: Date
+  status: 'active' | 'paused' | 'expired'
+  templateLines: JournalEntryLine[]
+  entityId: string
+  createdBy: string
+  createdAt: Date
+  runCount: number
+}
+
+// Allocation Types
+export interface Allocation {
+  id: string
+  name: string
+  description?: string
+  sourceAccountId: string
+  sourceAccountName: string
+  method: 'fixed' | 'percentage' | 'statistical'
+  basis?: string
+  targets: AllocationTarget[]
+  status: 'draft' | 'active' | 'inactive'
+  frequency: 'monthly' | 'quarterly' | 'yearly' | 'on_demand'
+  lastRunDate?: Date
+  entityId: string
+  createdBy: string
+  createdAt: Date
+}
+
+export interface AllocationTarget {
+  id: string
+  accountId: string
+  accountName: string
+  departmentId?: string
+  departmentName?: string
+  percentage?: number
+  fixedAmount?: number
+}
+
 // Admin Types
 export interface User {
   id: string

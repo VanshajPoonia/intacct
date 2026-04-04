@@ -61,10 +61,26 @@ const statusColors: Record<string, string> = {
   cleared: "bg-blue-100 text-blue-700",
 }
 
+const reconciliationStatusColors: Record<string, string> = {
+  unmatched: "bg-gray-100 text-gray-700",
+  matched: "bg-blue-100 text-blue-700",
+  reconciled: "bg-green-100 text-green-700",
+  exception: "bg-red-100 text-red-700",
+}
+
+const sourceLabels: Record<string, string> = {
+  bank_feed: "Bank Feed",
+  manual: "Manual",
+  import: "Import",
+  api: "API",
+}
+
 const typeIcons: Record<string, typeof ArrowUpRight> = {
   deposit: ArrowUpRight,
   withdrawal: ArrowDownRight,
   transfer: ArrowUpRight,
+  fee: ArrowDownRight,
+  interest: ArrowUpRight,
 }
 
 export default function TransactionsPage() {
@@ -74,6 +90,7 @@ export default function TransactionsPage() {
   const [selectedEntity, setSelectedEntity] = useState<string>("e4")
   const [selectedAccount, setSelectedAccount] = useState<string>("all")
   const [selectedType, setSelectedType] = useState<string>("all")
+  const [selectedReconStatus, setSelectedReconStatus] = useState<string>("all")
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
   
@@ -110,10 +127,12 @@ export default function TransactionsPage() {
     setLoading(true)
     try {
       const typeFilter = selectedType !== 'all' ? [selectedType] : undefined
+      const reconFilter = selectedReconStatus !== 'all' ? selectedReconStatus : undefined
       const result = await getTransactions(
         filters,
         debouncedSearch || undefined,
         typeFilter,
+        reconFilter,
         sort,
         page,
         pageSize
@@ -124,7 +143,7 @@ export default function TransactionsPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedEntity, selectedType, debouncedSearch, sort, page])
+  }, [selectedEntity, selectedType, selectedReconStatus, debouncedSearch, sort, page])
 
   useEffect(() => {
     Promise.all([getEntities(), getBankAccounts()]).then(([e, a]) => {
@@ -139,7 +158,7 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [selectedEntity, selectedType, debouncedSearch])
+  }, [selectedEntity, selectedType, selectedReconStatus, debouncedSearch])
 
   const handleSort = (key: string) => {
     setSort(prev => ({
@@ -258,6 +277,20 @@ export default function TransactionsPage() {
                     <SelectItem value="deposit">Deposits</SelectItem>
                     <SelectItem value="withdrawal">Withdrawals</SelectItem>
                     <SelectItem value="transfer">Transfers</SelectItem>
+                    <SelectItem value="fee">Fees</SelectItem>
+                    <SelectItem value="interest">Interest</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={selectedReconStatus} onValueChange={setSelectedReconStatus}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Reconciliation" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="unmatched">Unmatched</SelectItem>
+                    <SelectItem value="matched">Matched</SelectItem>
+                    <SelectItem value="reconciled">Reconciled</SelectItem>
+                    <SelectItem value="exception">Exception</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -280,8 +313,10 @@ export default function TransactionsPage() {
                       </div>
                     </TableHead>
                     <TableHead>Reference</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Account</TableHead>
+                    <TableHead>Description / Merchant</TableHead>
+                    <TableHead>Bank Account</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Category</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead 
                       className="text-right cursor-pointer hover:bg-muted/50"
@@ -293,6 +328,7 @@ export default function TransactionsPage() {
                       </div>
                     </TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Reconciliation</TableHead>
                     <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -306,20 +342,23 @@ export default function TransactionsPage() {
                         <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-8" /></TableCell>
                       </TableRow>
                     ))
                   ) : transactions.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                         No transactions found
                       </TableCell>
                     </TableRow>
                   ) : (
                     transactions.map((transaction) => {
                       const Icon = typeIcons[transaction.type] || ArrowUpRight
-                      const isDeposit = transaction.type === 'deposit'
+                      const isDeposit = transaction.type === 'deposit' || transaction.type === 'interest'
                       return (
                         <TableRow 
                           key={transaction.id}
@@ -332,10 +371,25 @@ export default function TransactionsPage() {
                           <TableCell className="text-muted-foreground">
                             {transaction.reference || '-'}
                           </TableCell>
-                          <TableCell className="max-w-[200px] truncate">
-                            {transaction.description}
+                          <TableCell className="max-w-[200px]">
+                            <div>
+                              <p className="truncate">{transaction.description}</p>
+                              {transaction.merchant && (
+                                <p className="text-xs text-muted-foreground truncate">{transaction.merchant}</p>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>{transaction.bankAccountName || '-'}</TableCell>
+                          <TableCell>
+                            <span className="text-xs text-muted-foreground">
+                              {sourceLabels[transaction.source] || transaction.source}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            {transaction.category ? (
+                              <Badge variant="outline" className="text-xs">{transaction.category}</Badge>
+                            ) : '-'}
+                          </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1.5">
                               <Icon className={cn(
@@ -346,7 +400,7 @@ export default function TransactionsPage() {
                             </div>
                           </TableCell>
                           <TableCell className={cn(
-                            "text-right font-medium",
+                            "text-right font-medium tabular-nums",
                             isDeposit ? "text-green-600" : "text-red-600"
                           )}>
                             {isDeposit ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount))}
@@ -357,6 +411,14 @@ export default function TransactionsPage() {
                               className={cn("text-xs", statusColors[transaction.status])}
                             >
                               {transaction.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant="secondary" 
+                              className={cn("text-xs", reconciliationStatusColors[transaction.reconciliationStatus])}
+                            >
+                              {transaction.reconciliationStatus}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -416,7 +478,7 @@ export default function TransactionsPage() {
 
       {/* Transaction Drawer */}
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <SheetContent className="w-[450px] sm:max-w-[450px]">
+        <SheetContent className="w-[500px] sm:max-w-[500px] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Transaction Details</SheetTitle>
           </SheetHeader>
@@ -426,9 +488,9 @@ export default function TransactionsPage() {
               <div className="text-center py-4 bg-muted/30 rounded-lg">
                 <p className={cn(
                   "text-3xl font-bold",
-                  selectedTransaction.type === 'deposit' ? "text-green-600" : "text-red-600"
+                  (selectedTransaction.type === 'deposit' || selectedTransaction.type === 'interest') ? "text-green-600" : "text-red-600"
                 )}>
-                  {selectedTransaction.type === 'deposit' ? '+' : '-'}
+                  {(selectedTransaction.type === 'deposit' || selectedTransaction.type === 'interest') ? '+' : '-'}
                   {formatCurrency(Math.abs(selectedTransaction.amount))}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1 capitalize">
@@ -438,42 +500,130 @@ export default function TransactionsPage() {
 
               <Separator />
 
-              {/* Details */}
+              {/* Basic Details */}
               <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Date</p>
-                  <p className="font-medium">{format(new Date(selectedTransaction.date), 'MMMM d, yyyy')}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Description</p>
-                  <p className="font-medium">{selectedTransaction.description}</p>
-                </div>
-                {selectedTransaction.reference && (
+                <h3 className="text-sm font-medium">Transaction Information</h3>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Reference</p>
-                    <p className="font-medium">{selectedTransaction.reference}</p>
+                    <p className="text-xs text-muted-foreground">Date</p>
+                    <p className="text-sm font-medium">{format(new Date(selectedTransaction.date), 'MMM d, yyyy')}</p>
                   </div>
-                )}
-                <div>
-                  <p className="text-sm text-muted-foreground">Bank Account</p>
-                  <p className="font-medium">{selectedTransaction.bankAccountName || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  <Badge 
-                    variant="secondary" 
-                    className={cn("text-xs", statusColors[selectedTransaction.status])}
-                  >
-                    {selectedTransaction.status}
-                  </Badge>
-                </div>
-                {selectedTransaction.category && (
                   <div>
-                    <p className="text-sm text-muted-foreground">Category</p>
-                    <p className="font-medium">{selectedTransaction.category}</p>
+                    <p className="text-xs text-muted-foreground">Reference</p>
+                    <p className="text-sm font-medium">{selectedTransaction.reference || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Source</p>
+                    <p className="text-sm font-medium">{sourceLabels[selectedTransaction.source] || selectedTransaction.source}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Currency</p>
+                    <p className="text-sm font-medium">{selectedTransaction.currency}</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Description</p>
+                  <p className="text-sm font-medium">{selectedTransaction.description}</p>
+                </div>
+                {selectedTransaction.merchant && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Merchant</p>
+                    <p className="text-sm font-medium">{selectedTransaction.merchant}</p>
                   </div>
                 )}
               </div>
+
+              <Separator />
+
+              {/* Account & Entity */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium">Account Details</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Bank Account</p>
+                    <p className="text-sm font-medium">{selectedTransaction.bankAccountName || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">GL Account</p>
+                    <p className="text-sm font-medium">{selectedTransaction.accountName}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Entity</p>
+                    <p className="text-sm font-medium">{selectedTransaction.entityName || '-'}</p>
+                  </div>
+                  {selectedTransaction.departmentName && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Department</p>
+                      <p className="text-sm font-medium">{selectedTransaction.departmentName}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Status & Reconciliation */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium">Status</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Transaction Status</p>
+                    <Badge 
+                      variant="secondary" 
+                      className={cn("text-xs mt-1", statusColors[selectedTransaction.status])}
+                    >
+                      {selectedTransaction.status}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Reconciliation</p>
+                    <Badge 
+                      variant="secondary" 
+                      className={cn("text-xs mt-1", reconciliationStatusColors[selectedTransaction.reconciliationStatus])}
+                    >
+                      {selectedTransaction.reconciliationStatus}
+                    </Badge>
+                  </div>
+                </div>
+                {selectedTransaction.matchedTransactionId && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Matched To</p>
+                    <p className="text-sm font-medium text-blue-600">{selectedTransaction.matchedTransactionId}</p>
+                  </div>
+                )}
+                {selectedTransaction.ruleName && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Applied Rule</p>
+                    <p className="text-sm font-medium">{selectedTransaction.ruleName}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Category & Tags */}
+              {(selectedTransaction.category || (selectedTransaction.tags && selectedTransaction.tags.length > 0)) && (
+                <>
+                  <Separator />
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-medium">Categorization</h3>
+                    {selectedTransaction.category && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Category</p>
+                        <Badge variant="outline" className="mt-1">{selectedTransaction.category}</Badge>
+                      </div>
+                    )}
+                    {selectedTransaction.tags && selectedTransaction.tags.length > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Tags</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {selectedTransaction.tags.map((tag) => (
+                            <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
 
               <Separator />
 

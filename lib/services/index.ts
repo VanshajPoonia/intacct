@@ -90,6 +90,40 @@ export async function getBankAccountById(id: string): Promise<BankAccount | null
 
 // ============ CORPORATE CARD SERVICES ============
 
+export interface CorporateCardSummary {
+  totalSpendThisMonth: number
+  missingReceipts: number
+  uncodedTransactions: number
+  aiSuggestionsPending: number
+  activeCards: number
+}
+
+export async function getCorporateCardSummary(): Promise<CorporateCardSummary> {
+  await delay(SIMULATED_DELAY)
+  
+  const thisMonth = new Date()
+  thisMonth.setDate(1)
+  thisMonth.setHours(0, 0, 0, 0)
+  
+  const thisMonthTransactions = corporateCardTransactions.filter(t => 
+    new Date(t.transactionDate) >= thisMonth
+  )
+  
+  const totalSpendThisMonth = thisMonthTransactions.reduce((sum, t) => sum + t.amount, 0)
+  const missingReceipts = corporateCardTransactions.filter(t => t.receiptStatus === 'missing').length
+  const uncodedTransactions = corporateCardTransactions.filter(t => t.codingStatus === 'uncoded').length
+  const aiSuggestionsPending = corporateCardTransactions.filter(t => t.codingStatus === 'suggested').length
+  const activeCards = new Set(corporateCardTransactions.map(t => t.cardId)).size
+  
+  return {
+    totalSpendThisMonth,
+    missingReceipts,
+    uncodedTransactions,
+    aiSuggestionsPending,
+    activeCards,
+  }
+}
+
 export async function getCorporateCardTransactions(
   cardId?: string,
   receiptStatus?: string,
@@ -181,6 +215,54 @@ export async function getCashPosition(filters: DashboardFilters): Promise<CashPo
     projectedBalance: runningBalance,
     accountBreakdown,
     dailyForecast,
+  }
+}
+
+export interface ShortTermObligations {
+  payablesCount: number
+  payablesAmount: number
+  payrollAmount: number
+  payrollDaysUntil: number
+  receivablesCount: number
+  receivablesAmount: number
+  netCashFlow: number
+}
+
+export async function getShortTermObligations(filters: DashboardFilters): Promise<ShortTermObligations> {
+  await delay(SIMULATED_DELAY)
+  
+  const today = new Date()
+  const sevenDaysFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+  
+  // Get bills due in next 7 days
+  const dueBills = mockBills.filter(b => {
+    const dueDate = new Date(b.dueDate)
+    return b.status === 'pending' && dueDate >= today && dueDate <= sevenDaysFromNow &&
+      (filters.entityId === 'e4' || b.entityId === filters.entityId)
+  })
+  
+  // Get invoices due in next 7 days
+  const dueInvoices = mockInvoices.filter(i => {
+    const dueDate = new Date(i.dueDate)
+    return i.status !== 'paid' && dueDate >= today && dueDate <= sevenDaysFromNow &&
+      (filters.entityId === 'e4' || i.entityId === filters.entityId)
+  })
+  
+  const payablesAmount = dueBills.reduce((sum, b) => sum + b.amount, 0)
+  const receivablesAmount = dueInvoices.reduce((sum, i) => sum + i.amount, 0)
+  
+  // Payroll estimate (mock - typically would come from payroll system)
+  const payrollAmount = filters.entityId === 'e4' ? 125000 : filters.entityId === 'e1' ? 85000 : 40000
+  const payrollDaysUntil = 5
+  
+  return {
+    payablesCount: dueBills.length,
+    payablesAmount,
+    payrollAmount,
+    payrollDaysUntil,
+    receivablesCount: dueInvoices.length,
+    receivablesAmount,
+    netCashFlow: receivablesAmount - payablesAmount - payrollAmount,
   }
 }
 
@@ -1029,6 +1111,8 @@ export async function getEntityPerformance(filters: DashboardFilters): Promise<E
 export async function getTransactions(
   filters: DashboardFilters,
   search?: string,
+  typeFilter?: string[],
+  reconStatusFilter?: string,
   sort?: SortConfig,
   page: number = 1,
   pageSize: number = 10
@@ -1047,13 +1131,26 @@ export async function getTransactions(
     t.date >= filters.dateRange.startDate && t.date <= filters.dateRange.endDate
   )
   
+  // Apply type filter
+  if (typeFilter && typeFilter.length > 0) {
+    filtered = filtered.filter(t => typeFilter.includes(t.type))
+  }
+  
+  // Apply reconciliation status filter
+  if (reconStatusFilter) {
+    filtered = filtered.filter(t => t.reconciliationStatus === reconStatusFilter)
+  }
+  
   // Apply search
   if (search) {
     const s = search.toLowerCase()
     filtered = filtered.filter(t => 
       t.description.toLowerCase().includes(s) ||
       t.accountName.toLowerCase().includes(s) ||
-      t.reference?.toLowerCase().includes(s)
+      t.reference?.toLowerCase().includes(s) ||
+      t.merchant?.toLowerCase().includes(s) ||
+      t.category?.toLowerCase().includes(s) ||
+      t.bankAccountName?.toLowerCase().includes(s)
     )
   }
   

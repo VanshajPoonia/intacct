@@ -12,6 +12,10 @@ import {
   getBankAccounts, 
   getTransfers,
   getEntities,
+  getShortTermObligations,
+  getCorporateCardSummary,
+  type ShortTermObligations,
+  type CorporateCardSummary,
 } from "@/lib/services"
 import type { CashPositionData, BankAccount, Transfer, Entity, DashboardFilters } from "@/lib/types"
 import { 
@@ -66,6 +70,8 @@ export default function CashDashboardPage() {
   const [cashPosition, setCashPosition] = useState<CashPositionData | null>(null)
   const [accounts, setAccounts] = useState<BankAccount[]>([])
   const [recentTransfers, setRecentTransfers] = useState<Transfer[]>([])
+  const [obligations, setObligations] = useState<ShortTermObligations | null>(null)
+  const [cardSummary, setCardSummary] = useState<CorporateCardSummary | null>(null)
   const [loading, setLoading] = useState(true)
 
   const filters: DashboardFilters = {
@@ -80,14 +86,18 @@ export default function CashDashboardPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [positionData, accountsData, transfersData] = await Promise.all([
+      const [positionData, accountsData, transfersData, obligationsData, cardSummaryData] = await Promise.all([
         getCashPosition(filters),
         getBankAccounts(),
         getTransfers(filters, undefined, undefined, undefined, 1, 5),
+        getShortTermObligations(filters),
+        getCorporateCardSummary(),
       ])
       setCashPosition(positionData)
       setAccounts(accountsData)
       setRecentTransfers(transfersData.data)
+      setObligations(obligationsData)
+      setCardSummary(cardSummaryData)
     } finally {
       setLoading(false)
     }
@@ -405,50 +415,57 @@ export default function CashDashboardPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 rounded-lg border bg-red-50 border-red-200">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 bg-red-100 rounded-lg flex items-center justify-center">
-                          <ArrowDownRight className="h-4 w-4 text-red-600" />
+                  {obligations && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-3 rounded-lg border bg-red-50 border-red-200">
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 bg-red-100 rounded-lg flex items-center justify-center">
+                            <ArrowDownRight className="h-4 w-4 text-red-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-red-900">Payables Due (7 days)</p>
+                            <p className="text-xs text-red-700">{obligations.payablesCount} bills pending</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-red-900">Payables Due (7 days)</p>
-                          <p className="text-xs text-red-700">12 bills pending</p>
+                        <p className="text-sm font-semibold text-red-600">-{formatCurrency(obligations.payablesAmount)}</p>
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-lg border bg-amber-50 border-amber-200">
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 bg-amber-100 rounded-lg flex items-center justify-center">
+                            <ArrowDownRight className="h-4 w-4 text-amber-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-amber-900">Payroll (Next)</p>
+                            <p className="text-xs text-amber-700">Due in {obligations.payrollDaysUntil} days</p>
+                          </div>
+                        </div>
+                        <p className="text-sm font-semibold text-amber-600">-{formatCurrency(obligations.payrollAmount)}</p>
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-lg border bg-green-50 border-green-200">
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 bg-green-100 rounded-lg flex items-center justify-center">
+                            <ArrowUpRight className="h-4 w-4 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-green-900">Receivables Due (7 days)</p>
+                            <p className="text-xs text-green-700">{obligations.receivablesCount} invoices expected</p>
+                          </div>
+                        </div>
+                        <p className="text-sm font-semibold text-green-600">+{formatCurrency(obligations.receivablesAmount)}</p>
+                      </div>
+                      <div className="pt-3 border-t">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Net Cash Flow (7 days)</span>
+                          <span className={cn(
+                            "font-semibold",
+                            obligations.netCashFlow >= 0 ? "text-green-600" : "text-red-600"
+                          )}>
+                            {obligations.netCashFlow >= 0 ? '+' : ''}{formatCurrency(obligations.netCashFlow)}
+                          </span>
                         </div>
                       </div>
-                      <p className="text-sm font-semibold text-red-600">-{formatCurrency(85000)}</p>
                     </div>
-                    <div className="flex items-center justify-between p-3 rounded-lg border bg-amber-50 border-amber-200">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 bg-amber-100 rounded-lg flex items-center justify-center">
-                          <ArrowDownRight className="h-4 w-4 text-amber-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-amber-900">Payroll (Next)</p>
-                          <p className="text-xs text-amber-700">Due in 5 days</p>
-                        </div>
-                      </div>
-                      <p className="text-sm font-semibold text-amber-600">-{formatCurrency(125000)}</p>
-                    </div>
-                    <div className="flex items-center justify-between p-3 rounded-lg border bg-green-50 border-green-200">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 bg-green-100 rounded-lg flex items-center justify-center">
-                          <ArrowUpRight className="h-4 w-4 text-green-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-green-900">Receivables Due (7 days)</p>
-                          <p className="text-xs text-green-700">8 invoices expected</p>
-                        </div>
-                      </div>
-                      <p className="text-sm font-semibold text-green-600">+{formatCurrency(142500)}</p>
-                    </div>
-                    <div className="pt-3 border-t">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Net Cash Flow (7 days)</span>
-                        <span className="font-semibold text-green-600">+{formatCurrency(142500 - 85000 - 125000)}</span>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 )}
               </CardContent>
             </Card>
@@ -528,32 +545,54 @@ export default function CashDashboardPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 rounded-lg bg-muted/30">
-                      <p className="text-xs text-muted-foreground">This Month</p>
-                      <p className="text-lg font-bold">{formatCurrency(4459)}</p>
-                    </div>
-                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
-                      <p className="text-xs text-amber-700">Missing Receipts</p>
-                      <p className="text-lg font-bold text-amber-600">2</p>
+                {loading ? (
+                  <div className="space-y-4">
+                    <Skeleton className="h-20 w-full" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Uncoded transactions</span>
-                      <span className="font-medium">3</span>
+                ) : cardSummary && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 rounded-lg bg-muted/30">
+                        <p className="text-xs text-muted-foreground">This Month</p>
+                        <p className="text-lg font-bold">{formatCurrency(cardSummary.totalSpendThisMonth)}</p>
+                      </div>
+                      <div className={cn(
+                        "p-3 rounded-lg border",
+                        cardSummary.missingReceipts > 0 
+                          ? "bg-amber-50 border-amber-200" 
+                          : "bg-green-50 border-green-200"
+                      )}>
+                        <p className={cn(
+                          "text-xs",
+                          cardSummary.missingReceipts > 0 ? "text-amber-700" : "text-green-700"
+                        )}>Missing Receipts</p>
+                        <p className={cn(
+                          "text-lg font-bold",
+                          cardSummary.missingReceipts > 0 ? "text-amber-600" : "text-green-600"
+                        )}>{cardSummary.missingReceipts}</p>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">AI suggestions pending</span>
-                      <span className="font-medium">2</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Active cards</span>
-                      <span className="font-medium">2</span>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Uncoded transactions</span>
+                        <span className="font-medium">{cardSummary.uncodedTransactions}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">AI suggestions pending</span>
+                        <span className="font-medium">{cardSummary.aiSuggestionsPending}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Active cards</span>
+                        <span className="font-medium">{cardSummary.activeCards}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>

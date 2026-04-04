@@ -151,14 +151,21 @@ export default function BalanceSheetPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => window.print()}>
                 <Printer className="h-4 w-4 mr-2" />
                 Print
               </Button>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
+              <Select defaultValue="pdf" onValueChange={(format) => console.log(`Exporting as ${format}`)}>
+                <SelectTrigger className="w-[130px]">
+                  <Download className="h-4 w-4 mr-2" />
+                  <span>Export</span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pdf">Export PDF</SelectItem>
+                  <SelectItem value="excel">Export Excel</SelectItem>
+                  <SelectItem value="csv">Export CSV</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

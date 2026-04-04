@@ -2623,3 +2623,573 @@ export async function toggleReportFavorite(id: string): Promise<{ success: boole
   }
   return { success: false }
 }
+
+// ============ ADMIN SERVICES ============
+
+import type { User, Dimension, Integration, Workflow, ApiKey } from '@/lib/types'
+
+const mockUsers: User[] = [
+  {
+    id: 'u1',
+    email: 'sarah.chen@company.com',
+    firstName: 'Sarah',
+    lastName: 'Chen',
+    role: 'admin',
+    status: 'active',
+    entityIds: ['e1', 'e2', 'e3', 'e4'],
+    lastLoginAt: new Date('2024-03-15T10:30:00'),
+    createdAt: new Date('2023-01-15'),
+    avatar: '/avatars/sarah.jpg',
+  },
+  {
+    id: 'u2',
+    email: 'michael.johnson@company.com',
+    firstName: 'Michael',
+    lastName: 'Johnson',
+    role: 'controller',
+    status: 'active',
+    entityIds: ['e1', 'e2'],
+    lastLoginAt: new Date('2024-03-15T09:15:00'),
+    createdAt: new Date('2023-02-20'),
+  },
+  {
+    id: 'u3',
+    email: 'emily.davis@company.com',
+    firstName: 'Emily',
+    lastName: 'Davis',
+    role: 'accountant',
+    status: 'active',
+    entityIds: ['e1'],
+    lastLoginAt: new Date('2024-03-14T16:45:00'),
+    createdAt: new Date('2023-03-10'),
+  },
+  {
+    id: 'u4',
+    email: 'james.wilson@company.com',
+    firstName: 'James',
+    lastName: 'Wilson',
+    role: 'ap_clerk',
+    status: 'active',
+    entityIds: ['e1', 'e2'],
+    lastLoginAt: new Date('2024-03-15T08:00:00'),
+    createdAt: new Date('2023-06-01'),
+  },
+  {
+    id: 'u5',
+    email: 'lisa.brown@company.com',
+    firstName: 'Lisa',
+    lastName: 'Brown',
+    role: 'ar_clerk',
+    status: 'active',
+    entityIds: ['e1'],
+    lastLoginAt: new Date('2024-03-13T14:20:00'),
+    createdAt: new Date('2023-07-15'),
+  },
+  {
+    id: 'u6',
+    email: 'robert.taylor@company.com',
+    firstName: 'Robert',
+    lastName: 'Taylor',
+    role: 'viewer',
+    status: 'inactive',
+    entityIds: ['e1'],
+    createdAt: new Date('2023-08-01'),
+  },
+  {
+    id: 'u7',
+    email: 'new.user@company.com',
+    firstName: 'New',
+    lastName: 'User',
+    role: 'accountant',
+    status: 'pending',
+    entityIds: ['e1'],
+    createdAt: new Date('2024-03-14'),
+  },
+]
+
+export async function getUsers(
+  search?: string,
+  role?: string[],
+  status?: string[],
+  sort?: SortConfig,
+  page: number = 1,
+  pageSize: number = 10
+): Promise<PaginatedResponse<User>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockUsers]
+  
+  if (role && role.length > 0) {
+    filtered = filtered.filter(u => role.includes(u.role))
+  }
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(u => status.includes(u.status))
+  }
+  
+  if (search) {
+    const s = search.toLowerCase()
+    filtered = filtered.filter(u => 
+      u.email.toLowerCase().includes(s) ||
+      u.firstName.toLowerCase().includes(s) ||
+      u.lastName.toLowerCase().includes(s)
+    )
+  }
+  
+  if (sort) {
+    filtered.sort((a, b) => {
+      const aVal = a[sort.key as keyof User]
+      const bVal = b[sort.key as keyof User]
+      if (aVal === undefined || bVal === undefined) return 0
+      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  }
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
+export async function createUser(user: Partial<User>): Promise<{ success: boolean; user?: User }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newUser: User = {
+    id: `u${mockUsers.length + 1}`,
+    email: user.email || '',
+    firstName: user.firstName || '',
+    lastName: user.lastName || '',
+    role: user.role || 'viewer',
+    status: 'pending',
+    entityIds: user.entityIds || [],
+    createdAt: new Date(),
+  }
+  
+  mockUsers.push(newUser)
+  return { success: true, user: newUser }
+}
+
+export async function updateUser(id: string, updates: Partial<User>): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const user = mockUsers.find(u => u.id === id)
+  if (user) {
+    Object.assign(user, updates)
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function deactivateUser(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const user = mockUsers.find(u => u.id === id)
+  if (user) {
+    user.status = 'inactive'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+// ============ DIMENSION SERVICES ============
+
+const mockDimensions: Dimension[] = [
+  { id: 'd1', name: 'Sales', code: 'SALES', type: 'department', status: 'active', entityIds: ['e1', 'e2'], createdAt: new Date('2023-01-01') },
+  { id: 'd2', name: 'Marketing', code: 'MKT', type: 'department', status: 'active', entityIds: ['e1', 'e2'], createdAt: new Date('2023-01-01') },
+  { id: 'd3', name: 'Engineering', code: 'ENG', type: 'department', status: 'active', entityIds: ['e1'], createdAt: new Date('2023-01-01') },
+  { id: 'd4', name: 'Finance', code: 'FIN', type: 'department', status: 'active', entityIds: ['e1', 'e2', 'e3'], createdAt: new Date('2023-01-01') },
+  { id: 'd5', name: 'HR', code: 'HR', type: 'department', status: 'active', entityIds: ['e1'], createdAt: new Date('2023-01-01') },
+  { id: 'd6', name: 'Operations', code: 'OPS', type: 'department', status: 'inactive', entityIds: ['e1'], createdAt: new Date('2023-01-01') },
+  { id: 'd7', name: 'Headquarters', code: 'HQ', type: 'location', status: 'active', entityIds: ['e1'], createdAt: new Date('2023-01-01') },
+  { id: 'd8', name: 'West Coast', code: 'WEST', type: 'location', status: 'active', entityIds: ['e1', 'e2'], createdAt: new Date('2023-01-01') },
+  { id: 'd9', name: 'East Coast', code: 'EAST', type: 'location', status: 'active', entityIds: ['e1', 'e3'], createdAt: new Date('2023-01-01') },
+  { id: 'd10', name: 'Project Alpha', code: 'ALPHA', type: 'project', status: 'active', entityIds: ['e1'], createdAt: new Date('2023-06-01') },
+  { id: 'd11', name: 'Project Beta', code: 'BETA', type: 'project', status: 'active', entityIds: ['e1'], createdAt: new Date('2023-08-01') },
+  { id: 'd12', name: 'Retail', code: 'RETAIL', type: 'class', status: 'active', entityIds: ['e1', 'e2'], createdAt: new Date('2023-01-01') },
+  { id: 'd13', name: 'Wholesale', code: 'WHSLE', type: 'class', status: 'active', entityIds: ['e1', 'e2'], createdAt: new Date('2023-01-01') },
+]
+
+export async function getDimensions(
+  type?: string,
+  status?: string[],
+  search?: string,
+  sort?: SortConfig
+): Promise<Dimension[]> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockDimensions]
+  
+  if (type) {
+    filtered = filtered.filter(d => d.type === type)
+  }
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(d => status.includes(d.status))
+  }
+  
+  if (search) {
+    const s = search.toLowerCase()
+    filtered = filtered.filter(d => 
+      d.name.toLowerCase().includes(s) ||
+      d.code.toLowerCase().includes(s)
+    )
+  }
+  
+  if (sort) {
+    filtered.sort((a, b) => {
+      const aVal = a[sort.key as keyof Dimension]
+      const bVal = b[sort.key as keyof Dimension]
+      if (aVal === undefined || bVal === undefined) return 0
+      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  }
+  
+  return filtered
+}
+
+export async function createDimension(dimension: Partial<Dimension>): Promise<{ success: boolean; dimension?: Dimension }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newDimension: Dimension = {
+    id: `d${mockDimensions.length + 1}`,
+    name: dimension.name || '',
+    code: dimension.code || '',
+    type: dimension.type || 'custom',
+    status: 'active',
+    parentId: dimension.parentId,
+    entityIds: dimension.entityIds || [],
+    createdAt: new Date(),
+  }
+  
+  mockDimensions.push(newDimension)
+  return { success: true, dimension: newDimension }
+}
+
+export async function updateDimension(id: string, updates: Partial<Dimension>): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const dimension = mockDimensions.find(d => d.id === id)
+  if (dimension) {
+    Object.assign(dimension, updates)
+    return { success: true }
+  }
+  return { success: false }
+}
+
+// ============ INTEGRATION SERVICES ============
+
+const mockIntegrations: Integration[] = [
+  {
+    id: 'int1',
+    name: 'Chase Bank',
+    type: 'bank',
+    provider: 'Plaid',
+    status: 'connected',
+    lastSyncAt: new Date('2024-03-15T06:00:00'),
+    createdAt: new Date('2023-01-15'),
+  },
+  {
+    id: 'int2',
+    name: 'Bank of America',
+    type: 'bank',
+    provider: 'Plaid',
+    status: 'connected',
+    lastSyncAt: new Date('2024-03-15T06:00:00'),
+    createdAt: new Date('2023-02-01'),
+  },
+  {
+    id: 'int3',
+    name: 'ADP Payroll',
+    type: 'payroll',
+    provider: 'ADP',
+    status: 'connected',
+    lastSyncAt: new Date('2024-03-01T00:00:00'),
+    createdAt: new Date('2023-01-20'),
+  },
+  {
+    id: 'int4',
+    name: 'Salesforce CRM',
+    type: 'crm',
+    provider: 'Salesforce',
+    status: 'connected',
+    lastSyncAt: new Date('2024-03-15T08:00:00'),
+    createdAt: new Date('2023-03-01'),
+  },
+  {
+    id: 'int5',
+    name: 'Shopify',
+    type: 'ecommerce',
+    provider: 'Shopify',
+    status: 'error',
+    lastSyncAt: new Date('2024-03-10T12:00:00'),
+    createdAt: new Date('2023-04-01'),
+  },
+  {
+    id: 'int6',
+    name: 'Avalara Tax',
+    type: 'tax',
+    provider: 'Avalara',
+    status: 'connected',
+    lastSyncAt: new Date('2024-03-14T00:00:00'),
+    createdAt: new Date('2023-05-01'),
+  },
+  {
+    id: 'int7',
+    name: 'Expensify',
+    type: 'expense',
+    provider: 'Expensify',
+    status: 'disconnected',
+    createdAt: new Date('2023-06-01'),
+  },
+  {
+    id: 'int8',
+    name: 'BambooHR',
+    type: 'hr',
+    provider: 'BambooHR',
+    status: 'pending',
+    createdAt: new Date('2024-03-10'),
+  },
+]
+
+export async function getIntegrations(type?: string, status?: string[]): Promise<Integration[]> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockIntegrations]
+  
+  if (type) {
+    filtered = filtered.filter(i => i.type === type)
+  }
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(i => status.includes(i.status))
+  }
+  
+  return filtered
+}
+
+export async function syncIntegration(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY * 2)
+  const integration = mockIntegrations.find(i => i.id === id)
+  if (integration && integration.status === 'connected') {
+    integration.lastSyncAt = new Date()
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function disconnectIntegration(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const integration = mockIntegrations.find(i => i.id === id)
+  if (integration) {
+    integration.status = 'disconnected'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function reconnectIntegration(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const integration = mockIntegrations.find(i => i.id === id)
+  if (integration && (integration.status === 'disconnected' || integration.status === 'error')) {
+    integration.status = 'connected'
+    integration.lastSyncAt = new Date()
+    return { success: true }
+  }
+  return { success: false }
+}
+
+// ============ WORKFLOW SERVICES ============
+
+const mockWorkflows: Workflow[] = [
+  {
+    id: 'wf1',
+    name: 'Bill Approval > $5,000',
+    type: 'approval',
+    trigger: 'bill.created',
+    status: 'active',
+    steps: [
+      { id: 's1', order: 1, type: 'condition', config: { field: 'amount', operator: 'gte', value: 5000 } },
+      { id: 's2', order: 2, type: 'approval', config: { role: 'controller' } },
+    ],
+    entityIds: ['e1', 'e2'],
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2023-02-01'),
+  },
+  {
+    id: 'wf2',
+    name: 'Invoice Overdue Notification',
+    type: 'notification',
+    trigger: 'invoice.overdue',
+    status: 'active',
+    steps: [
+      { id: 's1', order: 1, type: 'notification', config: { channel: 'email', template: 'overdue_invoice' } },
+    ],
+    entityIds: ['e1'],
+    createdBy: 'Michael Johnson',
+    createdAt: new Date('2023-03-15'),
+  },
+  {
+    id: 'wf3',
+    name: 'Journal Entry Auto-Post',
+    type: 'automation',
+    trigger: 'journal_entry.approved',
+    status: 'active',
+    steps: [
+      { id: 's1', order: 1, type: 'action', config: { action: 'post' } },
+    ],
+    entityIds: ['e1', 'e2', 'e3'],
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2023-04-01'),
+  },
+  {
+    id: 'wf4',
+    name: 'Expense Report Approval',
+    type: 'approval',
+    trigger: 'expense.submitted',
+    status: 'inactive',
+    steps: [
+      { id: 's1', order: 1, type: 'approval', config: { role: 'manager' } },
+      { id: 's2', order: 2, type: 'condition', config: { field: 'amount', operator: 'gte', value: 1000 } },
+      { id: 's3', order: 3, type: 'approval', config: { role: 'controller' } },
+    ],
+    entityIds: ['e1'],
+    createdBy: 'Emily Davis',
+    createdAt: new Date('2023-05-01'),
+  },
+  {
+    id: 'wf5',
+    name: 'Payment Confirmation',
+    type: 'notification',
+    trigger: 'payment.completed',
+    status: 'draft',
+    steps: [
+      { id: 's1', order: 1, type: 'notification', config: { channel: 'email', template: 'payment_confirmation' } },
+    ],
+    entityIds: ['e1'],
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-03-01'),
+  },
+]
+
+export async function getWorkflows(type?: string, status?: string[]): Promise<Workflow[]> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockWorkflows]
+  
+  if (type) {
+    filtered = filtered.filter(w => w.type === type)
+  }
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(w => status.includes(w.status))
+  }
+  
+  return filtered
+}
+
+export async function createWorkflow(workflow: Partial<Workflow>): Promise<{ success: boolean; workflow?: Workflow }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newWorkflow: Workflow = {
+    id: `wf${mockWorkflows.length + 1}`,
+    name: workflow.name || 'Untitled Workflow',
+    type: workflow.type || 'automation',
+    trigger: workflow.trigger || '',
+    status: 'draft',
+    steps: workflow.steps || [],
+    entityIds: workflow.entityIds || [],
+    createdBy: 'Current User',
+    createdAt: new Date(),
+  }
+  
+  mockWorkflows.push(newWorkflow)
+  return { success: true, workflow: newWorkflow }
+}
+
+export async function updateWorkflowStatus(id: string, status: 'active' | 'inactive' | 'draft'): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const workflow = mockWorkflows.find(w => w.id === id)
+  if (workflow) {
+    workflow.status = status
+    return { success: true }
+  }
+  return { success: false }
+}
+
+// ============ API KEY SERVICES ============
+
+const mockApiKeys: ApiKey[] = [
+  {
+    id: 'ak1',
+    name: 'Production API',
+    key: 'sk_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    status: 'active',
+    permissions: ['read:all', 'write:transactions', 'write:bills', 'write:invoices'],
+    lastUsedAt: new Date('2024-03-15T10:30:00'),
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2023-01-15'),
+  },
+  {
+    id: 'ak2',
+    name: 'Reporting Integration',
+    key: 'sk_live_yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy',
+    status: 'active',
+    permissions: ['read:reports', 'read:transactions'],
+    lastUsedAt: new Date('2024-03-14T08:00:00'),
+    expiresAt: new Date('2024-12-31'),
+    createdBy: 'Michael Johnson',
+    createdAt: new Date('2023-06-01'),
+  },
+  {
+    id: 'ak3',
+    name: 'Testing Key',
+    key: 'sk_test_zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',
+    status: 'active',
+    permissions: ['read:all', 'write:all'],
+    createdBy: 'Emily Davis',
+    createdAt: new Date('2024-01-15'),
+  },
+  {
+    id: 'ak4',
+    name: 'Old Integration',
+    key: 'sk_live_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    status: 'revoked',
+    permissions: ['read:all'],
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2022-06-01'),
+  },
+]
+
+export async function getApiKeys(): Promise<ApiKey[]> {
+  await delay(SIMULATED_DELAY)
+  return mockApiKeys
+}
+
+export async function createApiKey(key: Partial<ApiKey>): Promise<{ success: boolean; apiKey?: ApiKey }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newKey: ApiKey = {
+    id: `ak${mockApiKeys.length + 1}`,
+    name: key.name || 'New API Key',
+    key: `sk_live_${Math.random().toString(36).substring(2, 34)}`,
+    status: 'active',
+    permissions: key.permissions || ['read:all'],
+    expiresAt: key.expiresAt,
+    createdBy: 'Current User',
+    createdAt: new Date(),
+  }
+  
+  mockApiKeys.push(newKey)
+  return { success: true, apiKey: newKey }
+}
+
+export async function revokeApiKey(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const key = mockApiKeys.find(k => k.id === id)
+  if (key && key.status === 'active') {
+    key.status = 'revoked'
+    return { success: true }
+  }
+  return { success: false }
+}

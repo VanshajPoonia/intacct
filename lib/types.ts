@@ -529,3 +529,70 @@ export interface ChartDataPoint {
   value: number
   [key: string]: string | number
 }
+
+// Admin Types
+export interface User {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  role: 'admin' | 'controller' | 'accountant' | 'viewer' | 'ap_clerk' | 'ar_clerk'
+  status: 'active' | 'inactive' | 'pending'
+  entityIds: string[]
+  lastLoginAt?: Date
+  createdAt: Date
+  avatar?: string
+}
+
+export interface Dimension {
+  id: string
+  name: string
+  code: string
+  type: 'department' | 'location' | 'project' | 'class' | 'custom'
+  status: 'active' | 'inactive'
+  parentId?: string
+  entityIds: string[]
+  createdAt: Date
+}
+
+export interface Integration {
+  id: string
+  name: string
+  type: 'bank' | 'payroll' | 'crm' | 'ecommerce' | 'tax' | 'expense' | 'hr'
+  provider: string
+  status: 'connected' | 'disconnected' | 'error' | 'pending'
+  lastSyncAt?: Date
+  configuration?: Record<string, unknown>
+  createdAt: Date
+}
+
+export interface Workflow {
+  id: string
+  name: string
+  type: 'approval' | 'notification' | 'automation'
+  trigger: string
+  status: 'active' | 'inactive' | 'draft'
+  steps: WorkflowStep[]
+  entityIds: string[]
+  createdBy: string
+  createdAt: Date
+}
+
+export interface WorkflowStep {
+  id: string
+  order: number
+  type: 'approval' | 'notification' | 'condition' | 'action'
+  config: Record<string, unknown>
+}
+
+export interface ApiKey {
+  id: string
+  name: string
+  key: string
+  status: 'active' | 'revoked'
+  permissions: string[]
+  lastUsedAt?: Date
+  expiresAt?: Date
+  createdBy: string
+  createdAt: Date
+}

@@ -1111,6 +1111,35 @@ export async function approveBill(id: string): Promise<{ success: boolean }> {
   const bill = mockBills.find(b => b.id === id)
   if (bill && (bill.status === 'draft' || bill.status === 'pending')) {
     bill.status = 'approved'
+    bill.approvalStatus = 'approved'
+    bill.approvedAt = new Date()
+    bill.approvedBy = 'Current User'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function rejectBill(id: string, reason: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const bill = mockBills.find(b => b.id === id)
+  if (bill && bill.approvalStatus === 'pending_approval') {
+    bill.approvalStatus = 'rejected'
+    bill.rejectedAt = new Date()
+    bill.rejectedBy = 'Current User'
+    bill.rejectionReason = reason
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function submitBillForApproval(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const bill = mockBills.find(b => b.id === id)
+  if (bill && bill.approvalStatus === 'not_submitted') {
+    bill.approvalStatus = 'pending_approval'
+    bill.status = 'pending'
+    bill.submittedAt = new Date()
+    bill.submittedBy = 'Current User'
     return { success: true }
   }
   return { success: false }

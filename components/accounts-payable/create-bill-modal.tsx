@@ -78,12 +78,35 @@ export function CreateBillModal({ open, onClose, onSuccess }: CreateBillModalPro
   // Form state
   const [vendorId, setVendorId] = useState("")
   const [entityId, setEntityId] = useState("e1")
+  const [departmentId, setDepartmentId] = useState("")
+  const [locationId, setLocationId] = useState("")
+  const [terms, setTerms] = useState("Net 30")
+  const [currency, setCurrency] = useState("USD")
   const [billDate, setBillDate] = useState<Date>(new Date())
   const [dueDate, setDueDate] = useState<Date>(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000))
   const [description, setDescription] = useState("")
   const [lineItems, setLineItems] = useState<Partial<BillLineItem>[]>([
-    { id: '1', description: '', accountId: '', accountName: '', quantity: 1, unitPrice: 0, amount: 0 }
+    { id: '1', description: '', accountId: '', accountName: '', quantity: 1, unitPrice: 0, amount: 0, taxAmount: 0, departmentId: '', departmentName: '' }
   ])
+  
+  // Departments and locations for dropdowns
+  const departments = [
+    { id: 'd1', name: 'Operations' },
+    { id: 'd2', name: 'Engineering' },
+    { id: 'd3', name: 'HR' },
+    { id: 'd4', name: 'Marketing' },
+    { id: 'd5', name: 'Finance' },
+  ]
+  
+  const locations = [
+    { id: 'l1', name: 'San Francisco HQ' },
+    { id: 'l2', name: 'New York Office' },
+    { id: 'l3', name: 'Chicago Branch' },
+    { id: 'l4', name: 'Remote' },
+  ]
+  
+  const termsOptions = ['Net 15', 'Net 30', 'Net 45', 'Net 60', 'Due on Receipt']
+  const currencies = ['USD', 'EUR', 'GBP', 'CAD']
   
   useEffect(() => {
     if (open) {
@@ -119,7 +142,12 @@ export function CreateBillModal({ open, onClose, onSuccess }: CreateBillModalPro
         accountName: '',
         quantity: 1, 
         unitPrice: 0, 
-        amount: 0 
+        amount: 0,
+        taxAmount: 0,
+        departmentId: departmentId,
+        departmentName: departments.find(d => d.id === departmentId)?.name || '',
+        locationId: locationId,
+        locationName: locations.find(l => l.id === locationId)?.name || '',
       }
     ])
   }
@@ -183,11 +211,15 @@ export function CreateBillModal({ open, onClose, onSuccess }: CreateBillModalPro
     // Reset form
     setVendorId("")
     setEntityId("e1")
+    setDepartmentId("")
+    setLocationId("")
+    setTerms("Net 30")
+    setCurrency("USD")
     setBillDate(new Date())
     setDueDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000))
     setDescription("")
     setLineItems([
-      { id: '1', description: '', accountId: '', accountName: '', quantity: 1, unitPrice: 0, amount: 0 }
+      { id: '1', description: '', accountId: '', accountName: '', quantity: 1, unitPrice: 0, amount: 0, taxAmount: 0, departmentId: '', departmentName: '' }
     ])
     onClose()
   }
@@ -229,6 +261,73 @@ export function CreateBillModal({ open, onClose, onSuccess }: CreateBillModalPro
                     {entities.map(entity => (
                       <SelectItem key={entity.id} value={entity.id}>
                         {entity.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            {/* Department, Location, Terms, Currency */}
+            <div className="grid grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="department">Department</Label>
+                <Select value={departmentId} onValueChange={setDepartmentId}>
+                  <SelectTrigger id="department">
+                    <SelectValue placeholder="Select dept" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map(dept => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="location">Location</Label>
+                <Select value={locationId} onValueChange={setLocationId}>
+                  <SelectTrigger id="location">
+                    <SelectValue placeholder="Select location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map(loc => (
+                      <SelectItem key={loc.id} value={loc.id}>
+                        {loc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="terms">Terms</Label>
+                <Select value={terms} onValueChange={setTerms}>
+                  <SelectTrigger id="terms">
+                    <SelectValue placeholder="Select terms" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {termsOptions.map(term => (
+                      <SelectItem key={term} value={term}>
+                        {term}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="currency">Currency</Label>
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger id="currency">
+                    <SelectValue placeholder="Select currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {currencies.map(curr => (
+                      <SelectItem key={curr} value={curr}>
+                        {curr}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -318,15 +417,17 @@ export function CreateBillModal({ open, onClose, onSuccess }: CreateBillModalPro
                 </Button>
               </div>
               
-              <div className="border rounded-md">
+              <div className="border rounded-md overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[30%]">Account</TableHead>
-                      <TableHead className="w-[30%]">Description</TableHead>
-                      <TableHead className="w-[12%] text-right">Qty</TableHead>
-                      <TableHead className="w-[14%] text-right">Unit Price</TableHead>
-                      <TableHead className="w-[14%] text-right">Amount</TableHead>
+                      <TableHead className="min-w-[140px]">Account</TableHead>
+                      <TableHead className="min-w-[140px]">Description</TableHead>
+                      <TableHead className="min-w-[100px]">Department</TableHead>
+                      <TableHead className="w-[70px] text-right">Qty</TableHead>
+                      <TableHead className="w-[90px] text-right">Unit Price</TableHead>
+                      <TableHead className="w-[80px] text-right">Tax</TableHead>
+                      <TableHead className="w-[100px] text-right">Amount</TableHead>
                       <TableHead className="w-[40px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -359,6 +460,29 @@ export function CreateBillModal({ open, onClose, onSuccess }: CreateBillModalPro
                           />
                         </TableCell>
                         <TableCell>
+                          <Select 
+                            value={item.departmentId || ''} 
+                            onValueChange={(value) => {
+                              updateLineItem(index, 'departmentId', value)
+                              const dept = departments.find(d => d.id === value)
+                              if (dept) {
+                                updateLineItem(index, 'departmentName', dept.name)
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue placeholder="Dept" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {departments.map(dept => (
+                                <SelectItem key={dept.id} value={dept.id}>
+                                  {dept.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
                           <Input
                             type="number"
                             className="h-8 text-right"
@@ -377,8 +501,19 @@ export function CreateBillModal({ open, onClose, onSuccess }: CreateBillModalPro
                             onChange={(e) => updateLineItem(index, 'unitPrice', Number(e.target.value))}
                           />
                         </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            className="h-8 text-right"
+                            min={0}
+                            step={0.01}
+                            placeholder="0.00"
+                            value={item.taxAmount || ''}
+                            onChange={(e) => updateLineItem(index, 'taxAmount', Number(e.target.value))}
+                          />
+                        </TableCell>
                         <TableCell className="text-right font-medium">
-                          {formatCurrency(item.amount || 0)}
+                          {formatCurrency((item.amount || 0) + (item.taxAmount || 0))}
                         </TableCell>
                         <TableCell>
                           <Button
@@ -397,11 +532,14 @@ export function CreateBillModal({ open, onClose, onSuccess }: CreateBillModalPro
                   </TableBody>
                   <TableFooter>
                     <TableRow>
-                      <TableCell colSpan={4} className="text-right font-medium">
-                        Total
+                      <TableCell colSpan={5} className="text-right font-medium">
+                        Subtotal
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatCurrency(lineItems.reduce((sum, item) => sum + (item.taxAmount || 0), 0))}
                       </TableCell>
                       <TableCell className="text-right font-bold">
-                        {formatCurrency(totalAmount)}
+                        {formatCurrency(totalAmount + lineItems.reduce((sum, item) => sum + (item.taxAmount || 0), 0))}
                       </TableCell>
                       <TableCell />
                     </TableRow>
@@ -413,13 +551,21 @@ export function CreateBillModal({ open, onClose, onSuccess }: CreateBillModalPro
         </ScrollArea>
         
         <DialogFooter className="pt-4 border-t">
-          <Button variant="outline" onClick={handleClose} disabled={saving}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={!isValid || saving}>
-            {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Create Bill
-          </Button>
+          <div className="flex items-center justify-between w-full">
+            <Button variant="outline" onClick={handleClose} disabled={saving}>
+              Cancel
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" onClick={handleSubmit} disabled={!isValid || saving}>
+                {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save as Draft
+              </Button>
+              <Button onClick={() => { /* Save and submit for approval */ handleSubmit() }} disabled={!isValid || saving}>
+                {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Submit for Approval
+              </Button>
+            </div>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

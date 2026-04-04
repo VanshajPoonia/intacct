@@ -248,6 +248,37 @@ export function VendorDrawer({
 
                   <Separator />
 
+                  {/* Remittance Info */}
+                  <div>
+                    <p className="text-sm font-medium mb-3">Remittance Information</p>
+                    <div className="grid grid-cols-2 gap-4 p-4 rounded-lg border bg-muted/30">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Bank Name</p>
+                        <p className="text-sm font-medium">{vendor.bankName || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Account Number</p>
+                        <p className="text-sm font-medium font-mono">{vendor.bankAccountNumber || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Routing Number</p>
+                        <p className="text-sm font-medium font-mono">{vendor.bankRoutingNumber || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Preferred Payment Method</p>
+                        <p className="text-sm font-medium capitalize">{vendor.preferredPaymentMethod || '-'}</p>
+                      </div>
+                      {vendor.remittanceEmail && (
+                        <div className="col-span-2">
+                          <p className="text-xs text-muted-foreground">Remittance Email</p>
+                          <p className="text-sm font-medium">{vendor.remittanceEmail}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <Separator />
+
                   {/* Balance Summary */}
                   <div>
                     <p className="text-sm font-medium mb-3">Account Summary</p>

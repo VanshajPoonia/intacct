@@ -31,6 +31,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Checkbox } from "@/components/ui/checkbox"
+import { toast } from "sonner"
 import { 
   Plus, 
   Search, 
@@ -48,6 +50,7 @@ import {
   XCircle,
   Clock,
   AlertCircle,
+  Send,
 } from "lucide-react"
 import type { 
   Bill, 
@@ -62,6 +65,8 @@ import {
   getEntities,
   getVendors,
   approveBill,
+  rejectBill,
+  submitBillForApproval,
   voidBill,
 } from "@/lib/services"
 import { BillDrawer } from "@/components/accounts-payable/bill-drawer"
@@ -111,6 +116,41 @@ export default function BillsPage() {
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+
+  // Bulk selection handlers
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    )
+  }
+
+  const selectAll = () => {
+    if (!data) return
+    if (selectedIds.length === data.data.length) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(data.data.map(b => b.id))
+    }
+  }
+
+  const handleBulkApprove = async () => {
+    for (const id of selectedIds) {
+      await approveBill(id)
+    }
+    toast.success(`${selectedIds.length} bills approved`)
+    setSelectedIds([])
+    fetchData()
+  }
+
+  const handleBulkSubmit = async () => {
+    for (const id of selectedIds) {
+      await submitBillForApproval(id)
+    }
+    toast.success(`${selectedIds.length} bills submitted for approval`)
+    setSelectedIds([])
+    fetchData()
+  }
 
   // Load entities and vendors on mount
   useEffect(() => {
@@ -369,13 +409,40 @@ export default function BillsPage() {
           </CardContent>
         </Card>
 
+        {/* Bulk Actions */}
+        {selectedIds.length > 0 && (
+          <Card className="bg-muted/50">
+            <CardContent className="py-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">{selectedIds.length} bill(s) selected</span>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={handleBulkSubmit}>
+                    <Send className="h-4 w-4 mr-1.5" />
+                    Submit for Approval
+                  </Button>
+                  <Button size="sm" onClick={handleBulkApprove}>
+                    <CheckCircle className="h-4 w-4 mr-1.5" />
+                    Approve Selected
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Table */}
         <Card>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[120px]">
+                  <TableHead className="w-[40px]">
+                    <Checkbox
+                      checked={data && selectedIds.length === data.data.length && data.data.length > 0}
+                      onCheckedChange={selectAll}
+                    />
+                  </TableHead>
+                  <TableHead className="w-[110px]">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -387,7 +454,8 @@ export default function BillsPage() {
                     </Button>
                   </TableHead>
                   <TableHead>Vendor</TableHead>
-                  <TableHead className="w-[100px]">
+                  <TableHead className="w-[100px]">Dept</TableHead>
+                  <TableHead className="w-[90px]">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -398,18 +466,18 @@ export default function BillsPage() {
                       <ArrowUpDown className="ml-1 h-3.5 w-3.5" />
                     </Button>
                   </TableHead>
-                  <TableHead className="w-[100px]">
+                  <TableHead className="w-[90px]">
                     <Button
                       variant="ghost"
                       size="sm"
                       className="-ml-3 h-8"
                       onClick={() => handleSort('dueDate')}
                     >
-                      Due Date
+                      Due
                       <ArrowUpDown className="ml-1 h-3.5 w-3.5" />
                     </Button>
                   </TableHead>
-                  <TableHead className="text-right w-[120px]">
+                  <TableHead className="text-right w-[100px]">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -420,30 +488,36 @@ export default function BillsPage() {
                       <ArrowUpDown className="ml-1 h-3.5 w-3.5" />
                     </Button>
                   </TableHead>
-                  <TableHead className="w-[100px]">Status</TableHead>
-                  <TableHead className="w-[60px]"></TableHead>
+                  <TableHead className="w-[85px]">Status</TableHead>
+                  <TableHead className="w-[85px]">Approval</TableHead>
+                  <TableHead className="w-[70px]">Payment</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-14" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-14" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-12" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-8" /></TableCell>
                     </TableRow>
                   ))
                 ) : data?.data.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center">
+                    <TableCell colSpan={11} className="h-32 text-center">
                       <div className="flex flex-col items-center gap-2 text-muted-foreground">
                         <FileText className="h-8 w-8" />
                         <p>No bills found</p>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => setCreateModalOpen(true)}>
                           Create Bill
                         </Button>
                       </div>
@@ -458,21 +532,55 @@ export default function BillsPage() {
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => handleRowClick(bill)}
                       >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.includes(bill.id)}
+                            onCheckedChange={() => toggleSelect(bill.id)}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">{bill.number}</TableCell>
                         <TableCell>{bill.vendorName}</TableCell>
-                        <TableCell>{format(new Date(bill.date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {bill.departmentName || '-'}
+                        </TableCell>
+                        <TableCell className="text-sm">{format(new Date(bill.date), 'MMM d')}</TableCell>
                         <TableCell>
-                          <span className={isOverdue ? 'text-red-600 font-medium' : ''}>
-                            {format(new Date(bill.dueDate), 'MMM d, yyyy')}
+                          <span className={isOverdue ? 'text-red-600 font-medium text-sm' : 'text-sm'}>
+                            {format(new Date(bill.dueDate), 'MMM d')}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right font-mono">
+                        <TableCell className="text-right font-mono text-sm">
                           {formatCurrency(bill.amount)}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary" className={statusColors[bill.status]}>
+                          <Badge variant="secondary" className={`${statusColors[bill.status]} text-xs`}>
                             {bill.status}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {bill.approvalStatus === 'not_submitted' && (
+                            <Badge variant="outline" className="text-xs bg-muted">Draft</Badge>
+                          )}
+                          {bill.approvalStatus === 'pending_approval' && (
+                            <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">Pending</Badge>
+                          )}
+                          {bill.approvalStatus === 'approved' && (
+                            <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">Approved</Badge>
+                          )}
+                          {bill.approvalStatus === 'rejected' && (
+                            <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">Rejected</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {bill.paymentStatus === 'unpaid' && (
+                            <Badge variant="outline" className="text-xs">Unpaid</Badge>
+                          )}
+                          {bill.paymentStatus === 'partial' && (
+                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">Partial</Badge>
+                          )}
+                          {bill.paymentStatus === 'paid' && (
+                            <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">Paid</Badge>
+                          )}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>

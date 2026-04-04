@@ -4096,13 +4096,20 @@ export async function sendPurchaseOrder(id: string): Promise<{ success: boolean 
   return { success: false }
 }
 
-export async function receivePurchaseOrder(id: string, lineId: string, quantity: number): Promise<{ success: boolean }> {
+export async function receivePurchaseOrder(id: string, lineId?: string, quantity?: number): Promise<{ success: boolean }> {
   await delay(SIMULATED_DELAY)
   const po = mockPurchaseOrders.find(p => p.id === id)
   if (po) {
+    // If no lineId provided, mark all lines as fully received
+    if (!lineId) {
+      po.lines.forEach(l => { l.receivedQuantity = l.quantity })
+      po.status = 'received'
+      return { success: true }
+    }
+    
     const line = po.lines.find(l => l.id === lineId)
     if (line) {
-      line.receivedQuantity = Math.min(line.quantity, line.receivedQuantity + quantity)
+      line.receivedQuantity = Math.min(line.quantity, line.receivedQuantity + (quantity || line.quantity))
       
       const allReceived = po.lines.every(l => l.receivedQuantity >= l.quantity)
       const someReceived = po.lines.some(l => l.receivedQuantity > 0)

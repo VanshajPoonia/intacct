@@ -406,6 +406,28 @@ export interface Task {
   createdAt: Date
 }
 
+// Payment Types
+export interface Payment {
+  id: string
+  number: string
+  date: Date
+  amount: number
+  currency: string
+  method: 'check' | 'ach' | 'wire' | 'credit_card'
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'voided'
+  vendorId: string
+  vendorName: string
+  billIds: string[]
+  bankAccountId: string
+  bankAccountName: string
+  checkNumber?: string
+  reference?: string
+  memo?: string
+  entityId: string
+  createdBy: string
+  createdAt: Date
+}
+
 // Bank Account Types
 export interface BankAccount {
   id: string

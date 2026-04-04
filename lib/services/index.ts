@@ -618,6 +618,295 @@ export async function getBills(
   return { data, total, page, pageSize, totalPages }
 }
 
+export async function getBillById(id: string): Promise<Bill | null> {
+  await delay(SIMULATED_DELAY)
+  return mockBills.find(b => b.id === id) || null
+}
+
+export async function createBill(bill: Partial<Bill>): Promise<{ success: boolean; bill?: Bill }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newBill: Bill = {
+    id: `b${mockBills.length + 1}`,
+    number: `BILL-2024-${String(mockBills.length + 1).padStart(3, '0')}`,
+    vendorId: bill.vendorId || '',
+    vendorName: bill.vendorName || '',
+    date: bill.date || new Date(),
+    dueDate: bill.dueDate || new Date(),
+    amount: bill.amount || 0,
+    currency: 'USD',
+    status: 'draft',
+    description: bill.description,
+    lineItems: bill.lineItems || [],
+    entityId: bill.entityId || 'e1',
+    createdAt: new Date(),
+  }
+  mockBills.push(newBill)
+  return { success: true, bill: newBill }
+}
+
+export async function updateBill(id: string, updates: Partial<Bill>): Promise<{ success: boolean; bill?: Bill }> {
+  await delay(SIMULATED_DELAY)
+  const index = mockBills.findIndex(b => b.id === id)
+  if (index !== -1) {
+    mockBills[index] = { ...mockBills[index], ...updates }
+    return { success: true, bill: mockBills[index] }
+  }
+  return { success: false }
+}
+
+export async function approveBill(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const bill = mockBills.find(b => b.id === id)
+  if (bill && (bill.status === 'draft' || bill.status === 'pending')) {
+    bill.status = 'approved'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function voidBill(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const bill = mockBills.find(b => b.id === id)
+  if (bill && bill.status !== 'paid') {
+    bill.status = 'voided'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+// ============ PAYMENT SERVICES ============
+
+import type { Payment } from '@/lib/types'
+
+const mockPayments: Payment[] = [
+  {
+    id: 'pay1',
+    number: 'PAY-2024-001',
+    date: new Date('2024-03-10'),
+    amount: 12500,
+    currency: 'USD',
+    method: 'ach',
+    status: 'completed',
+    vendorId: 'v1',
+    vendorName: 'Acme Supplies Inc.',
+    billIds: ['b1'],
+    bankAccountId: 'ba1',
+    bankAccountName: 'Operating Account',
+    reference: 'ACH-789456',
+    memo: 'March payment',
+    entityId: 'e1',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-03-10'),
+  },
+  {
+    id: 'pay2',
+    number: 'PAY-2024-002',
+    date: new Date('2024-03-12'),
+    amount: 8750,
+    currency: 'USD',
+    method: 'check',
+    status: 'completed',
+    vendorId: 'v2',
+    vendorName: 'TechPro Services',
+    billIds: ['b2'],
+    bankAccountId: 'ba1',
+    bankAccountName: 'Operating Account',
+    checkNumber: '10234',
+    memo: 'IT services - Q1',
+    entityId: 'e1',
+    createdBy: 'Michael Johnson',
+    createdAt: new Date('2024-03-12'),
+  },
+  {
+    id: 'pay3',
+    number: 'PAY-2024-003',
+    date: new Date('2024-03-14'),
+    amount: 45000,
+    currency: 'USD',
+    method: 'wire',
+    status: 'processing',
+    vendorId: 'v3',
+    vendorName: 'Global Partners LLC',
+    billIds: ['b3', 'b4'],
+    bankAccountId: 'ba1',
+    bankAccountName: 'Operating Account',
+    reference: 'WIRE-2024-0314',
+    memo: 'International supplier payment',
+    entityId: 'e1',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-03-14'),
+  },
+  {
+    id: 'pay4',
+    number: 'PAY-2024-004',
+    date: new Date('2024-03-15'),
+    amount: 3200,
+    currency: 'USD',
+    method: 'credit_card',
+    status: 'completed',
+    vendorId: 'v4',
+    vendorName: 'Office Depot',
+    billIds: ['b5'],
+    bankAccountId: 'ba2',
+    bankAccountName: 'Corporate Card',
+    reference: 'CC-4521',
+    memo: 'Office supplies',
+    entityId: 'e1',
+    createdBy: 'Emily Davis',
+    createdAt: new Date('2024-03-15'),
+  },
+  {
+    id: 'pay5',
+    number: 'PAY-2024-005',
+    date: new Date('2024-03-16'),
+    amount: 15800,
+    currency: 'USD',
+    method: 'ach',
+    status: 'pending',
+    vendorId: 'v1',
+    vendorName: 'Acme Supplies Inc.',
+    billIds: ['b6'],
+    bankAccountId: 'ba1',
+    bankAccountName: 'Operating Account',
+    memo: 'Pending batch',
+    entityId: 'e1',
+    createdBy: 'Sarah Chen',
+    createdAt: new Date('2024-03-16'),
+  },
+]
+
+export async function getPayments(
+  filters: DashboardFilters,
+  search?: string,
+  status?: string[],
+  method?: string[],
+  sort?: SortConfig,
+  page: number = 1,
+  pageSize: number = 10
+): Promise<PaginatedResponse<Payment>> {
+  await delay(SIMULATED_DELAY)
+  
+  let filtered = [...mockPayments]
+  
+  if (filters.entityId && filters.entityId !== 'e4') {
+    filtered = filtered.filter(p => p.entityId === filters.entityId)
+  }
+  
+  if (filters.vendorId) {
+    filtered = filtered.filter(p => p.vendorId === filters.vendorId)
+  }
+  
+  if (status && status.length > 0) {
+    filtered = filtered.filter(p => status.includes(p.status))
+  }
+  
+  if (method && method.length > 0) {
+    filtered = filtered.filter(p => method.includes(p.method))
+  }
+  
+  if (search) {
+    const s = search.toLowerCase()
+    filtered = filtered.filter(p => 
+      p.number.toLowerCase().includes(s) ||
+      p.vendorName.toLowerCase().includes(s) ||
+      p.reference?.toLowerCase().includes(s) ||
+      p.checkNumber?.toLowerCase().includes(s)
+    )
+  }
+  
+  if (sort) {
+    filtered.sort((a, b) => {
+      const aVal = a[sort.key as keyof Payment]
+      const bVal = b[sort.key as keyof Payment]
+      if (aVal === undefined || bVal === undefined) return 0
+      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  }
+  
+  const total = filtered.length
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize
+  const data = filtered.slice(start, start + pageSize)
+  
+  return { data, total, page, pageSize, totalPages }
+}
+
+export async function getPaymentById(id: string): Promise<Payment | null> {
+  await delay(SIMULATED_DELAY)
+  return mockPayments.find(p => p.id === id) || null
+}
+
+export async function createPayment(payment: Partial<Payment>): Promise<{ success: boolean; payment?: Payment }> {
+  await delay(SIMULATED_DELAY)
+  
+  const newPayment: Payment = {
+    id: `pay${mockPayments.length + 1}`,
+    number: `PAY-2024-${String(mockPayments.length + 1).padStart(3, '0')}`,
+    date: payment.date || new Date(),
+    amount: payment.amount || 0,
+    currency: 'USD',
+    method: payment.method || 'ach',
+    status: 'pending',
+    vendorId: payment.vendorId || '',
+    vendorName: payment.vendorName || '',
+    billIds: payment.billIds || [],
+    bankAccountId: payment.bankAccountId || '',
+    bankAccountName: payment.bankAccountName || '',
+    checkNumber: payment.checkNumber,
+    reference: payment.reference,
+    memo: payment.memo,
+    entityId: payment.entityId || 'e1',
+    createdBy: 'Current User',
+    createdAt: new Date(),
+  }
+  
+  // Mark associated bills as paid
+  newPayment.billIds.forEach(billId => {
+    const bill = mockBills.find(b => b.id === billId)
+    if (bill) bill.status = 'paid'
+  })
+  
+  mockPayments.push(newPayment)
+  return { success: true, payment: newPayment }
+}
+
+export async function processPayment(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const payment = mockPayments.find(p => p.id === id)
+  if (payment && payment.status === 'pending') {
+    payment.status = 'processing'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function completePayment(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const payment = mockPayments.find(p => p.id === id)
+  if (payment && (payment.status === 'pending' || payment.status === 'processing')) {
+    payment.status = 'completed'
+    return { success: true }
+  }
+  return { success: false }
+}
+
+export async function voidPayment(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const payment = mockPayments.find(p => p.id === id)
+  if (payment && payment.status !== 'completed') {
+    payment.status = 'voided'
+    // Restore bills to approved status
+    payment.billIds.forEach(billId => {
+      const bill = mockBills.find(b => b.id === billId)
+      if (bill) bill.status = 'approved'
+    })
+    return { success: true }
+  }
+  return { success: false }
+}
+
 // ============ INVOICE SERVICES ============
 
 export async function getInvoices(

@@ -2869,6 +2869,58 @@ export async function toggleReportFavorite(id: string): Promise<{ success: boole
   return { success: false }
 }
 
+export interface RecentReport {
+  id: string
+  name: string
+  type: string
+  href: string
+  viewedAt: Date
+}
+
+const mockRecentReports: RecentReport[] = [
+  { id: 'rr1', name: 'Income Statement', type: 'income_statement', href: '/reports/income-statement', viewedAt: new Date('2024-03-15T14:30:00') },
+  { id: 'rr2', name: 'Balance Sheet', type: 'balance_sheet', href: '/reports/balance-sheet', viewedAt: new Date('2024-03-15T11:00:00') },
+  { id: 'rr3', name: 'Budget vs Actual', type: 'budget_vs_actual', href: '/reports/budget-vs-actual', viewedAt: new Date('2024-03-14T16:45:00') },
+  { id: 'rr4', name: 'Trial Balance', type: 'trial_balance', href: '/general-ledger/reports/trial-balance', viewedAt: new Date('2024-03-14T10:20:00') },
+  { id: 'rr5', name: 'Cash Flow Statement', type: 'cash_flow', href: '/reports/cash-flow', viewedAt: new Date('2024-03-13T09:00:00') },
+]
+
+export async function getRecentReports(): Promise<RecentReport[]> {
+  await delay(SIMULATED_DELAY)
+  return mockRecentReports.sort((a, b) => new Date(b.viewedAt).getTime() - new Date(a.viewedAt).getTime())
+}
+
+interface PinnedReport {
+  id: string
+  name: string
+  type: string
+  href: string
+  lastRunAt?: Date
+  isPinned: boolean
+}
+
+const mockPinnedReports: PinnedReport[] = [
+  { id: 'pr1', name: 'Monthly P&L', type: 'income_statement', href: '/reports/income-statement', lastRunAt: new Date('2024-03-15'), isPinned: true },
+  { id: 'pr2', name: 'Balance Sheet', type: 'balance_sheet', href: '/reports/balance-sheet', lastRunAt: new Date('2024-03-14'), isPinned: true },
+  { id: 'pr3', name: 'Budget Variance', type: 'budget_vs_actual', href: '/reports/budget-vs-actual', lastRunAt: new Date('2024-03-13'), isPinned: true },
+]
+
+export async function getPinnedReports(): Promise<PinnedReport[]> {
+  await delay(SIMULATED_DELAY)
+  return mockPinnedReports.filter(r => r.isPinned)
+}
+
+export async function toggleReportPin(id: string): Promise<{ success: boolean }> {
+  await delay(SIMULATED_DELAY)
+  const report = mockPinnedReports.find(r => r.id === id)
+  if (report) {
+    report.isPinned = !report.isPinned
+    return { success: true }
+  }
+  // If not found, add it as pinned
+  return { success: true }
+}
+
 // ============ ADMIN SERVICES ============
 
 import type { User, Dimension, Integration, Workflow, ApiKey } from '@/lib/types'

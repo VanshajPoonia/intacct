@@ -1,10 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { AppShell } from "@/components/layout/app-shell"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import {
   Select,
   SelectContent,
@@ -12,15 +15,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { 
   Download,
   Printer,
   Calendar,
   ChevronDown,
   ChevronRight,
-  Building2
+  Building2,
+  GitCompare,
+  TrendingUp,
+  TrendingDown,
+  RefreshCw,
+  X,
 } from "lucide-react"
-import { format } from "date-fns"
+import { format, subMonths, subQuarters, subYears } from "date-fns"
 import { getEntities, getBalanceSheetData } from "@/lib/services"
 import type { Entity, BalanceSheetData } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -34,29 +47,67 @@ function formatCurrency(value: number) {
   }).format(value)
 }
 
+function formatPercent(value: number) {
+  return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`
+}
+
 interface LineItemProps {
   label: string
   value: number
+  previousValue?: number
+  showComparison?: boolean
   indent?: number
   isHeader?: boolean
   isTotal?: boolean
   isSubtotal?: boolean
 }
 
-function LineItem({ label, value, indent = 0, isHeader, isTotal, isSubtotal }: LineItemProps) {
+function LineItem({ 
+  label, 
+  value, 
+  previousValue,
+  showComparison = false,
+  indent = 0, 
+  isHeader, 
+  isTotal, 
+  isSubtotal 
+}: LineItemProps) {
+  const hasComparison = showComparison && previousValue !== undefined
+  const change = hasComparison && previousValue !== 0 
+    ? ((value - previousValue) / Math.abs(previousValue)) * 100 
+    : 0
+
   return (
     <div 
       className={cn(
-        "flex items-center justify-between py-1.5 px-4",
+        "flex items-center justify-between py-2 px-4 transition-colors",
         isHeader && "font-semibold text-foreground bg-muted/50",
         isTotal && "font-bold text-foreground border-t-2 border-double pt-2 mt-2",
-        isSubtotal && "font-medium border-t pt-1.5 mt-1",
-        !isHeader && !isTotal && !isSubtotal && "text-muted-foreground"
+        isSubtotal && "font-medium border-t pt-2 mt-1",
+        !isHeader && !isTotal && !isSubtotal && "text-muted-foreground hover:bg-muted/30"
       )}
-      style={{ paddingLeft: `${16 + indent * 16}px` }}
+      style={{ paddingLeft: `${16 + indent * 20}px` }}
     >
       <span>{label}</span>
-      <span className="tabular-nums">{formatCurrency(value)}</span>
+      <div className="flex items-center gap-6">
+        <span className="tabular-nums w-28 text-right font-medium">{formatCurrency(value)}</span>
+        {hasComparison && (
+          <>
+            <span className="tabular-nums text-muted-foreground w-24 text-right text-sm">
+              {formatCurrency(previousValue)}
+            </span>
+            {change !== 0 && (
+              <span className={cn(
+                "text-xs flex items-center gap-0.5 w-16 justify-end",
+                change >= 0 ? "text-emerald-600" : "text-red-600"
+              )}>
+                {change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                {formatPercent(change)}
+              </span>
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -64,37 +115,102 @@ function LineItem({ label, value, indent = 0, isHeader, isTotal, isSubtotal }: L
 function SectionHeader({ 
   label, 
   isOpen, 
-  onToggle 
+  onToggle,
+  total,
+  previousTotal,
+  showComparison,
 }: { 
   label: string
   isOpen: boolean
-  onToggle: () => void 
+  onToggle: () => void
+  total?: number
+  previousTotal?: number
+  showComparison?: boolean
 }) {
+  const hasComparison = showComparison && previousTotal !== undefined && total !== undefined
+  const change = hasComparison && previousTotal !== 0 
+    ? ((total - previousTotal) / Math.abs(previousTotal)) * 100 
+    : 0
+
   return (
     <button 
       onClick={onToggle}
-      className="flex items-center gap-2 w-full py-2 px-4 font-semibold text-sm uppercase tracking-wide text-primary hover:bg-muted/50 transition-colors"
+      className="flex items-center justify-between w-full py-3 px-4 font-semibold text-sm uppercase tracking-wide text-primary hover:bg-muted/50 transition-colors"
     >
-      {isOpen ? (
-        <ChevronDown className="h-4 w-4" />
-      ) : (
-        <ChevronRight className="h-4 w-4" />
+      <div className="flex items-center gap-2">
+        {isOpen ? (
+          <ChevronDown className="h-4 w-4" />
+        ) : (
+          <ChevronRight className="h-4 w-4" />
+        )}
+        {label}
+      </div>
+      {total !== undefined && (
+        <div className="flex items-center gap-6">
+          <span className="tabular-nums w-28 text-right">{formatCurrency(total)}</span>
+          {hasComparison && (
+            <>
+              <span className="tabular-nums text-muted-foreground w-24 text-right text-sm">
+                {formatCurrency(previousTotal)}
+              </span>
+              {change !== 0 && (
+                <span className={cn(
+                  "text-xs flex items-center gap-0.5 w-16 justify-end font-normal",
+                  change >= 0 ? "text-emerald-600" : "text-red-600"
+                )}>
+                  {change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                  {formatPercent(change)}
+                </span>
+              )}
+            </>
+          )}
+        </div>
       )}
-      {label}
     </button>
   )
 }
+
+const periodOptions = [
+  { value: 'end_of_month', label: 'End of Month' },
+  { value: 'end_of_quarter', label: 'End of Quarter' },
+  { value: 'end_of_year', label: 'End of Year' },
+  { value: 'custom', label: 'Custom Date' },
+]
+
+const comparisonOptions = [
+  { value: 'none', label: 'No Comparison' },
+  { value: 'prior_month', label: 'Prior Month' },
+  { value: 'prior_quarter', label: 'Prior Quarter' },
+  { value: 'prior_year', label: 'Prior Year' },
+]
 
 export default function BalanceSheetPage() {
   const [loading, setLoading] = useState(true)
   const [entities, setEntities] = useState<Entity[]>([])
   const [selectedEntity, setSelectedEntity] = useState<string>("e4")
+  const [periodType, setPeriodType] = useState<string>("end_of_month")
+  const [comparisonMode, setComparisonMode] = useState<string>("prior_month")
+  const [customDate, setCustomDate] = useState<Date>(new Date())
   const [data, setData] = useState<BalanceSheetData | null>(null)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(['assets', 'liabilities', 'equity'])
   )
+  const [activeFilters, setActiveFilters] = useState<string[]>([])
   
-  const asOfDate = new Date()
+  const asOfDate = customDate
+
+  const getComparisonDate = useCallback(() => {
+    switch (comparisonMode) {
+      case 'prior_month':
+        return subMonths(asOfDate, 1)
+      case 'prior_quarter':
+        return subQuarters(asOfDate, 1)
+      case 'prior_year':
+        return subYears(asOfDate, 1)
+      default:
+        return null
+    }
+  }, [comparisonMode, asOfDate])
 
   useEffect(() => {
     async function loadEntities() {
@@ -122,7 +238,21 @@ export default function BalanceSheetPage() {
       }
     }
     loadData()
-  }, [selectedEntity])
+  }, [selectedEntity, asOfDate])
+
+  // Update active filters
+  useEffect(() => {
+    const filters: string[] = []
+    if (selectedEntity !== 'e4') {
+      const entity = entities.find(e => e.id === selectedEntity)
+      if (entity) filters.push(`Entity: ${entity.name}`)
+    }
+    if (comparisonMode !== 'none') {
+      const comp = comparisonOptions.find(c => c.value === comparisonMode)
+      if (comp) filters.push(`Compare: ${comp.label}`)
+    }
+    setActiveFilters(filters)
+  }, [selectedEntity, comparisonMode, entities])
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => {
@@ -136,7 +266,22 @@ export default function BalanceSheetPage() {
     })
   }
 
+  const clearFilter = (filter: string) => {
+    if (filter.startsWith('Entity:')) {
+      setSelectedEntity('e4')
+    } else if (filter.startsWith('Compare:')) {
+      setComparisonMode('none')
+    }
+  }
+
   const selectedEntityName = entities.find(e => e.id === selectedEntity)?.name || 'All Entities'
+  const showComparison = comparisonMode !== 'none'
+  const comparisonDate = getComparisonDate()
+
+  // Generate mock previous values (in real app would come from API)
+  const getPreviousValue = (currentValue: number) => {
+    return Math.round(currentValue * (0.85 + Math.random() * 0.3))
+  }
 
   return (
     <AppShell>
@@ -151,6 +296,10 @@ export default function BalanceSheetPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setLoading(true)}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
               <Button variant="outline" size="sm" onClick={() => window.print()}>
                 <Printer className="h-4 w-4 mr-2" />
                 Print
@@ -169,28 +318,97 @@ export default function BalanceSheetPage() {
             </div>
           </div>
 
-          {/* Filters */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-              <Select value={selectedEntity} onValueChange={setSelectedEntity}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Select Entity" />
-                </SelectTrigger>
-                <SelectContent>
-                  {entities.map(entity => (
-                    <SelectItem key={entity.id} value={entity.id}>
-                      {entity.name}
-                    </SelectItem>
+          {/* Sticky Filter Bar */}
+          <Card className="sticky top-0 z-10 shadow-sm">
+            <CardContent className="py-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <Select value={selectedEntity} onValueChange={setSelectedEntity}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select Entity" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {entities.map(entity => (
+                        <SelectItem key={entity.id} value={entity.id}>
+                          {entity.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Separator orientation="vertical" className="h-8" />
+
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-[180px] justify-start text-left font-normal">
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {format(asOfDate, 'MMM d, yyyy')}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={customDate}
+                        onSelect={(date) => date && setCustomDate(date)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <Separator orientation="vertical" className="h-8" />
+
+                <div className="flex items-center gap-2">
+                  <GitCompare className="h-4 w-4 text-muted-foreground" />
+                  <Select value={comparisonMode} onValueChange={setComparisonMode}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder="Compare" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {comparisonOptions.map(option => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Active Filter Pills */}
+              {activeFilters.length > 0 && (
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                  <span className="text-xs text-muted-foreground">Active filters:</span>
+                  {activeFilters.map((filter) => (
+                    <Badge key={filter} variant="secondary" className="gap-1 text-xs">
+                      {filter}
+                      <button 
+                        onClick={() => clearFilter(filter)}
+                        className="ml-1 hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Calendar className="h-4 w-4" />
-              <span>As of {format(asOfDate, 'MMM d, yyyy')}</span>
-            </div>
-          </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 text-xs"
+                    onClick={() => {
+                      setSelectedEntity('e4')
+                      setComparisonMode('none')
+                    }}
+                  >
+                    Clear all
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Report Header */}
           <Card>
@@ -198,12 +416,29 @@ export default function BalanceSheetPage() {
               <CardTitle className="text-lg">{selectedEntityName}</CardTitle>
               <p className="text-sm text-muted-foreground">Balance Sheet</p>
               <p className="text-sm text-muted-foreground">As of {format(asOfDate, 'MMMM d, yyyy')}</p>
+              {showComparison && comparisonDate && (
+                <Badge variant="outline" className="mt-2">
+                  Compared to {format(comparisonDate, 'MMM d, yyyy')}
+                </Badge>
+              )}
             </CardHeader>
+
+            {/* Column Headers */}
+            {showComparison && (
+              <div className="flex items-center justify-end px-4 py-2 bg-muted/30 border-b text-xs font-medium text-muted-foreground gap-6">
+                <span className="w-28 text-right">Current</span>
+                <span className="w-24 text-right">
+                  {comparisonMode === 'prior_year' ? 'Prior Year' : comparisonMode === 'prior_quarter' ? 'Prior Quarter' : 'Prior Month'}
+                </span>
+                <span className="w-16 text-right">Change</span>
+              </div>
+            )}
+
             <CardContent className="p-0">
               {loading ? (
                 <div className="p-6 space-y-4">
                   {Array.from({ length: 15 }).map((_, i) => (
-                    <Skeleton key={i} className="h-6 w-full" />
+                    <Skeleton key={i} className="h-8 w-full" />
                   ))}
                 </div>
               ) : data ? (
@@ -214,29 +449,32 @@ export default function BalanceSheetPage() {
                       label="Assets" 
                       isOpen={expandedSections.has('assets')}
                       onToggle={() => toggleSection('assets')}
+                      total={data.assets.total}
+                      previousTotal={showComparison ? getPreviousValue(data.assets.total) : undefined}
+                      showComparison={showComparison}
                     />
                     {expandedSections.has('assets') && (
                       <div className="pb-4">
-                        <LineItem label="Current Assets" value={0} isHeader indent={0} />
-                        <LineItem label="Cash and Cash Equivalents" value={data.assets.currentAssets.cash} indent={1} />
-                        <LineItem label="Accounts Receivable" value={data.assets.currentAssets.accountsReceivable} indent={1} />
-                        <LineItem label="Inventory" value={data.assets.currentAssets.inventory} indent={1} />
-                        <LineItem label="Prepaid Expenses" value={data.assets.currentAssets.prepaidExpenses} indent={1} />
-                        <LineItem label="Other Current Assets" value={data.assets.currentAssets.other} indent={1} />
-                        <LineItem label="Total Current Assets" value={data.assets.currentAssets.total} isSubtotal indent={0} />
+                        <LineItem label="Current Assets" value={data.assets.currentAssets.total} isHeader indent={0} showComparison={false} />
+                        <LineItem label="Cash and Cash Equivalents" value={data.assets.currentAssets.cash} previousValue={showComparison ? getPreviousValue(data.assets.currentAssets.cash) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Accounts Receivable" value={data.assets.currentAssets.accountsReceivable} previousValue={showComparison ? getPreviousValue(data.assets.currentAssets.accountsReceivable) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Inventory" value={data.assets.currentAssets.inventory} previousValue={showComparison ? getPreviousValue(data.assets.currentAssets.inventory) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Prepaid Expenses" value={data.assets.currentAssets.prepaidExpenses} previousValue={showComparison ? getPreviousValue(data.assets.currentAssets.prepaidExpenses) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Other Current Assets" value={data.assets.currentAssets.other} previousValue={showComparison ? getPreviousValue(data.assets.currentAssets.other) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Total Current Assets" value={data.assets.currentAssets.total} previousValue={showComparison ? getPreviousValue(data.assets.currentAssets.total) : undefined} showComparison={showComparison} isSubtotal indent={0} />
                         
                         <div className="h-3" />
                         
-                        <LineItem label="Non-Current Assets" value={0} isHeader indent={0} />
-                        <LineItem label="Property, Plant & Equipment" value={data.assets.nonCurrentAssets.ppe} indent={1} />
-                        <LineItem label="Accumulated Depreciation" value={-data.assets.nonCurrentAssets.accumulatedDepreciation} indent={1} />
-                        <LineItem label="Intangible Assets" value={data.assets.nonCurrentAssets.intangibles} indent={1} />
-                        <LineItem label="Long-term Investments" value={data.assets.nonCurrentAssets.investments} indent={1} />
-                        <LineItem label="Other Non-Current Assets" value={data.assets.nonCurrentAssets.other} indent={1} />
-                        <LineItem label="Total Non-Current Assets" value={data.assets.nonCurrentAssets.total} isSubtotal indent={0} />
+                        <LineItem label="Non-Current Assets" value={data.assets.nonCurrentAssets.total} isHeader indent={0} showComparison={false} />
+                        <LineItem label="Property, Plant & Equipment" value={data.assets.nonCurrentAssets.ppe} previousValue={showComparison ? getPreviousValue(data.assets.nonCurrentAssets.ppe) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Accumulated Depreciation" value={-data.assets.nonCurrentAssets.accumulatedDepreciation} previousValue={showComparison ? -getPreviousValue(data.assets.nonCurrentAssets.accumulatedDepreciation) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Intangible Assets" value={data.assets.nonCurrentAssets.intangibles} previousValue={showComparison ? getPreviousValue(data.assets.nonCurrentAssets.intangibles) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Long-term Investments" value={data.assets.nonCurrentAssets.investments} previousValue={showComparison ? getPreviousValue(data.assets.nonCurrentAssets.investments) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Other Non-Current Assets" value={data.assets.nonCurrentAssets.other} previousValue={showComparison ? getPreviousValue(data.assets.nonCurrentAssets.other) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Total Non-Current Assets" value={data.assets.nonCurrentAssets.total} previousValue={showComparison ? getPreviousValue(data.assets.nonCurrentAssets.total) : undefined} showComparison={showComparison} isSubtotal indent={0} />
                         
                         <div className="h-2" />
-                        <LineItem label="TOTAL ASSETS" value={data.assets.total} isTotal />
+                        <LineItem label="TOTAL ASSETS" value={data.assets.total} previousValue={showComparison ? getPreviousValue(data.assets.total) : undefined} showComparison={showComparison} isTotal />
                       </div>
                     )}
                   </div>
@@ -247,27 +485,30 @@ export default function BalanceSheetPage() {
                       label="Liabilities" 
                       isOpen={expandedSections.has('liabilities')}
                       onToggle={() => toggleSection('liabilities')}
+                      total={data.liabilities.total}
+                      previousTotal={showComparison ? getPreviousValue(data.liabilities.total) : undefined}
+                      showComparison={showComparison}
                     />
                     {expandedSections.has('liabilities') && (
                       <div className="pb-4">
-                        <LineItem label="Current Liabilities" value={0} isHeader indent={0} />
-                        <LineItem label="Accounts Payable" value={data.liabilities.currentLiabilities.accountsPayable} indent={1} />
-                        <LineItem label="Accrued Expenses" value={data.liabilities.currentLiabilities.accruedExpenses} indent={1} />
-                        <LineItem label="Short-term Debt" value={data.liabilities.currentLiabilities.shortTermDebt} indent={1} />
-                        <LineItem label="Current Portion of Long-term Debt" value={data.liabilities.currentLiabilities.currentPortionLTD} indent={1} />
-                        <LineItem label="Other Current Liabilities" value={data.liabilities.currentLiabilities.other} indent={1} />
-                        <LineItem label="Total Current Liabilities" value={data.liabilities.currentLiabilities.total} isSubtotal indent={0} />
+                        <LineItem label="Current Liabilities" value={data.liabilities.currentLiabilities.total} isHeader indent={0} showComparison={false} />
+                        <LineItem label="Accounts Payable" value={data.liabilities.currentLiabilities.accountsPayable} previousValue={showComparison ? getPreviousValue(data.liabilities.currentLiabilities.accountsPayable) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Accrued Expenses" value={data.liabilities.currentLiabilities.accruedExpenses} previousValue={showComparison ? getPreviousValue(data.liabilities.currentLiabilities.accruedExpenses) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Short-term Debt" value={data.liabilities.currentLiabilities.shortTermDebt} previousValue={showComparison ? getPreviousValue(data.liabilities.currentLiabilities.shortTermDebt) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Current Portion of Long-term Debt" value={data.liabilities.currentLiabilities.currentPortionLTD} previousValue={showComparison ? getPreviousValue(data.liabilities.currentLiabilities.currentPortionLTD) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Other Current Liabilities" value={data.liabilities.currentLiabilities.other} previousValue={showComparison ? getPreviousValue(data.liabilities.currentLiabilities.other) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Total Current Liabilities" value={data.liabilities.currentLiabilities.total} previousValue={showComparison ? getPreviousValue(data.liabilities.currentLiabilities.total) : undefined} showComparison={showComparison} isSubtotal indent={0} />
                         
                         <div className="h-3" />
                         
-                        <LineItem label="Non-Current Liabilities" value={0} isHeader indent={0} />
-                        <LineItem label="Long-term Debt" value={data.liabilities.nonCurrentLiabilities.longTermDebt} indent={1} />
-                        <LineItem label="Deferred Tax Liabilities" value={data.liabilities.nonCurrentLiabilities.deferredTax} indent={1} />
-                        <LineItem label="Other Long-term Liabilities" value={data.liabilities.nonCurrentLiabilities.other} indent={1} />
-                        <LineItem label="Total Non-Current Liabilities" value={data.liabilities.nonCurrentLiabilities.total} isSubtotal indent={0} />
+                        <LineItem label="Non-Current Liabilities" value={data.liabilities.nonCurrentLiabilities.total} isHeader indent={0} showComparison={false} />
+                        <LineItem label="Long-term Debt" value={data.liabilities.nonCurrentLiabilities.longTermDebt} previousValue={showComparison ? getPreviousValue(data.liabilities.nonCurrentLiabilities.longTermDebt) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Deferred Tax Liabilities" value={data.liabilities.nonCurrentLiabilities.deferredTax} previousValue={showComparison ? getPreviousValue(data.liabilities.nonCurrentLiabilities.deferredTax) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Other Long-term Liabilities" value={data.liabilities.nonCurrentLiabilities.other} previousValue={showComparison ? getPreviousValue(data.liabilities.nonCurrentLiabilities.other) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Total Non-Current Liabilities" value={data.liabilities.nonCurrentLiabilities.total} previousValue={showComparison ? getPreviousValue(data.liabilities.nonCurrentLiabilities.total) : undefined} showComparison={showComparison} isSubtotal indent={0} />
                         
                         <div className="h-2" />
-                        <LineItem label="TOTAL LIABILITIES" value={data.liabilities.total} isTotal />
+                        <LineItem label="TOTAL LIABILITIES" value={data.liabilities.total} previousValue={showComparison ? getPreviousValue(data.liabilities.total) : undefined} showComparison={showComparison} isTotal />
                       </div>
                     )}
                   </div>
@@ -275,20 +516,23 @@ export default function BalanceSheetPage() {
                   {/* EQUITY */}
                   <div>
                     <SectionHeader 
-                      label="Stockholders&apos; Equity" 
+                      label="Stockholders' Equity" 
                       isOpen={expandedSections.has('equity')}
                       onToggle={() => toggleSection('equity')}
+                      total={data.equity.total}
+                      previousTotal={showComparison ? getPreviousValue(data.equity.total) : undefined}
+                      showComparison={showComparison}
                     />
                     {expandedSections.has('equity') && (
                       <div className="pb-4">
-                        <LineItem label="Common Stock" value={data.equity.commonStock} indent={1} />
-                        <LineItem label="Additional Paid-in Capital" value={data.equity.additionalPaidInCapital} indent={1} />
-                        <LineItem label="Retained Earnings" value={data.equity.retainedEarnings} indent={1} />
-                        <LineItem label="Treasury Stock" value={-data.equity.treasuryStock} indent={1} />
-                        <LineItem label="Other Comprehensive Income" value={data.equity.otherComprehensiveIncome} indent={1} />
+                        <LineItem label="Common Stock" value={data.equity.commonStock} previousValue={showComparison ? getPreviousValue(data.equity.commonStock) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Additional Paid-in Capital" value={data.equity.additionalPaidInCapital} previousValue={showComparison ? getPreviousValue(data.equity.additionalPaidInCapital) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Retained Earnings" value={data.equity.retainedEarnings} previousValue={showComparison ? getPreviousValue(data.equity.retainedEarnings) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Treasury Stock" value={-data.equity.treasuryStock} previousValue={showComparison ? -getPreviousValue(data.equity.treasuryStock) : undefined} showComparison={showComparison} indent={1} />
+                        <LineItem label="Other Comprehensive Income" value={data.equity.otherComprehensiveIncome} previousValue={showComparison ? getPreviousValue(data.equity.otherComprehensiveIncome) : undefined} showComparison={showComparison} indent={1} />
                         
                         <div className="h-2" />
-                        <LineItem label="TOTAL STOCKHOLDERS&apos; EQUITY" value={data.equity.total} isTotal />
+                        <LineItem label="TOTAL STOCKHOLDERS' EQUITY" value={data.equity.total} previousValue={showComparison ? getPreviousValue(data.equity.total) : undefined} showComparison={showComparison} isTotal />
                       </div>
                     )}
                   </div>
@@ -298,6 +542,8 @@ export default function BalanceSheetPage() {
                     <LineItem 
                       label="TOTAL LIABILITIES AND STOCKHOLDERS' EQUITY" 
                       value={data.liabilities.total + data.equity.total} 
+                      previousValue={showComparison ? getPreviousValue(data.liabilities.total) + getPreviousValue(data.equity.total) : undefined}
+                      showComparison={showComparison}
                       isTotal 
                     />
                   </div>

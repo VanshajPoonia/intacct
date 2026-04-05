@@ -11,6 +11,7 @@ import type {
   ReconciliationItem,
   RoleHomeConfig,
   RoleHomepageAction,
+  RoleHomepageChartConfig,
   RoleHomepageData,
   RoleHomepageMetric,
   RoleHomepageSection,
@@ -1153,6 +1154,57 @@ async function getCFOHomepageData(filters: FinanceFilters): Promise<RoleHomepage
       },
     ]),
     sections: [
+      toSection('cfo-charts', 'full', [
+        {
+          id: 'cfo-revenue-chart',
+          title: 'Revenue vs Budget Trend',
+          description: 'Monthly revenue performance against planned budget for the current fiscal period.',
+          kind: 'chart',
+          chart: {
+            type: 'bar',
+            data: budgetVsActual.slice(0, 6).map(item => ({
+              name: item.category,
+              value: item.actual,
+              fill: item.variancePercent >= 0 ? 'hsl(var(--chart-1))' : 'hsl(var(--chart-3))',
+            })),
+            xAxisKey: 'name',
+            showGrid: true,
+            showLegend: false,
+            height: 240,
+          } satisfies RoleHomepageChartConfig,
+          footerLink: {
+            id: 'footer-cfo-budget-chart',
+            label: 'Open Budget vs Actual Report',
+            href: '/reports/budget-vs-actual',
+            icon: 'Calculator',
+          },
+        },
+        {
+          id: 'cfo-cash-trend',
+          title: 'Cash Flow Analysis',
+          description: 'Operating, investing, and financing activities for the reporting window.',
+          kind: 'chart',
+          chart: {
+            type: 'bar',
+            data: [
+              { name: 'Operating', value: cashFlow.operatingActivities.total, fill: cashFlow.operatingActivities.total >= 0 ? 'hsl(var(--chart-1))' : 'hsl(var(--destructive))' },
+              { name: 'Investing', value: cashFlow.investingActivities.total, fill: cashFlow.investingActivities.total >= 0 ? 'hsl(var(--chart-2))' : 'hsl(var(--destructive))' },
+              { name: 'Financing', value: cashFlow.financingActivities.total, fill: cashFlow.financingActivities.total >= 0 ? 'hsl(var(--chart-4))' : 'hsl(var(--destructive))' },
+              { name: 'Net Change', value: cashFlow.netChangeInCash, fill: cashFlow.netChangeInCash >= 0 ? 'hsl(var(--chart-5))' : 'hsl(var(--destructive))' },
+            ],
+            xAxisKey: 'name',
+            showGrid: true,
+            showLegend: false,
+            height: 240,
+          } satisfies RoleHomepageChartConfig,
+          footerLink: {
+            id: 'footer-cfo-cash-chart',
+            label: 'Open Cash Flow Statement',
+            href: '/reports/cash-flow',
+            icon: 'Landmark',
+          },
+        },
+      ]),
       toSection('cfo-main', 'main', [
         {
           id: 'cfo-performance-trend',

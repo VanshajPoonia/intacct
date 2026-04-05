@@ -4,10 +4,33 @@ import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart"
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  XAxis,
+  YAxis,
+} from "recharts"
 import type { ReactNode } from "react"
 import type {
   HomepageTone,
   RoleHomepageAction,
+  RoleHomepageChartConfig,
   RoleHomepageMetric,
   RoleHomepageSection,
   RoleHomepageWidget,
@@ -98,6 +121,157 @@ function MetricCell({ metric }: { metric: RoleHomepageMetric }) {
 
 function EmptyState({ message }: { message?: string }) {
   return <div className="border border-dashed border-border/80 px-4 py-4 text-sm text-muted-foreground">{message ?? "No data available."}</div>
+}
+
+const defaultChartColors = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+]
+
+function HomepageChart({ config }: { config: RoleHomepageChartConfig }) {
+  const { type, data, series, xAxisKey = "name", showLegend = false, showGrid = true, stacked = false, height = 200 } = config
+
+  const chartConfig: ChartConfig = {}
+  if (series?.length) {
+    series.forEach((s, i) => {
+      chartConfig[s.dataKey] = {
+        label: s.name,
+        color: s.color ?? defaultChartColors[i % defaultChartColors.length],
+      }
+    })
+  } else {
+    data.forEach((d, i) => {
+      chartConfig[d.name] = {
+        label: d.name,
+        color: d.fill ?? defaultChartColors[i % defaultChartColors.length],
+      }
+    })
+  }
+
+  if (type === "bar") {
+    return (
+      <ChartContainer config={chartConfig} className="w-full" style={{ height }}>
+        <BarChart data={data} accessibilityLayer>
+          {showGrid && <CartesianGrid strokeDasharray="3 3" vertical={false} />}
+          <XAxis dataKey={xAxisKey} tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
+          <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          {showLegend && <ChartLegend content={<ChartLegendContent />} />}
+          {series?.length ? (
+            series.map((s, i) => (
+              <Bar
+                key={s.id}
+                dataKey={s.dataKey}
+                fill={s.color ?? defaultChartColors[i % defaultChartColors.length]}
+                radius={[4, 4, 0, 0]}
+                stackId={stacked ? "stack" : undefined}
+              />
+            ))
+          ) : (
+            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+              {data.map((entry, index) => (
+                <Cell key={entry.name} fill={entry.fill ?? defaultChartColors[index % defaultChartColors.length]} />
+              ))}
+            </Bar>
+          )}
+        </BarChart>
+      </ChartContainer>
+    )
+  }
+
+  if (type === "line") {
+    return (
+      <ChartContainer config={chartConfig} className="w-full" style={{ height }}>
+        <LineChart data={data} accessibilityLayer>
+          {showGrid && <CartesianGrid strokeDasharray="3 3" vertical={false} />}
+          <XAxis dataKey={xAxisKey} tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
+          <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          {showLegend && <ChartLegend content={<ChartLegendContent />} />}
+          {series?.length ? (
+            series.map((s, i) => (
+              <Line
+                key={s.id}
+                type="monotone"
+                dataKey={s.dataKey}
+                stroke={s.color ?? defaultChartColors[i % defaultChartColors.length]}
+                strokeWidth={2}
+                dot={false}
+              />
+            ))
+          ) : (
+            <Line type="monotone" dataKey="value" stroke={defaultChartColors[0]} strokeWidth={2} dot={false} />
+          )}
+        </LineChart>
+      </ChartContainer>
+    )
+  }
+
+  if (type === "area") {
+    return (
+      <ChartContainer config={chartConfig} className="w-full" style={{ height }}>
+        <AreaChart data={data} accessibilityLayer>
+          {showGrid && <CartesianGrid strokeDasharray="3 3" vertical={false} />}
+          <XAxis dataKey={xAxisKey} tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
+          <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          {showLegend && <ChartLegend content={<ChartLegendContent />} />}
+          {series?.length ? (
+            series.map((s, i) => (
+              <Area
+                key={s.id}
+                type="monotone"
+                dataKey={s.dataKey}
+                fill={s.color ?? defaultChartColors[i % defaultChartColors.length]}
+                stroke={s.color ?? defaultChartColors[i % defaultChartColors.length]}
+                fillOpacity={0.3}
+                stackId={stacked ? "stack" : undefined}
+              />
+            ))
+          ) : (
+            <Area
+              type="monotone"
+              dataKey="value"
+              fill={defaultChartColors[0]}
+              stroke={defaultChartColors[0]}
+              fillOpacity={0.3}
+            />
+          )}
+        </AreaChart>
+      </ChartContainer>
+    )
+  }
+
+  if (type === "pie" || type === "donut") {
+    const innerRadius = type === "donut" ? 50 : 0
+    return (
+      <ChartContainer config={chartConfig} className="mx-auto w-full" style={{ height }}>
+        <PieChart accessibilityLayer>
+          <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy="50%"
+            innerRadius={innerRadius}
+            outerRadius={80}
+            paddingAngle={2}
+          >
+            {data.map((entry, index) => (
+              <Cell key={entry.name} fill={entry.fill ?? defaultChartColors[index % defaultChartColors.length]} />
+            ))}
+          </Pie>
+          {showLegend && <ChartLegend content={<ChartLegendContent nameKey="name" />} />}
+        </PieChart>
+      </ChartContainer>
+    )
+  }
+
+  return <EmptyState message="Unsupported chart type" />
 }
 
 function HomepageListItem({ item }: { item: RoleHomepageWidgetItem }) {
@@ -296,6 +470,14 @@ export function HomepageWidgetSurface({
             <EmptyState message={widget.emptyMessage} />
           )}
         </div>
+      ) : null}
+
+      {widget.kind === "chart" ? (
+        widget.chart ? (
+          <HomepageChart config={widget.chart} />
+        ) : (
+          <EmptyState message={widget.emptyMessage ?? "No chart data available."} />
+        )
       ) : null}
     </WidgetChrome>
   )

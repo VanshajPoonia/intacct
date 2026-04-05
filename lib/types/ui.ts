@@ -152,14 +152,39 @@ export interface RoleHomepageWidgetItem {
   meta?: string[]
 }
 
+export interface RoleHomepageChartDataPoint {
+  name: string
+  value: number
+  fill?: string
+}
+
+export interface RoleHomepageChartSeries {
+  id: string
+  name: string
+  dataKey: string
+  color?: string
+}
+
+export interface RoleHomepageChartConfig {
+  type: 'bar' | 'line' | 'area' | 'pie' | 'donut'
+  data: RoleHomepageChartDataPoint[]
+  series?: RoleHomepageChartSeries[]
+  xAxisKey?: string
+  showLegend?: boolean
+  showGrid?: boolean
+  stacked?: boolean
+  height?: number
+}
+
 export interface RoleHomepageWidget {
   id: string
   title: string
   description?: string
-  kind: 'metrics' | 'list' | 'actions' | 'progress'
+  kind: 'metrics' | 'list' | 'actions' | 'progress' | 'chart'
   metrics?: RoleHomepageMetric[]
   items?: RoleHomepageWidgetItem[]
   actions?: RoleHomepageAction[]
+  chart?: RoleHomepageChartConfig
   footerLink?: ShellRouteLink
   emptyMessage?: string
 }

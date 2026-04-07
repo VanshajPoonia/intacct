@@ -7,6 +7,9 @@ export * from './workflow'
 export * from './work-queue'
 export * from './reporting'
 export * from './shell'
+export * from './planning'
+export * from './fixed-assets'
+export * from './contracts-revenue'
 
 // Transitional compatibility exports for the pre-service shell/navigation UI.
 export { navModules, searchableItems, sidebarItems } from '../mock-data'

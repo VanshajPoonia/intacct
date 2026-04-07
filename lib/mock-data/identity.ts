@@ -6,7 +6,7 @@ export const roles: Role[] = [
     name: 'Accountant',
     description: 'Daily operator focused on close, reconciliations, and exceptions.',
     landingRoute: '/',
-    navigationModules: ['home', 'work-queue', 'general-ledger', 'cash-management', 'reports'],
+    navigationModules: ['home', 'work-queue', 'general-ledger', 'cash-management', 'budgets-forecasting', 'fixed-assets', 'contracts-revenue', 'reports'],
     accentLabel: 'Close'
   },
   {
@@ -30,7 +30,7 @@ export const roles: Role[] = [
     name: 'Controller',
     description: 'Oversees close, controls, consolidations, and reporting accuracy.',
     landingRoute: '/',
-    navigationModules: ['general-ledger', 'reports', 'work-queue', 'admin'],
+    navigationModules: ['general-ledger', 'budgets-forecasting', 'fixed-assets', 'contracts-revenue', 'reports', 'work-queue', 'admin'],
     accentLabel: 'Controls'
   },
   {
@@ -38,7 +38,7 @@ export const roles: Role[] = [
     name: 'CFO',
     description: 'Reviews performance, trends, consolidation, and forecast readiness.',
     landingRoute: '/',
-    navigationModules: ['reports', 'cash-management', 'admin'],
+    navigationModules: ['reports', 'budgets-forecasting', 'contracts-revenue', 'cash-management', 'admin'],
     accentLabel: 'Performance'
   },
   {
@@ -46,7 +46,7 @@ export const roles: Role[] = [
     name: 'Admin',
     description: 'Administers users, workflows, integrations, and system settings.',
     landingRoute: '/',
-    navigationModules: ['admin', 'reports', 'integrations'],
+    navigationModules: ['admin', 'budgets-forecasting', 'fixed-assets', 'contracts-revenue', 'reports', 'integrations'],
     accentLabel: 'Platform'
   },
 ]

@@ -122,14 +122,16 @@ export function paginate<T>(items: T[], page: number, pageSize: number): Paginat
   }
 }
 
-export function sortItems<T extends Record<string, unknown>>(items: T[], sort?: SortConfig) {
+export function sortItems<T>(items: T[], sort?: SortConfig) {
   if (!sort) {
     return items
   }
 
   return [...items].sort((left, right) => {
-    const leftValue = left[sort.key]
-    const rightValue = right[sort.key]
+    const leftRecord = left as Record<string, unknown>
+    const rightRecord = right as Record<string, unknown>
+    const leftValue = leftRecord[sort.key]
+    const rightValue = rightRecord[sort.key]
 
     if (leftValue instanceof Date && rightValue instanceof Date) {
       return sort.direction === 'asc'

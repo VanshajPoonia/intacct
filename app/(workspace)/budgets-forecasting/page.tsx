@@ -1,5 +1,5 @@
-import { ShellStubRoute } from "@/components/layout/shell-stub-route"
+import { BudgetsForecastingPage } from "@/components/finance/budgets-forecasting-page"
 
 export default function BudgetsForecastingLandingPage() {
-  return <ShellStubRoute pathname="/budgets-forecasting" />
+  return <BudgetsForecastingPage />
 }

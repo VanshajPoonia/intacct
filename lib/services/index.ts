@@ -145,6 +145,53 @@ export {
 } from './cash-management-workspace'
 
 export {
+  getBudgetSubmissionsWorkspace,
+  getBudgetSubmissionDetail,
+  getBudgetVarianceDetail,
+  getBudgetVarianceWorkspace,
+  getBudgetVersionDetail,
+  getBudgetVersionsWorkspace,
+  getBudgetsForecastingDefaultSection,
+  getBudgetsForecastingOverview,
+  getBudgetsForecastingTabs,
+  getForecastScenarioDetail,
+  getForecastScenariosWorkspace,
+  saveBudgetVersion,
+  saveForecastScenario,
+  updateBudgetSubmission,
+} from './budgets-forecasting-workspace'
+
+export {
+  disposeFixedAsset,
+  getAssetLifecycleWorkspace,
+  getAssetLifecycleEventDetail,
+  getDepreciationRunDetail,
+  getDepreciationWorkspace,
+  getFixedAssetDetail,
+  getFixedAssetsDefaultSection,
+  getFixedAssetsOverview,
+  getFixedAssetsTabs,
+  getFixedAssetsWorkspace,
+  runDepreciationPreview,
+  saveFixedAsset,
+} from './fixed-assets-workspace'
+
+export {
+  getContractDetail,
+  getContractsRevenueDefaultSection,
+  getContractsRevenueOverview,
+  getContractsRevenueTabs,
+  getContractsWorkspace,
+  getRevenueRecognitionWorkspace,
+  getRevenueRecognitionDetail,
+  getRevenueScheduleDetail,
+  getRevenueSchedulesWorkspace,
+  postRevenueRecognition,
+  releaseRevenueRecognitionHold,
+  saveContract,
+} from './contracts-revenue-workspace'
+
+export {
   departments,
   employees,
   locations,

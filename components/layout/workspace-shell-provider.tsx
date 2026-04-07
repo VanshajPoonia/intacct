@@ -96,7 +96,7 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
 
     setRoleOverride(storedRole ? (storedRole as RoleId) : null)
     setEntityOverride(storedEntity || null)
-    setDatePreset(storedPreset ? (storedPreset as DateRangePreset) : null)
+    setDatePresetState(storedPreset ? (storedPreset as DateRangePreset) : null)
     setSidebarCollapsedState(storedSidebar === "true")
     setIsHydrated(true)
   }, [])

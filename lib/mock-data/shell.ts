@@ -441,7 +441,7 @@ export const shellModules: ShellModule[] = [
 export const roleShellConfigs: RoleShellConfig[] = [
   {
     roleId: 'accountant',
-    moduleIds: ['home', 'work-queue', 'general-ledger', 'accounts-payable', 'accounts-receivable', 'cash-management', 'reports', 'company'],
+    moduleIds: ['home', 'work-queue', 'general-ledger', 'accounts-payable', 'accounts-receivable', 'cash-management', 'budgets-forecasting', 'fixed-assets', 'contracts-revenue', 'reports', 'company'],
     sidebarSectionIds: ['accountant-core', 'monitoring', 'workspace-admin'],
     commandGroupIds: ['priority-actions', 'navigate', 'create', 'reports'],
     homeLabel: 'Accounting Home',
@@ -462,7 +462,7 @@ export const roleShellConfigs: RoleShellConfig[] = [
   },
   {
     roleId: 'controller',
-    moduleIds: ['home', 'general-ledger', 'cash-management', 'reports', 'dashboards', 'company', 'work-queue', 'admin'],
+    moduleIds: ['home', 'general-ledger', 'cash-management', 'budgets-forecasting', 'fixed-assets', 'contracts-revenue', 'reports', 'dashboards', 'company', 'work-queue', 'admin'],
     sidebarSectionIds: ['controller-core', 'monitoring', 'workspace-admin'],
     commandGroupIds: ['priority-actions', 'navigate', 'create', 'reports', 'admin'],
     homeLabel: 'Controller Home',
@@ -476,7 +476,7 @@ export const roleShellConfigs: RoleShellConfig[] = [
   },
   {
     roleId: 'admin',
-    moduleIds: ['home', 'admin', 'integrations', 'api-developer', 'event-monitoring', 'rule-engine', 'workflows-automation', 'exports-sharing', 'company'],
+    moduleIds: ['home', 'budgets-forecasting', 'fixed-assets', 'contracts-revenue', 'admin', 'integrations', 'api-developer', 'event-monitoring', 'rule-engine', 'workflows-automation', 'exports-sharing', 'company'],
     sidebarSectionIds: ['admin-core', 'monitoring', 'workspace-admin'],
     commandGroupIds: ['priority-actions', 'navigate', 'admin'],
     homeLabel: 'Admin Home',
@@ -494,6 +494,9 @@ export const shellSidebarSections: ShellSidebarSection[] = [
       { id: 'sb-approvals', label: 'Approvals', href: '/approvals', icon: 'BadgeCheck', moduleId: 'work-queue', matchers: ['/approvals'] },
       { id: 'sb-reconciliation', label: 'Reconciliation', href: '/cash-management/reconciliation', icon: 'ArrowLeftRight', moduleId: 'cash-management', matchers: ['/cash-management/reconciliation'] },
       { id: 'sb-journals', label: 'Journals', href: '/general-ledger/journal-entries', icon: 'BookText', moduleId: 'general-ledger', matchers: ['/general-ledger/journal-entries'] },
+      { id: 'sb-budgets', label: 'Budgets', href: '/budgets-forecasting', icon: 'Calculator', moduleId: 'budgets-forecasting', matchers: ['/budgets-forecasting'] },
+      { id: 'sb-assets', label: 'Fixed Assets', href: '/fixed-assets', icon: 'Factory', moduleId: 'fixed-assets', matchers: ['/fixed-assets'] },
+      { id: 'sb-contracts', label: 'Contracts', href: '/contracts-revenue', icon: 'FileSpreadsheet', moduleId: 'contracts-revenue', matchers: ['/contracts-revenue'] },
       { id: 'sb-close', label: 'Close Tasks', href: '/tasks', icon: 'CheckSquare', moduleId: 'work-queue', matchers: ['/tasks'] },
     ],
   },

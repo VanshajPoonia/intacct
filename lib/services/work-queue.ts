@@ -11,6 +11,7 @@ import {
   workQueueSections,
 } from '@/lib/mock-data/work-queue'
 import type {
+  RoleId,
   SavedView,
   ShellRouteLink,
   WorkQueueActionDefinition,
@@ -308,7 +309,11 @@ function upsertOverride(itemId: string, updates: Partial<WorkQueueItemStateOverr
   return created
 }
 
-function getAssignedSectionIds(baseSectionId: WorkQueueSectionId, assigneeId: string | undefined, activeUserId: string) {
+function getAssignedSectionIds(
+  baseSectionId: WorkQueueSectionId,
+  assigneeId: string | undefined,
+  activeUserId: string
+): WorkQueueSectionId[] {
   return assigneeId === activeUserId ? [baseSectionId, 'assigned_to_me'] : [baseSectionId]
 }
 
@@ -1029,7 +1034,7 @@ export async function getWorkQueueFilterOptions(filters: WorkQueueFilters, _user
   }
 }
 
-export async function getWorkQueueSavedViews(roleId?: string): Promise<SavedView[]> {
+export async function getWorkQueueSavedViews(roleId?: RoleId): Promise<SavedView[]> {
   const views = await getSavedViews('work-queue')
   if (!roleId) {
     return views

@@ -1,8 +1,24 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { format } from "date-fns"
+import {
+  Bell,
+  CalendarDays,
+  CheckSquare,
+  ChevronDown,
+  HelpCircle,
+  LogOut,
+  Search,
+  Settings,
+  ShieldCheck,
+  User,
+  Users,
+} from "lucide-react"
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-provider"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -12,317 +28,252 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
-import { Badge } from "@/components/ui/badge"
-import { 
-  Search, 
-  Bell, 
-  CheckSquare, 
-  HelpCircle, 
-  ChevronDown,
-  Building2,
-  CalendarDays,
-  LogOut,
-  Settings,
-  User
-} from "lucide-react"
-import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth/context"
-import { getEntities, getNotifications, getTasks } from "@/lib/services"
-import type { Entity, Notification, Task } from "@/lib/types"
-import type { DateRange } from "react-day-picker"
-import { format } from "date-fns"
+import { cn } from "@/lib/utils"
 
 interface AppHeaderProps {
-  onSearchClick: () => void
+  onSearchClick?: () => void
   className?: string
+}
+
+function formatDateWindow(startDate: Date, endDate: Date) {
+  return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d, yyyy")}`
 }
 
 export function AppHeader({ onSearchClick, className }: AppHeaderProps) {
   const router = useRouter()
-  const { user, logout } = useAuth()
-  
-  const [entities, setEntities] = useState<Entity[]>([])
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null)
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: new Date(2024, 2, 1),
-    to: new Date(2024, 2, 31),
-  })
-  const [showNotifications, setShowNotifications] = useState(false)
-  const [showTasks, setShowTasks] = useState(false)
+  const { logout } = useAuth()
+  const {
+    activeEntity,
+    activeRole,
+    availableRoles,
+    currentUser,
+    counts,
+    datePresets,
+    dateRange,
+    entities,
+    openCommandPalette,
+    setActiveEntity,
+    setActiveRole,
+    setDatePreset,
+  } = useWorkspaceShell()
 
-  useEffect(() => {
-    const loadData = async () => {
-      const [entitiesData, notificationsData, tasksData] = await Promise.all([
-        getEntities(),
-        getNotifications(false, undefined, 1, 5),
-        getTasks(undefined, ['todo', 'in_progress'], undefined, undefined, undefined, 1, 5),
-      ])
-      setEntities(entitiesData)
-      setNotifications(notificationsData.data)
-      setTasks(tasksData.data)
-      if (entitiesData.length > 0) {
-        setSelectedEntity(entitiesData[0])
-      }
-    }
-    loadData()
-  }, [])
+  const userName =
+    currentUser?.displayName ?? [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(" ") || "Finance User"
+  const userInitials = [currentUser?.firstName?.[0], currentUser?.lastName?.[0]].filter(Boolean).join("") || "FU"
 
   const handleLogout = async () => {
     await logout()
-    router.push('/login')
+    router.push("/login")
   }
 
-  const unreadNotifications = notifications.filter(n => !n.read).length
-  const pendingTasks = tasks.filter(t => t.status !== 'completed').length
-  
-  const userName = user ? `${user.firstName} ${user.lastName}` : 'User'
-  const userEmail = user?.email || 'user@company.com'
-  const userInitials = user ? `${user.firstName[0]}${user.lastName[0]}` : 'U'
-
   return (
-    <header className={cn(
-      "sticky top-0 z-50 flex h-14 items-center justify-between gap-4 border-b border-border bg-card px-4",
-      className
-    )}>
-      {/* Left: Logo and Product Name */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <span className="text-sm font-bold text-primary-foreground">F</span>
+    <header
+      className={cn(
+        "sticky top-0 z-50 border-b border-border/80 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/88",
+        className
+      )}
+    >
+      <div className="mx-auto flex h-[60px] max-w-[1680px] items-center gap-3 px-3 py-2 sm:px-4 lg:px-6">
+        <div className="flex min-w-0 items-center gap-3 border-r border-border/70 pr-4">
+          <div className="flex h-9 w-9 items-center justify-center rounded-sm bg-primary text-sm font-semibold text-primary-foreground">
+            F
           </div>
-          <span className="text-lg font-semibold text-foreground hidden sm:block">FinanceOS</span>
+          <div className="hidden min-w-0 sm:block">
+            <div className="text-sm font-semibold tracking-tight text-foreground">FinanceOS</div>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Enterprise Finance</div>
+          </div>
         </div>
-      </div>
 
-      {/* Center: Search, Entity Switcher, Date Range */}
-      <div className="flex flex-1 items-center justify-center gap-2 max-w-2xl">
-        {/* Global Search */}
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={onSearchClick}
-          className="h-9 w-64 justify-start text-muted-foreground bg-muted/50 border-border hover:bg-muted"
-        >
-          <Search className="mr-2 h-4 w-4" />
-          <span className="text-sm">Search...</span>
-          <kbd className="pointer-events-none ml-auto inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-            <span className="text-xs">⌘</span>K
-          </kbd>
-        </Button>
-
-        {/* Entity Switcher */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-9 gap-1.5 border-border bg-background">
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium hidden md:block">{selectedEntity?.code || 'All'}</span>
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuLabel>Select Entity</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {entities.map((entity) => (
-              <DropdownMenuItem
-                key={entity.id}
-                onClick={() => setSelectedEntity(entity)}
-className={cn(
-  "cursor-pointer",
-  selectedEntity?.id === entity.id && "bg-accent"
-  )}
-              >
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium">{entity.name}</span>
-                  <span className="text-xs text-muted-foreground">{entity.code} • {entity.currency}</span>
-                </div>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Date Range Selector */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-9 gap-1.5 border-border bg-background hidden lg:flex">
-              <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">
-                {dateRange?.from ? (
-                  dateRange.to ? (
-                    <>
-                      {format(dateRange.from, "MMM d")} - {format(dateRange.to, "MMM d, yyyy")}
-                    </>
-                  ) : (
-                    format(dateRange.from, "MMM d, yyyy")
-                  )
-                ) : (
-                  "Select dates"
-                )}
-              </span>
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="center">
-            <Calendar
-              mode="range"
-              selected={dateRange}
-              onSelect={setDateRange}
-              numberOfMonths={2}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-      </div>
-
-      {/* Right: Notifications, Tasks, Help, Profile */}
-      <div className="flex items-center gap-1">
-        {/* Notifications */}
-        <Popover open={showNotifications} onOpenChange={setShowNotifications}>
-          <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-9 w-9 relative">
-              <Bell className="h-4 w-4" />
-              {unreadNotifications > 0 && (
-                <Badge 
-                  variant="destructive" 
-                  className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]"
+        <div className="hidden min-w-0 items-center gap-2 lg:flex">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-2 rounded-sm border-border bg-background">
+                <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs font-semibold uppercase tracking-[0.12em]">{activeRole?.name ?? "Role"}</span>
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-72 rounded-sm">
+              <DropdownMenuLabel className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Demo Role
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {availableRoles.map(role => (
+                <DropdownMenuItem
+                  key={role.id}
+                  onClick={() => setActiveRole(role.id)}
+                  className={cn("cursor-pointer gap-3 rounded-sm py-2.5", role.id === activeRole?.id && "bg-muted")}
                 >
-                  {unreadNotifications}
-                </Badge>
-              )}
-              <span className="sr-only">Notifications</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-80 p-0">
-            <div className="border-b border-border px-4 py-3">
-              <h3 className="text-sm font-semibold">Notifications</h3>
-            </div>
-            <div className="max-h-80 overflow-y-auto">
-              {notifications.slice(0, 5).map((notification) => (
-                <div 
-                  key={notification.id}
+                  <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-muted">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium">{role.name}</div>
+                    <div className="text-xs text-muted-foreground">{role.description}</div>
+                  </div>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-2 rounded-sm border-border bg-background">
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Entity</span>
+                <span className="max-w-[140px] truncate text-sm font-medium">{activeEntity?.code ?? "Select"}</span>
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-72 rounded-sm">
+              <DropdownMenuLabel className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Reporting Entity
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {entities.map(entity => (
+                <DropdownMenuItem
+                  key={entity.id}
+                  onClick={() => setActiveEntity(entity.id)}
+                  className={cn("cursor-pointer gap-3 rounded-sm py-2.5", entity.id === activeEntity?.id && "bg-muted")}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium">{entity.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {entity.code} · {entity.currency}
+                    </div>
+                  </div>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-2 rounded-sm border-border bg-background">
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                <span className="hidden text-sm font-medium xl:block">
+                  {dateRange ? formatDateWindow(dateRange.startDate, dateRange.endDate) : "Date Range"}
+                </span>
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56 rounded-sm">
+              <DropdownMenuLabel className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Reporting Window
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {datePresets.map(option => (
+                <DropdownMenuItem
+                  key={option.value}
+                  onClick={() => setDatePreset(option.value)}
                   className={cn(
-                    "flex flex-col gap-1 border-b border-border px-4 py-3 last:border-0",
-                    !notification.read && "bg-accent/50"
+                    "cursor-pointer rounded-sm py-2",
+                    dateRange?.preset === option.value && "bg-muted"
                   )}
                 >
-                  <span className="text-sm font-medium">{notification.title}</span>
-                  <span className="text-xs text-muted-foreground">{notification.message}</span>
-                </div>
+                  {option.label}
+                </DropdownMenuItem>
               ))}
-            </div>
-            <div className="border-t border-border px-4 py-2">
-              <Button variant="ghost" size="sm" className="w-full text-xs" asChild>
-                <Link href="/notifications">View all notifications</Link>
-              </Button>
-            </div>
-          </PopoverContent>
-        </Popover>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
-        {/* Tasks */}
-        <Popover open={showTasks} onOpenChange={setShowTasks}>
-          <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-9 w-9 relative">
-              <CheckSquare className="h-4 w-4" />
-              {pendingTasks > 0 && (
-                <Badge 
-                  className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px] bg-amber-500 hover:bg-amber-500"
-                >
-                  {pendingTasks}
+        <div className="ml-auto flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onSearchClick ?? openCommandPalette}
+            className="hidden h-9 w-[280px] justify-start gap-2 rounded-sm border-border bg-background text-muted-foreground md:flex"
+          >
+            <Search className="h-4 w-4" />
+            <span className="text-sm">Search navigation, actions, or records</span>
+            <kbd className="ml-auto rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+              ⌘K
+            </kbd>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onSearchClick ?? openCommandPalette}
+            className="h-9 w-9 rounded-sm md:hidden"
+          >
+            <Search className="h-4 w-4" />
+          </Button>
+
+          <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-sm" asChild>
+            <Link href="/notifications">
+              <Bell className="h-4 w-4" />
+              {counts.notifications > 0 ? (
+                <Badge className="absolute -right-1 -top-1 h-4 min-w-4 rounded-sm px-1 text-[10px]">
+                  {counts.notifications}
                 </Badge>
-              )}
-              <span className="sr-only">Tasks</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-80 p-0">
-            <div className="border-b border-border px-4 py-3">
-              <h3 className="text-sm font-semibold">My Tasks</h3>
-            </div>
-            <div className="max-h-80 overflow-y-auto">
-              {tasks.slice(0, 4).map((task) => (
-                <div 
-                  key={task.id}
-                  className="flex items-start gap-3 border-b border-border px-4 py-3 last:border-0"
-                >
-                  <div className={cn(
-                    "mt-0.5 h-2 w-2 rounded-full",
-                    task.priority === 'high' && "bg-red-500",
-                    task.priority === 'medium' && "bg-amber-500",
-                    task.priority === 'low' && "bg-blue-500"
-                  )} />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium block truncate">{task.title}</span>
-                    {task.dueDate && (
-                      <span className="text-xs text-muted-foreground">
-                        Due {format(task.dueDate, "MMM d")}
-                      </span>
-                    )}
+              ) : null}
+            </Link>
+          </Button>
+
+          <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-sm" asChild>
+            <Link href="/tasks">
+              <CheckSquare className="h-4 w-4" />
+              {counts.tasks > 0 ? (
+                <Badge className="absolute -right-1 -top-1 h-4 min-w-4 rounded-sm bg-amber-500 px-1 text-[10px] text-white hover:bg-amber-500">
+                  {counts.tasks}
+                </Badge>
+              ) : null}
+            </Link>
+          </Button>
+
+          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-sm" asChild>
+            <Link href="/reports">
+              <HelpCircle className="h-4 w-4" />
+            </Link>
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-9 gap-2 rounded-sm border border-transparent pl-2 pr-1 hover:border-border">
+                <Avatar className="h-7 w-7 rounded-sm">
+                  <AvatarFallback className="rounded-sm bg-primary text-xs text-primary-foreground">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="hidden text-left lg:block">
+                  <div className="max-w-[160px] truncate text-sm font-medium text-foreground">{userName}</div>
+                  <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                    {activeRole?.name ?? "Role"}
                   </div>
                 </div>
-              ))}
-            </div>
-            <div className="border-t border-border px-4 py-2">
-              <Button variant="ghost" size="sm" className="w-full text-xs" asChild>
-                <Link href="/tasks">View all tasks</Link>
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        {/* Help */}
-        <Button variant="ghost" size="icon" className="h-9 w-9">
-          <HelpCircle className="h-4 w-4" />
-          <span className="sr-only">Help</span>
-        </Button>
-
-{/* User Profile */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-9 gap-2 pl-2 pr-1">
-              <Avatar className="h-7 w-7">
-                <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                  {userInitials}
-                </AvatarFallback>
-              </Avatar>
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
-              <div className="flex flex-col">
-                <span className="font-medium">{userName}</span>
-                <span className="text-xs text-muted-foreground font-normal">{userEmail}</span>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer">
-              <User className="mr-2 h-4 w-4" />
-              Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem className="cursor-pointer" asChild>
-              <Link href="/settings">
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              className="cursor-pointer text-destructive focus:text-destructive"
-              onClick={handleLogout}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Log out
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive">
-              <LogOut className="mr-2 h-4 w-4" />
-              Log out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-60 rounded-sm">
+              <DropdownMenuLabel>
+                <div className="space-y-1">
+                  <div className="font-medium">{userName}</div>
+                  <div className="text-xs text-muted-foreground">{currentUser?.email ?? "demo@financeos.app"}</div>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="cursor-pointer rounded-sm">
+                <User className="mr-2 h-4 w-4" />
+                Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="cursor-pointer rounded-sm">
+                <Link href="/settings">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="cursor-pointer rounded-sm text-destructive focus:text-destructive"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Log out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
   )

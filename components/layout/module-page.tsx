@@ -2,7 +2,11 @@
 
 import { AppShell } from "./app-shell"
 import { Breadcrumbs, type BreadcrumbItem } from "@/components/navigation/breadcrumbs"
-import { PageHeader } from "@/components/finance/page-header"
+import {
+  DenseSectionHeader,
+  WorkspaceBreadcrumbRow,
+  WorkspacePageToolbar,
+} from "@/components/layout/workspace-primitives"
 
 interface ModulePageProps {
   title: string
@@ -21,11 +25,13 @@ export function ModulePage({
 }: ModulePageProps) {
   return (
     <AppShell>
-      <div className="space-y-4">
-        <Breadcrumbs items={breadcrumbs} />
-        <PageHeader title={title} description={description}>
-          {actions}
-        </PageHeader>
+      <div className="space-y-5">
+        <WorkspacePageToolbar>
+          <WorkspaceBreadcrumbRow>
+            <Breadcrumbs items={breadcrumbs} />
+          </WorkspaceBreadcrumbRow>
+        </WorkspacePageToolbar>
+        <DenseSectionHeader title={title} description={description} actions={actions} />
         {children}
       </div>
     </AppShell>

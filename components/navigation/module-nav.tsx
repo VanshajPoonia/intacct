@@ -1,181 +1,124 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { ChevronDown } from "lucide-react"
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-provider"
 import { Button } from "@/components/ui/button"
-import { 
-  LayoutDashboard,
-  FileText,
-  Building2,
-  Banknote,
-  BookOpen,
-  Receipt,
-  CreditCard,
-  ShoppingCart,
-  Package,
-  FolderKanban,
-  Clock,
-  Network,
-  Settings,
-  ChevronDown
-} from "lucide-react"
+import { getShellIcon } from "@/lib/utils/shell-icons"
 import { cn } from "@/lib/utils"
-import { navModules } from "@/lib/mock-data"
 import { MegaMenu } from "./mega-menu"
 
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  LayoutDashboard,
-  FileText,
-  Building2,
-  Banknote,
-  BookOpen,
-  Receipt,
-  CreditCard,
-  ShoppingCart,
-  Package,
-  FolderKanban,
-  Clock,
-  Network,
-  Settings,
+function matchesModulePath(matchers: string[], pathname: string) {
+  return matchers.some(matcher => (matcher === "/" ? pathname === "/" : pathname.startsWith(matcher)))
 }
 
 export function ModuleNav() {
   const pathname = usePathname()
-  const [activeModule, setActiveModule] = useState<string | null>(null)
+  const { isLoading, topModules } = useWorkspaceShell()
+  const [openModuleId, setOpenModuleId] = useState<string | null>(null)
   const navRef = useRef<HTMLDivElement>(null)
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Close mega menu when clicking outside
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    setOpenModuleId(null)
+  }, [pathname])
+
+  useEffect(() => {
+    function handleDocumentClick(event: MouseEvent) {
       if (navRef.current && !navRef.current.contains(event.target as Node)) {
-        setActiveModule(null)
+        setOpenModuleId(null)
       }
     }
-    
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
-  // Handle keyboard navigation
-  useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setActiveModule(null)
+      if (event.key === "Escape") {
+        setOpenModuleId(null)
       }
     }
-    
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
+
+    document.addEventListener("mousedown", handleDocumentClick)
+    document.addEventListener("keydown", handleEscape)
+
+    return () => {
+      document.removeEventListener("mousedown", handleDocumentClick)
+      document.removeEventListener("keydown", handleEscape)
+    }
   }, [])
 
-  const handleModuleClick = (moduleId: string, hasMenu: boolean) => {
-    if (hasMenu) {
-      setActiveModule(activeModule === moduleId ? null : moduleId)
-    } else {
-      setActiveModule(null)
-    }
-  }
+  const activeModule = useMemo(
+    () => topModules.find(module => matchesModulePath(module.matchers, pathname)) ?? null,
+    [pathname, topModules]
+  )
 
-  const handleMouseEnter = (moduleId: string, hasMenu: boolean) => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-    }
-    if (hasMenu && activeModule) {
-      setActiveModule(moduleId)
-    }
-  }
-
-  const handleMouseLeave = () => {
-    timeoutRef.current = setTimeout(() => {
-      setActiveModule(null)
-    }, 150)
-  }
-
-  const handleMenuMouseEnter = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-    }
+  if (!isLoading && !topModules.length) {
+    return null
   }
 
   return (
-    <div ref={navRef} className="relative">
-      <nav className="flex items-center border-b border-border bg-card px-4 overflow-x-auto">
-        <div className="flex items-center gap-0.5">
-          {navModules.map((module) => {
-            const Icon = iconMap[module.icon] || LayoutDashboard
-            const isActive = module.href 
-              ? pathname === module.href 
-              : pathname.startsWith(`/${module.id}`)
-            const hasMenu = !!module.megaMenu
-            const isMenuOpen = activeModule === module.id
+    <div ref={navRef} className="relative border-b border-border/80 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85">
+      <nav className="mx-auto flex max-w-[1680px] items-center gap-0.5 overflow-x-auto px-3 py-1.5 sm:px-4 lg:px-6">
+        {topModules.map(module => {
+          const Icon = getShellIcon(module.icon)
+          const hasMenu = Boolean(module.groups?.length || module.megaMenu?.length)
+          const isActive = activeModule?.id === module.id
+          const isOpen = openModuleId === module.id
+          const groups = module.groups ?? module.megaMenu ?? []
 
+          if (!hasMenu) {
             return (
-              <div
-                key={module.id}
-                className="relative"
-                onMouseEnter={() => handleMouseEnter(module.id, hasMenu)}
-                onMouseLeave={handleMouseLeave}
-              >
-                {module.href && !hasMenu ? (
-                  <Link href={module.href}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={cn(
-                        "h-10 px-3 gap-1.5 rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:bg-transparent",
-                        isActive && "border-b-primary text-foreground"
-                      )}
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span className="text-sm font-medium hidden lg:block">{module.label}</span>
-                    </Button>
-                  </Link>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleModuleClick(module.id, hasMenu)}
-                    className={cn(
-                      "h-10 px-3 gap-1.5 rounded-none border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:bg-transparent",
-                      isActive && "border-b-primary text-foreground",
-                      isMenuOpen && "text-foreground bg-muted"
-                    )}
-                    aria-expanded={isMenuOpen}
-                    aria-haspopup={hasMenu}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="text-sm font-medium hidden lg:block">{module.label}</span>
-                    {hasMenu && (
-                      <ChevronDown className={cn(
-                        "h-3 w-3 transition-transform hidden lg:block",
-                        isMenuOpen && "rotate-180"
-                      )} />
-                    )}
-                  </Button>
-                )}
-              </div>
+              <Link key={module.id} href={module.href}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "h-9 gap-2 rounded-sm border border-transparent px-3 text-xs font-medium tracking-[0.02em] text-muted-foreground",
+                    "hover:border-border hover:bg-muted/60 hover:text-foreground",
+                    isActive && "border-border bg-muted/70 text-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span className="whitespace-nowrap">{module.label}</span>
+                </Button>
+              </Link>
             )
-          })}
-        </div>
+          }
+
+          return (
+            <Button
+              key={module.id}
+              variant="ghost"
+              size="sm"
+              onClick={() => setOpenModuleId(current => (current === module.id ? null : module.id))}
+              className={cn(
+                "h-9 gap-2 rounded-sm border border-transparent px-3 text-xs font-medium tracking-[0.02em] text-muted-foreground",
+                "hover:border-border hover:bg-muted/60 hover:text-foreground",
+                isActive && "border-border bg-muted/70 text-foreground",
+                isOpen && "border-border bg-background text-foreground"
+              )}
+              aria-expanded={isOpen}
+              aria-haspopup="dialog"
+            >
+              <Icon className="h-4 w-4" />
+              <span className="whitespace-nowrap">{module.label}</span>
+              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isOpen && "rotate-180")} />
+            </Button>
+          )
+        })}
       </nav>
 
-      {/* Mega Menu Overlay */}
-      {activeModule && (() => {
-        const module = navModules.find(m => m.id === activeModule)
-        if (module?.megaMenu) {
-          return (
-            <MegaMenu
-              groups={module.megaMenu}
-              onClose={() => setActiveModule(null)}
-              onMouseEnter={handleMenuMouseEnter}
-              onMouseLeave={handleMouseLeave}
-            />
-          )
-        }
-        return null
-      })()}
+      {openModuleId ? (
+        (() => {
+          const openModule = topModules.find(module => module.id === openModuleId)
+          const groups = openModule?.groups ?? openModule?.megaMenu ?? []
+
+          if (!openModule || !groups.length) {
+            return null
+          }
+
+          return <MegaMenu groups={groups} moduleLabel={openModule.label} onClose={() => setOpenModuleId(null)} />
+        })()
+      ) : null}
     </div>
   )
 }

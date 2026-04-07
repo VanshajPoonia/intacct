@@ -84,6 +84,16 @@ export {
 } from './shell'
 
 export {
+  getAccountantHomepageData,
+  getAdminHomepageData,
+  getAPSpecialistHomepageData,
+  getARSpecialistHomepageData,
+  getCFOHomepageData,
+  getControllerHomepageData,
+  getRoleHomepageData,
+} from './homepages'
+
+export {
   departments,
   employees,
   locations,

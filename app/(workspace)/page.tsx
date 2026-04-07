@@ -1,5 +1,5 @@
-import { RoleWorkspaceLanding } from "@/components/layout/role-workspace-landing"
+import { RoleHomepageResolver } from "@/components/layout/role-homepage-resolver"
 
 export default function WorkspaceHomePage() {
-  return <RoleWorkspaceLanding />
+  return <RoleHomepageResolver />
 }

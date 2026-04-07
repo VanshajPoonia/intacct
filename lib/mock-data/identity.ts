@@ -13,7 +13,7 @@ export const roles: Role[] = [
     id: 'ap_specialist',
     name: 'AP Specialist',
     description: 'Manages vendor onboarding, bills, approvals, and disbursements.',
-    landingRoute: '/accounts-payable',
+    landingRoute: '/',
     navigationModules: ['accounts-payable', 'work-queue', 'cash-management', 'reports'],
     accentLabel: 'Payables'
   },
@@ -21,7 +21,7 @@ export const roles: Role[] = [
     id: 'ar_specialist',
     name: 'AR Specialist',
     description: 'Owns invoicing, collections, receipts, and customer balances.',
-    landingRoute: '/accounts-receivable',
+    landingRoute: '/',
     navigationModules: ['accounts-receivable', 'work-queue', 'cash-management', 'reports'],
     accentLabel: 'Receivables'
   },
@@ -29,7 +29,7 @@ export const roles: Role[] = [
     id: 'controller',
     name: 'Controller',
     description: 'Oversees close, controls, consolidations, and reporting accuracy.',
-    landingRoute: '/general-ledger',
+    landingRoute: '/',
     navigationModules: ['general-ledger', 'reports', 'work-queue', 'admin'],
     accentLabel: 'Controls'
   },
@@ -37,7 +37,7 @@ export const roles: Role[] = [
     id: 'cfo',
     name: 'CFO',
     description: 'Reviews performance, trends, consolidation, and forecast readiness.',
-    landingRoute: '/reports',
+    landingRoute: '/',
     navigationModules: ['reports', 'cash-management', 'admin'],
     accentLabel: 'Performance'
   },
@@ -45,7 +45,7 @@ export const roles: Role[] = [
     id: 'admin',
     name: 'Admin',
     description: 'Administers users, workflows, integrations, and system settings.',
-    landingRoute: '/admin/users',
+    landingRoute: '/',
     navigationModules: ['admin', 'reports', 'integrations'],
     accentLabel: 'Platform'
   },
@@ -153,7 +153,7 @@ export const roleHomeConfigs: RoleHomeConfig[] = [
     subtitle: 'Today’s close-critical work, exceptions, and reconciliations.',
     primaryModule: 'work-queue',
     defaultRoute: '/',
-    emphasis: ['tasks_due_today', 'unreconciled_transactions', 'draft_journals', 'close_progress', 'exceptions'],
+    emphasis: ['tasks_due_today', 'unreconciled_transactions', 'draft_journals', 'missing_documents', 'close_progress', 'exceptions'],
     quickActions: [
       { id: 'qa-1', label: 'New Journal Entry', href: '/general-ledger/journal-entries' },
       { id: 'qa-2', label: 'Review Reconciliation', href: '/cash-management/reconciliation' },
@@ -165,7 +165,7 @@ export const roleHomeConfigs: RoleHomeConfig[] = [
     title: 'Payables Control Tower',
     subtitle: 'Bills, approvals, and payment readiness by entity.',
     primaryModule: 'accounts-payable',
-    defaultRoute: '/accounts-payable',
+    defaultRoute: '/',
     emphasis: ['pending_bills', 'approvals', 'discounts'],
     quickActions: [
       { id: 'qa-4', label: 'New Bill', href: '/accounts-payable/bills' },
@@ -177,7 +177,7 @@ export const roleHomeConfigs: RoleHomeConfig[] = [
     title: 'Receivables Command Center',
     subtitle: 'Invoice issuance, collections, and receipt application.',
     primaryModule: 'accounts-receivable',
-    defaultRoute: '/accounts-receivable',
+    defaultRoute: '/',
     emphasis: ['open_invoices', 'collections', 'cash_receipts'],
     quickActions: [
       { id: 'qa-6', label: 'New Invoice', href: '/accounts-receivable/invoices' },
@@ -189,7 +189,7 @@ export const roleHomeConfigs: RoleHomeConfig[] = [
     title: 'Controllership Overview',
     subtitle: 'Close progress, policy adherence, and reporting readiness.',
     primaryModule: 'general-ledger',
-    defaultRoute: '/general-ledger',
+    defaultRoute: '/',
     emphasis: ['close_status', 'trial_balance', 'exceptions'],
     quickActions: [
       { id: 'qa-8', label: 'Trial Balance', href: '/general-ledger/reports/trial-balance' },
@@ -201,7 +201,7 @@ export const roleHomeConfigs: RoleHomeConfig[] = [
     title: 'Executive Finance Summary',
     subtitle: 'Performance, liquidity, and forecast variance.',
     primaryModule: 'reports',
-    defaultRoute: '/reports',
+    defaultRoute: '/',
     emphasis: ['kpis', 'trends', 'forecast'],
     quickActions: [{ id: 'qa-10', label: 'Run P&L', href: '/reports/income-statement' }],
   },
@@ -210,7 +210,7 @@ export const roleHomeConfigs: RoleHomeConfig[] = [
     title: 'Platform Administration',
     subtitle: 'User access, workflows, integrations, and controls.',
     primaryModule: 'admin',
-    defaultRoute: '/admin/users',
+    defaultRoute: '/',
     emphasis: ['users', 'integrations', 'workflows'],
     quickActions: [{ id: 'qa-11', label: 'Manage Users', href: '/admin/users' }],
   },

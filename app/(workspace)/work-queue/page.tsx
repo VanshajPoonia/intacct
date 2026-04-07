@@ -1,5 +1,5 @@
-import { ShellStubRoute } from "@/components/layout/shell-stub-route"
+import { WorkQueuePage } from "@/components/workflows/work-queue-page"
 
 export default function WorkQueueLandingPage() {
-  return <ShellStubRoute pathname="/work-queue" />
+  return <WorkQueuePage />
 }

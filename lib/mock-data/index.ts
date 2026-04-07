@@ -4,6 +4,7 @@ export * from './accounting'
 export * from './payables'
 export * from './receivables'
 export * from './workflow'
+export * from './work-queue'
 export * from './reporting'
 export * from './shell'
 

@@ -55,7 +55,9 @@ export const notifications: Notification[] = [
 ]
 
 export const savedViews: SavedView[] = [
-  { id: 'sv-1', name: 'Month-End Exceptions', module: 'work-queue', filters: { status: ['blocked', 'in_progress'], entityId: 'e1' }, columns: ['name', 'phase', 'ownerName', 'dueDate'], sortBy: 'dueDate', sortDirection: 'asc', isDefault: true, roleScope: ['accountant', 'controller'], createdBy: 'u1', createdAt: new Date('2026-03-15T08:00:00') },
+  { id: 'sv-1', name: 'Month-End Exceptions', module: 'work-queue', filters: { sectionId: 'close_tasks', status: ['blocked', 'in_progress'] }, columns: ['item', 'entity', 'assignee', 'status', 'dueDate'], sortBy: 'dueDate', sortDirection: 'asc', isDefault: true, roleScope: ['accountant', 'controller'], createdBy: 'u1', createdAt: new Date('2026-03-15T08:00:00') },
+  { id: 'sv-4', name: 'My Today Queue', module: 'work-queue', filters: { sectionId: 'assigned_to_me', status: ['needs_review', 'pending_approval', 'blocked'] }, columns: ['item', 'source', 'status', 'priority', 'dueDate'], sortBy: 'dueDate', sortDirection: 'asc', isDefault: false, roleScope: ['accountant'], createdBy: 'u1', createdAt: new Date('2026-04-02T08:30:00') },
+  { id: 'sv-5', name: 'Reconciliation Breaks', module: 'work-queue', filters: { sectionId: 'reconciliation_exceptions', status: ['needs_review', 'blocked'] }, columns: ['item', 'entity', 'amount', 'status', 'dueDate'], sortBy: 'dueDate', sortDirection: 'asc', isDefault: false, roleScope: ['accountant', 'controller'], createdBy: 'u1', createdAt: new Date('2026-04-03T09:10:00') },
   { id: 'sv-2', name: 'Pending AP Approvals', module: 'accounts-payable', filters: { approvalStatus: ['pending_approval'], entityId: 'e1' }, isDefault: false, roleScope: ['ap_specialist', 'controller'], createdBy: 'u3', createdAt: new Date('2026-03-20T09:00:00') },
   { id: 'sv-3', name: 'AR Collections', module: 'accounts-receivable', filters: { collectionStatus: ['in_collections', 'reminder_sent'] }, isDefault: false, roleScope: ['ar_specialist'], createdBy: 'u4', createdAt: new Date('2026-03-28T14:00:00') },
 ]

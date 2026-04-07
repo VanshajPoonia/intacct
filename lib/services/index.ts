@@ -61,6 +61,19 @@ export {
 } from './close'
 
 export {
+  applyBulkWorkQueueAction,
+  applyWorkQueueAction,
+  getWorkQueueCurrentUserPermissions,
+  getWorkQueueFilterOptions,
+  getWorkQueueItemDetail,
+  getWorkQueueItems,
+  getWorkQueueSavedViews,
+  getWorkQueueSections,
+  getWorkQueueSummary,
+  saveWorkQueueView,
+} from './work-queue'
+
+export {
   createSavedView,
   deleteSavedView,
   getSavedViewById,

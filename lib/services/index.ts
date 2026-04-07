@@ -107,11 +107,50 @@ export {
 } from './homepages'
 
 export {
+  getChartAccountWorkspaceDetail,
+  getChartOfAccountsWorkspace,
+  getGeneralLedgerOverview,
+  getJournalEntriesWorkspace,
+  getJournalEntryWorkspaceDetail,
+} from './general-ledger-workspace'
+
+export {
+  getAccountsPayableOverview,
+  getBillWorkspaceDetail,
+  getBillsWorkspace,
+  getPaymentWorkspaceDetail,
+  getPaymentsWorkspace,
+  getVendorWorkspaceDetail,
+  getVendorsWorkspace,
+} from './accounts-payable-workspace'
+
+export {
+  getAccountsReceivableOverview,
+  getCustomerWorkspaceDetail,
+  getCustomersWorkspace,
+  getInvoiceWorkspaceDetail,
+  getInvoicesWorkspace,
+  getReceiptWorkspaceDetail,
+  getReceiptsWorkspace,
+} from './accounts-receivable-workspace'
+
+export {
+  getBankAccountWorkspaceDetail,
+  getCashAccountsWorkspace,
+  getCashManagementOverview,
+  getCashTransactionWorkspaceDetail,
+  getCashTransactionsWorkspace,
+  getReconciliationWorkspace,
+  getReconciliationWorkspaceDetail,
+} from './cash-management-workspace'
+
+export {
   departments,
   employees,
   locations,
   projects,
   adjustReconciliationItem,
+  activateAllocation,
   applyReceipt,
   approveBill,
   approveExpenseEntry,

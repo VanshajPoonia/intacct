@@ -10,6 +10,7 @@ export * from './shell'
 export * from './planning'
 export * from './fixed-assets'
 export * from './contracts-revenue'
+export * from './platform'
 
 // Transitional compatibility exports for the pre-service shell/navigation UI.
 export { navModules, searchableItems, sidebarItems } from '../mock-data'

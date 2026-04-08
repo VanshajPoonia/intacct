@@ -135,6 +135,66 @@ export {
 } from './accounts-receivable-workspace'
 
 export {
+  applyAdminWorkspaceAction,
+  getAdminWorkspaceDefaultSection,
+  getAdminWorkspaceDetail,
+  getAdminWorkspaceList,
+  getAdminWorkspaceOverview,
+  getAdminWorkspaceTabs,
+} from './admin-workspace'
+
+export {
+  applyIntegrationsWorkspaceAction,
+  getIntegrationsWorkspaceDefaultSection,
+  getIntegrationsWorkspaceDetail,
+  getIntegrationsWorkspaceList,
+  getIntegrationsWorkspaceOverview,
+  getIntegrationsWorkspaceTabs,
+} from './integrations-workspace'
+
+export {
+  applyApiDeveloperWorkspaceAction,
+  getApiDeveloperWorkspaceDefaultSection,
+  getApiDeveloperWorkspaceDetail,
+  getApiDeveloperWorkspaceList,
+  getApiDeveloperWorkspaceOverview,
+  getApiDeveloperWorkspaceTabs,
+} from './api-developer-workspace'
+
+export {
+  applyRuleEngineWorkspaceAction,
+  getRuleEngineWorkspaceDefaultSection,
+  getRuleEngineWorkspaceDetail,
+  getRuleEngineWorkspaceList,
+  getRuleEngineWorkspaceOverview,
+  getRuleEngineWorkspaceTabs,
+} from './rule-engine-workspace'
+
+export {
+  applyExportsSharingWorkspaceAction,
+  getExportsSharingWorkspaceDefaultSection,
+  getExportsSharingWorkspaceDetail,
+  getExportsSharingWorkspaceList,
+  getExportsSharingWorkspaceOverview,
+  getExportsSharingWorkspaceTabs,
+} from './exports-sharing-workspace'
+
+export {
+  applyEventMonitoringWorkspaceAction,
+  getEventMonitoringWorkspaceDefaultSection,
+  getEventMonitoringWorkspaceDetail,
+  getEventMonitoringWorkspaceList,
+  getEventMonitoringWorkspaceOverview,
+  getEventMonitoringWorkspaceTabs,
+} from './event-monitoring-workspace'
+
+export {
+  getAIWorkspaceOverview,
+  getDashboardsOverview,
+  getWorkflowsAutomationOverview,
+} from './platform-overviews'
+
+export {
   getBankAccountWorkspaceDetail,
   getCashAccountsWorkspace,
   getCashManagementOverview,

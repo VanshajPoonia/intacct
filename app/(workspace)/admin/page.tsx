@@ -1,5 +1,5 @@
-import { ShellStubRoute } from "@/components/layout/shell-stub-route"
+import { AdminWorkspacePage } from "@/components/admin/platform-module-pages"
 
 export default function AdminLandingPage() {
-  return <ShellStubRoute pathname="/admin" />
+  return <AdminWorkspacePage />
 }

@@ -1,5 +1,5 @@
-import { ShellStubRoute } from "@/components/layout/shell-stub-route"
+import { EventMonitoringWorkspacePage } from "@/components/admin/platform-module-pages"
 
 export default function EventMonitoringLandingPage() {
-  return <ShellStubRoute pathname="/event-monitoring" />
+  return <EventMonitoringWorkspacePage />
 }

@@ -1,5 +1,5 @@
-import { ShellStubRoute } from "@/components/layout/shell-stub-route"
+import { ApiDeveloperWorkspacePage } from "@/components/admin/platform-module-pages"
 
 export default function ApiDeveloperLandingPage() {
-  return <ShellStubRoute pathname="/api-developer" />
+  return <ApiDeveloperWorkspacePage />
 }

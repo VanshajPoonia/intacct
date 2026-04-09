@@ -1,5 +1,5 @@
-import { ShellStubRoute } from "@/components/layout/shell-stub-route"
+import { IntegrationsWorkspacePage } from "@/components/admin/platform-module-pages"
 
 export default function IntegrationsLandingPage() {
-  return <ShellStubRoute pathname="/integrations" />
+  return <IntegrationsWorkspacePage />
 }

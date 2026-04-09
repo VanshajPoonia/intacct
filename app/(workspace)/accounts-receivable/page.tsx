@@ -1,5 +1,5 @@
-import { ShellStubRoute } from "@/components/layout/shell-stub-route"
+import { AccountsReceivableOverviewPage } from "@/components/admin/platform-module-pages"
 
 export default function AccountsReceivableLandingPage() {
-  return <ShellStubRoute pathname="/accounts-receivable" />
+  return <AccountsReceivableOverviewPage />
 }

@@ -1,5 +1,5 @@
-import { ShellStubRoute } from "@/components/layout/shell-stub-route"
+import { WorkflowsAutomationOverviewPage } from "@/components/admin/platform-module-pages"
 
 export default function WorkflowsAutomationLandingPage() {
-  return <ShellStubRoute pathname="/workflows-automation" />
+  return <WorkflowsAutomationOverviewPage />
 }

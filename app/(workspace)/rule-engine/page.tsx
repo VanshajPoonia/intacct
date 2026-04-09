@@ -1,5 +1,5 @@
-import { ShellStubRoute } from "@/components/layout/shell-stub-route"
+import { RuleEngineWorkspacePage } from "@/components/admin/platform-module-pages"
 
 export default function RuleEngineLandingPage() {
-  return <ShellStubRoute pathname="/rule-engine" />
+  return <RuleEngineWorkspacePage />
 }

@@ -18,6 +18,9 @@ import type {
   ChartDataPoint,
   CorporateCardTransaction,
 } from './types'
+import { fixedAssets } from './mock-data/fixed-assets'
+import { payments as payablePayments } from './mock-data/payables'
+import { contracts as receivableContracts } from './mock-data/receivables'
 
 // Entities
 export const entities: Entity[] = [
@@ -480,3 +483,61 @@ export const savedViews = [
   { id: 'sv3', name: 'Open Invoices > $50k', module: 'accounts-receivable', filters: { status: ['sent', 'overdue'], minAmount: 50000 }, isDefault: false, createdBy: 'u1', createdAt: new Date('2024-02-15') },
   { id: 'sv4', name: 'Q1 Journal Entries', module: 'general-ledger', filters: { dateRange: 'this_quarter' }, isDefault: false, createdBy: 'u1', createdAt: new Date('2024-03-01') },
 ]
+
+// Compatibility aliases for detail pages added before the service/data split.
+export const mockBills = bills
+export const mockVendors = vendors
+export const mockInvoices = invoices
+export const mockCustomers = customers
+export const mockAccounts = accounts
+export const mockJournalEntries = journalEntries
+export const mockContracts = receivableContracts.map(contract => ({
+  ...contract,
+  contractNumber: contract.number,
+  totalValue: contract.contractValue,
+}))
+export const mockAssets = fixedAssets.map(asset => ({
+  ...asset,
+  acquisitionCost: asset.cost,
+  currentValue: asset.netBookValue,
+  usefulLife: Math.max(1, Math.round(asset.usefulLifeMonths / 12)),
+}))
+export const mockPayments = payablePayments.flatMap(payment =>
+  (payment.billIds ?? []).map(billId => ({
+    ...payment,
+    billId,
+    paymentNumber: payment.number,
+  }))
+)
+export const mockReceipts = invoices
+  .filter(invoice => invoice.amountPaid && invoice.amountPaid > 0)
+  .map(invoice => ({
+    id: `receipt-${invoice.id}`,
+    receiptNumber: `RCPT-${invoice.number}`,
+    invoiceId: invoice.id,
+    customerId: invoice.customerId,
+    customerName: invoice.customerName,
+    receiptDate: invoice.paidAt ?? invoice.dueDate,
+    date: invoice.paidAt ?? invoice.dueDate,
+    amount: invoice.amountPaid ?? invoice.amount,
+    currency: invoice.currency,
+    method: 'ach',
+    status: 'applied',
+    reference: `PMT-${invoice.number}`,
+  }))
+export const mockBankAccounts = bankAccounts.map(account => ({
+  ...account,
+  currentBalance: account.balance,
+  accountType: account.type,
+  isActive: account.status === 'active',
+  lastReconciled: new Date('2026-03-31'),
+  reconciledBalance: account.balance,
+  routingNumber: '****0219',
+}))
+export const mockBankTransactions = transactions.map(transaction => ({
+  ...transaction,
+  status:
+    transaction.reconciliationStatus === 'matched' || transaction.reconciliationStatus === 'reconciled'
+      ? 'matched'
+      : 'unmatched',
+}))

@@ -3,6 +3,8 @@ import type { AuditLogEntry } from './legacy'
 
 export type PaginatedAuditLogs = PaginatedResponse<AuditLogEntry>
 
+export { formatCurrency, formatDate } from '../utils'
+
 export type {
   AuditLogEntry,
   CorporateCardSummary,

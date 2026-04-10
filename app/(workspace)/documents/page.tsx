@@ -40,9 +40,9 @@ import {
 import {
   Download,
   Eye,
+  File as FilePdf,
   FileCheck,
   FileImage,
-  FilePdf,
   FileSpreadsheet,
   FileText,
   Filter,

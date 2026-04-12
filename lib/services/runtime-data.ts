@@ -86,3 +86,13 @@ export function invalidateRuntimeDataset(domain?: RuntimeDatasetDomain) {
 
   datasetCache.delete(domain)
 }
+
+export async function updateRuntimeDataset<T>(domain: RuntimeDatasetDomain, payload: T): Promise<T> {
+  const response = await fetchInternalApi<RuntimeDatasetResponse<T>>(`/api/runtime/datasets/${domain}`, {
+    method: "PUT",
+    body: JSON.stringify({ payload }),
+  })
+
+  invalidateRuntimeDataset(domain)
+  return hydrateDates(response.payload)
+}

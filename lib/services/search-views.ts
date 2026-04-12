@@ -1,14 +1,8 @@
-import { currentUser } from '@/lib/mock-data/identity'
-import { accounts, journalEntries } from '@/lib/mock-data/accounting'
-import { entities } from '@/lib/mock-data/organization'
-import { bills } from '@/lib/mock-data/payables'
-import { customers, invoices } from '@/lib/mock-data/receivables'
-import { savedViews } from '@/lib/mock-data/workflow'
-import { vendors } from '@/lib/mock-data/payables'
-import type { FinanceFilters, SavedView, SearchResult, SearchResultsByType } from '@/lib/types'
-import { delay, matchesFinanceFilters } from './base'
-
-const savedViewStore = [...savedViews]
+import type { Account, Bill, Customer, Entity, FinanceFilters, Invoice, JournalEntry, RoleId, SavedView, SearchResult, SearchResultsByType, Vendor } from "@/lib/types"
+import { delay, matchesFinanceFilters } from "./base"
+import { fetchInternalApi } from "./internal-api"
+import { getCurrentUser } from "./identity"
+import { getRuntimeDataset } from "./runtime-data"
 
 function buildScore(label: string, query: string) {
   const loweredLabel = label.toLowerCase()
@@ -41,6 +35,13 @@ export async function searchAll(query: string, filters?: Partial<FinanceFilters>
   if (!normalizedQuery) {
     return groupResults([])
   }
+
+  const [{ accounts, journalEntries }, { entities }, { bills, vendors }, { customers, invoices }] = await Promise.all([
+    getRuntimeDataset<{ accounts: Account[]; journalEntries: JournalEntry[] }>("accounting"),
+    getRuntimeDataset<{ entities: Entity[] }>("organization"),
+    getRuntimeDataset<{ bills: Bill[]; vendors: Vendor[] }>("payables"),
+    getRuntimeDataset<{ customers: Customer[]; invoices: Invoice[] }>("receivables"),
+  ])
 
   const results: SearchResult[] = [
     ...entities
@@ -125,59 +126,70 @@ export async function searchAll(query: string, filters?: Partial<FinanceFilters>
   return groupResults(results.sort((left, right) => right.score - left.score))
 }
 
+type SavedViewRow = {
+  id: string
+  module: string
+  name: string
+  filters: SavedView["filters"]
+  columns?: SavedView["columns"] | null
+  sort_by?: string | null
+  sort_direction?: "asc" | "desc" | null
+  is_default: boolean
+  role_scope?: string | string[] | null
+  created_by: string
+  created_at: string
+  updated_at?: string | null
+}
+
+function normalizeSavedView(row: SavedViewRow): SavedView {
+  const roleScope = (Array.isArray(row.role_scope)
+    ? row.role_scope
+    : typeof row.role_scope === "string" && row.role_scope.length > 0
+      ? row.role_scope.split(",")
+      : undefined) as RoleId[] | undefined
+
+  return {
+    id: row.id,
+    module: row.module,
+    name: row.name,
+    filters: row.filters,
+    columns: row.columns ?? undefined,
+    sortBy: row.sort_by ?? undefined,
+    sortDirection: row.sort_direction ?? undefined,
+    isDefault: row.is_default,
+    roleScope,
+    createdBy: row.created_by,
+    createdAt: new Date(row.created_at),
+    updatedAt: row.updated_at ? new Date(row.updated_at) : undefined,
+  }
+}
+
 export async function getSavedViews(module?: string): Promise<SavedView[]> {
-  await delay()
-  return (module ? savedViewStore.filter(view => view.module === module) : savedViewStore).map(view => ({ ...view }))
+  const response = await fetchInternalApi<{ data: SavedViewRow[] }>(`/api/saved-views${module ? `?module=${encodeURIComponent(module)}` : ""}`)
+  return response.data.map(normalizeSavedView)
 }
 
 export async function saveView(view: Partial<SavedView> & Pick<SavedView, 'name' | 'module' | 'filters'>): Promise<SavedView> {
-  await delay()
-
-  if (view.id) {
-    const existing = savedViewStore.find(candidate => candidate.id === view.id)
-    if (existing) {
-      Object.assign(existing, view, { updatedAt: new Date() })
-      if (existing.isDefault) {
-        savedViewStore.forEach(candidate => {
-          if (candidate.module === existing.module && candidate.id !== existing.id) {
-            candidate.isDefault = false
-          }
-        })
-      }
-      return existing
-    }
+  const currentUser = await getCurrentUser()
+  if (!currentUser) {
+    throw new Error("Authentication required.")
   }
 
-  const created: SavedView = {
-    id: `sv-${Date.now().toString(36)}-${savedViewStore.length + 1}`,
-    name: view.name,
-    module: view.module,
-    filters: view.filters,
-    columns: view.columns,
-    sortBy: view.sortBy,
-    sortDirection: view.sortDirection,
-    isDefault: view.isDefault ?? false,
-    roleScope: view.roleScope,
-    createdBy: currentUser.id,
-    createdAt: new Date(),
-  }
+  const response = await fetchInternalApi<{ data: SavedViewRow }>("/api/saved-views", {
+    method: "POST",
+    body: JSON.stringify({
+      ...view,
+      createdBy: currentUser.id,
+      createdAt: new Date().toISOString(),
+    }),
+  })
 
-  if (created.isDefault) {
-    savedViewStore.forEach(candidate => {
-      if (candidate.module === created.module) {
-        candidate.isDefault = false
-      }
-    })
-  }
-
-  savedViewStore.push(created)
-  return { ...created }
+  return normalizeSavedView(response.data)
 }
 
 export async function getSavedViewById(id: string): Promise<SavedView | null> {
-  await delay()
-  const view = savedViewStore.find(candidate => candidate.id === id)
-  return view ? { ...view } : null
+  const response = await fetchInternalApi<{ data: SavedViewRow | null }>(`/api/saved-views/${id}`)
+  return response.data ? normalizeSavedView(response.data) : null
 }
 
 export async function createSavedView(view: Omit<SavedView, 'id' | 'createdBy' | 'createdAt'>): Promise<{ success: boolean; view?: SavedView }> {
@@ -186,36 +198,27 @@ export async function createSavedView(view: Omit<SavedView, 'id' | 'createdBy' |
 }
 
 export async function updateSavedView(id: string, updates: Partial<SavedView>): Promise<{ success: boolean }> {
-  const existing = savedViewStore.find(view => view.id === id)
-  if (!existing) {
-    return { success: false }
-  }
-
-  await saveView({
-    ...existing,
-    ...updates,
-    id,
+  await fetchInternalApi<{ data: SavedViewRow }>(`/api/saved-views/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
   })
   return { success: true }
 }
 
 export async function deleteSavedView(id: string): Promise<{ success: boolean }> {
-  await delay()
-  const index = savedViewStore.findIndex(view => view.id === id)
-  if (index === -1) {
-    return { success: false }
-  }
-  savedViewStore.splice(index, 1)
+  await fetchInternalApi<{ success: boolean }>(`/api/saved-views/${id}`, {
+    method: "DELETE",
+  })
   return { success: true }
 }
 
 export async function setDefaultView(id: string, module: string): Promise<{ success: boolean }> {
-  await delay()
-  savedViewStore.forEach(view => {
-    if (view.module === module) {
-      view.isDefault = view.id === id
-      view.updatedAt = new Date()
-    }
+  await fetchInternalApi<{ data: SavedViewRow }>(`/api/saved-views/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      module,
+      isDefault: true,
+    }),
   })
   return { success: true }
 }

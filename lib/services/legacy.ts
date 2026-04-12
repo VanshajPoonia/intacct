@@ -30,19 +30,6 @@ import type {
   BankAccount,
   CorporateCardTransaction,
 } from '@/lib/types'
-import {
-  entities,
-  vendors,
-  customers,
-  accounts,
-  transactions as mockTransactions,
-  bills as mockBills,
-  invoices as mockInvoices,
-  journalEntries as mockJournalEntries,
-  approvalItems as mockApprovalItems,
-  bankAccounts,
-  corporateCardTransactions,
-} from '@/lib/mock-data'
 import { fetchInternalApi, InternalApiError, shouldUseSupabaseDataSource } from './internal-api'
 import {
   hydrateCustomer,
@@ -52,9 +39,82 @@ import {
   type SerializedInvoice,
   type SerializedInvoiceDetailRouteData,
 } from './receivables-hydration'
+import { getRuntimeDataset } from './runtime-data'
+
+let entities: Entity[] = []
+let vendors: Vendor[] = []
+let customers: Customer[] = []
+let accounts: Account[] = []
+let mockTransactions: Transaction[] = []
+let mockBills: Bill[] = []
+let mockInvoices: Invoice[] = []
+let mockJournalEntries: JournalEntry[] = []
+let mockApprovalItems: ApprovalItem[] = []
+let bankAccounts: BankAccount[] = []
+let corporateCardTransactions: CorporateCardTransaction[] = []
+let currentUser: any = null
+let savedViewsData: any[] = []
+let legacyStatePromise: Promise<void> | null = null
+
+async function ensureLegacyState() {
+  if (legacyStatePromise) {
+    return legacyStatePromise
+  }
+
+  legacyStatePromise = (async () => {
+    const [aggregate, identity, workflow] = await Promise.all([
+      getRuntimeDataset<{
+        entities: Entity[]
+        vendors: Vendor[]
+        customers: Customer[]
+        accounts: Account[]
+        transactions: Transaction[]
+        bills: Bill[]
+        invoices: Invoice[]
+        journalEntries: JournalEntry[]
+        approvalItems: ApprovalItem[]
+        bankAccounts: BankAccount[]
+        corporateCardTransactions: CorporateCardTransaction[]
+      }>('aggregate'),
+      getRuntimeDataset<{ currentUser: any }>('identity'),
+      getRuntimeDataset<{ savedViews: any[] }>('workflow'),
+    ])
+
+    entities = aggregate.entities
+    vendors = aggregate.vendors
+    customers = aggregate.customers
+    accounts = aggregate.accounts
+    mockTransactions = aggregate.transactions
+    mockBills = aggregate.bills
+    mockInvoices = aggregate.invoices
+    mockJournalEntries = aggregate.journalEntries
+    mockApprovalItems = aggregate.approvalItems
+    bankAccounts = aggregate.bankAccounts
+    corporateCardTransactions = aggregate.corporateCardTransactions
+    currentUser = identity.currentUser
+    savedViewsData = [...(workflow.savedViews ?? [])]
+
+    if (!userPreferences && currentUser?.preferences) {
+      userPreferences = { ...currentUser.preferences }
+    }
+  })()
+
+  try {
+    await legacyStatePromise
+  } finally {
+    legacyStatePromise = null
+  }
+}
 
 // Simulated latency for realistic UX
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+const delay = async (ms: number) => {
+  await ensureLegacyState()
+  if (ms <= 0) {
+    return
+  }
+
+  await new Promise(resolve => setTimeout(resolve, ms))
+}
 const SIMULATED_DELAY = 300
 
 // Mock departments, locations, projects, employees
@@ -4132,7 +4192,6 @@ export async function getActivityTimeline(
 // ============ AUTH SERVICES ============
 
 import type { AuthUser, AuthSession, UserPreferences, SavedView } from '@/lib/types'
-import { currentUser, savedViews as mockSavedViews } from '@/lib/mock-data'
 
 // Simulated user credentials for demo
 const demoCredentials = [
@@ -4197,28 +4256,37 @@ export async function validateSession(token: string): Promise<boolean> {
 
 // ============ PREFERENCES SERVICES ============
 
-let userPreferences: UserPreferences = { ...currentUser.preferences }
+let userPreferences: UserPreferences | null = null
 
 export async function getPreferences(): Promise<UserPreferences> {
   await delay(SIMULATED_DELAY)
-  return { ...userPreferences }
+  return {
+    theme: userPreferences?.theme ?? currentUser?.preferences?.theme ?? 'system',
+    defaultEntity: userPreferences?.defaultEntity ?? currentUser?.preferences?.defaultEntity ?? 'e4',
+    defaultDateRange: userPreferences?.defaultDateRange ?? currentUser?.preferences?.defaultDateRange ?? 'this_month',
+    sidebarCollapsed: userPreferences?.sidebarCollapsed ?? currentUser?.preferences?.sidebarCollapsed ?? false,
+    notifications: {
+      email: userPreferences?.notifications?.email ?? currentUser?.preferences?.notifications?.email ?? true,
+      push: userPreferences?.notifications?.push ?? currentUser?.preferences?.notifications?.push ?? true,
+      approvals: userPreferences?.notifications?.approvals ?? currentUser?.preferences?.notifications?.approvals ?? true,
+      tasks: userPreferences?.notifications?.tasks ?? currentUser?.preferences?.notifications?.tasks ?? true,
+    },
+  }
 }
 
 export async function updatePreferences(updates: Partial<UserPreferences>): Promise<{ success: boolean; preferences: UserPreferences }> {
   await delay(SIMULATED_DELAY)
-  userPreferences = { ...userPreferences, ...updates }
+  userPreferences = { ...(await getPreferences()), ...updates }
   return { success: true, preferences: { ...userPreferences } }
 }
 
 export async function resetPreferences(): Promise<{ success: boolean; preferences: UserPreferences }> {
   await delay(SIMULATED_DELAY)
-  userPreferences = { ...currentUser.preferences }
+  userPreferences = currentUser?.preferences ? { ...currentUser.preferences } : await getPreferences()
   return { success: true, preferences: { ...userPreferences } }
 }
 
 // ============ SAVED VIEW SERVICES ============
-
-const savedViewsData = [...mockSavedViews]
 
 export async function getSavedViews(module?: string): Promise<SavedView[]> {
   await delay(SIMULATED_DELAY)

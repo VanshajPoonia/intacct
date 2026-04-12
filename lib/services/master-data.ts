@@ -1,9 +1,26 @@
-import { accounts, journalEntries, transactions } from '@/lib/mock-data/accounting'
-import { entities } from '@/lib/mock-data/organization'
-import type { Account, Entity, FinanceFilters, JournalEntry, PaginatedResponse, SortConfig, Transaction } from '@/lib/types'
-import { delay, isInDateRange, matchesFinanceFilters, paginate, sortItems } from './base'
+import type { Account, Entity, FinanceFilters, JournalEntry, PaginatedResponse, SortConfig, Transaction } from "@/lib/types"
+import { delay, isInDateRange, matchesFinanceFilters, paginate, sortItems } from "./base"
+import { getRuntimeDataset } from "./runtime-data"
+
+let entities: Entity[] = []
+let accounts: Account[] = []
+let transactions: Transaction[] = []
+let journalEntries: JournalEntry[] = []
+
+async function ensureMasterDataState() {
+  const [{ entities: nextEntities }, accounting] = await Promise.all([
+    getRuntimeDataset<{ entities: Entity[] }>("organization"),
+    getRuntimeDataset<{ accounts: Account[]; transactions: Transaction[]; journalEntries: JournalEntry[] }>("accounting"),
+  ])
+
+  entities = nextEntities
+  accounts = accounting.accounts
+  transactions = accounting.transactions
+  journalEntries = accounting.journalEntries
+}
 
 export async function getEntities(): Promise<Entity[]> {
+  await ensureMasterDataState()
   await delay()
   return [...entities]
 }
@@ -17,6 +34,7 @@ export async function getTransactions(
   page: number = 1,
   pageSize: number = 10
 ): Promise<PaginatedResponse<Transaction>> {
+  await ensureMasterDataState()
   await delay()
 
   let filtered = transactions.filter(transaction => {
@@ -67,6 +85,7 @@ export async function getJournalEntries(
   page: number = 1,
   pageSize: number = 10
 ): Promise<PaginatedResponse<JournalEntry>> {
+  await ensureMasterDataState()
   await delay()
 
   let filtered = journalEntries.filter(entry => {
@@ -100,6 +119,7 @@ export async function getChartOfAccounts(
   sort?: SortConfig,
   filters?: FinanceFilters
 ): Promise<Account[]> {
+  await ensureMasterDataState()
   await delay()
 
   let filtered = [...accounts]

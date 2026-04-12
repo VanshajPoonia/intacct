@@ -1,18 +1,9 @@
-import { currentUser, roles, users } from '@/lib/mock-data/identity'
-import {
-  roleShellConfigs,
-  shellBreadcrumbDefinitions,
-  shellCommandGroups,
-  shellDatePresetOptions,
-  shellModules,
-  shellSidebarSections,
-  shellStubPages,
-} from '@/lib/mock-data/shell'
 import type {
   DateRangeFilter,
   DateRangePreset,
   Role,
   RoleId,
+  RoleShellConfig,
   ShellBreadcrumbDefinition,
   ShellBreadcrumbItem,
   ShellCommandGroup,
@@ -22,10 +13,48 @@ import type {
   ShellSidebarSection,
   ShellStubPage,
   User,
-} from '@/lib/types'
-import { getUnreadCount, getTasks } from './legacy'
-import { getCurrentUser, getRoleHomeConfig } from './identity'
-import { getEntities } from './master-data'
+} from "@/lib/types"
+import { getUnreadCount, getTasks } from "./legacy"
+import { getCurrentUser, getRoleHomeConfig } from "./identity"
+import { getEntities } from "./master-data"
+import { getRuntimeDataset } from "./runtime-data"
+
+let currentUser: User | null = null
+let roles: Role[] = []
+let users: User[] = []
+let roleShellConfigs: RoleShellConfig[] = []
+let shellBreadcrumbDefinitions: ShellBreadcrumbDefinition[] = []
+let shellCommandGroups: ShellCommandGroup[] = []
+let shellDatePresetOptions: ShellDatePresetOption[] = []
+let shellModules: ShellModule[] = []
+let shellSidebarSections: ShellSidebarSection[] = []
+let shellStubPages: ShellStubPage[] = []
+
+async function ensureShellState() {
+  const [identity, shell] = await Promise.all([
+    getRuntimeDataset<{ currentUser: User; roles: Role[]; users: User[] }>("identity"),
+    getRuntimeDataset<{
+      roleShellConfigs: RoleShellConfig[]
+      shellBreadcrumbDefinitions: ShellBreadcrumbDefinition[]
+      shellCommandGroups: ShellCommandGroup[]
+      shellDatePresetOptions: ShellDatePresetOption[]
+      shellModules: ShellModule[]
+      shellSidebarSections: ShellSidebarSection[]
+      shellStubPages: ShellStubPage[]
+    }>("shell"),
+  ])
+
+  currentUser = identity.currentUser
+  roles = identity.roles
+  users = identity.users
+  roleShellConfigs = shell.roleShellConfigs
+  shellBreadcrumbDefinitions = shell.shellBreadcrumbDefinitions
+  shellCommandGroups = shell.shellCommandGroups
+  shellDatePresetOptions = shell.shellDatePresetOptions
+  shellModules = shell.shellModules
+  shellSidebarSections = shell.shellSidebarSections
+  shellStubPages = shell.shellStubPages
+}
 
 const canonicalRoleFallbacks: Partial<Record<RoleId, RoleId>> = {
   ap_clerk: 'ap_specialist',
@@ -188,6 +217,9 @@ function filterRoles(roleIds?: RoleId[]) {
 }
 
 function findCurrentUserRecord(userId?: string): User {
+  if (!currentUser) {
+    throw new Error("Shell state has not been initialized.")
+  }
   if (!userId) {
     return currentUser
   }
@@ -242,6 +274,7 @@ function buildFallbackTrail(pathname: string): ShellBreadcrumbItem[] {
 }
 
 export async function getAvailableRoles(): Promise<Role[]> {
+  await ensureShellState()
   return filterRoles(['accountant', 'ap_specialist', 'ar_specialist', 'controller', 'cfo', 'admin'])
 }
 
@@ -251,6 +284,7 @@ export async function getShellContext(options?: {
   datePreset?: DateRangePreset
   userId?: string
 }): Promise<ShellContextData> {
+  await ensureShellState()
   const [authUser, entities, availableRoles, unreadNotifications, taskResponse] = await Promise.all([
     getCurrentUser(),
     getEntities(),
@@ -290,6 +324,7 @@ export async function getShellContext(options?: {
 }
 
 export async function getTopModuleNav(roleId: RoleId): Promise<ShellModule[]> {
+  await ensureShellState()
   const config = getRoleConfig(roleId)
   if (!config) {
     return []
@@ -302,6 +337,7 @@ export async function getTopModuleNav(roleId: RoleId): Promise<ShellModule[]> {
 }
 
 export async function getSidebarNav(roleId: RoleId): Promise<ShellSidebarSection[]> {
+  await ensureShellState()
   const config = getRoleConfig(roleId)
   if (!config) {
     return []
@@ -314,6 +350,7 @@ export async function getSidebarNav(roleId: RoleId): Promise<ShellSidebarSection
 }
 
 export async function getBreadcrumbs(pathname: string, roleId: RoleId): Promise<ShellBreadcrumbItem[]> {
+  await ensureShellState()
   const config = getRoleConfig(roleId)
   const homeItem: ShellBreadcrumbItem = {
     label: config?.homeLabel ?? 'Home',
@@ -336,6 +373,7 @@ export async function getBreadcrumbs(pathname: string, roleId: RoleId): Promise<
 }
 
 export async function getCommandPaletteConfig(roleId: RoleId): Promise<ShellCommandGroup[]> {
+  await ensureShellState()
   const config = getRoleConfig(roleId)
   const canonicalRoleId = toCanonicalRoleId(roleId)
 
@@ -355,6 +393,7 @@ export async function getCommandPaletteConfig(roleId: RoleId): Promise<ShellComm
 }
 
 export async function getStubPage(pathname: string, roleId: RoleId): Promise<ShellStubPage | null> {
+  await ensureShellState()
   const canonicalRoleId = toCanonicalRoleId(roleId)
   const page = shellStubPages.find(candidate => candidate.path === pathname)
 
@@ -378,6 +417,7 @@ export async function getStubPage(pathname: string, roleId: RoleId): Promise<She
 }
 
 export async function getActiveModuleForPath(pathname: string, roleId: RoleId): Promise<ShellModule | null> {
+  await ensureShellState()
   const modules = await getTopModuleNav(roleId)
   return (
     modules.find(module =>
@@ -387,5 +427,6 @@ export async function getActiveModuleForPath(pathname: string, roleId: RoleId): 
 }
 
 export async function getDatePresetOptions(): Promise<ShellDatePresetOption[]> {
+  await ensureShellState()
   return shellDatePresetOptions.map(option => ({ ...option }))
 }

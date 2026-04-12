@@ -1,9 +1,24 @@
-import { bankAccounts, reconciliationItems } from '@/lib/mock-data/accounting'
-import { closeTasks } from '@/lib/mock-data/workflow'
-import type { CloseStatus, CloseTask, FinanceFilters, ReconciliationData } from '@/lib/types'
-import { delay, isInDateRange, matchesFinanceFilters } from './base'
+import type { BankAccount, CloseStatus, CloseTask, FinanceFilters, ReconciliationData, ReconciliationItem } from "@/lib/types"
+import { delay, isInDateRange, matchesFinanceFilters } from "./base"
+import { getRuntimeDataset } from "./runtime-data"
+
+let bankAccounts: BankAccount[] = []
+let reconciliationItems: ReconciliationItem[] = []
+let closeTasks: CloseTask[] = []
+
+async function ensureCloseState() {
+  const [accounting, workflow] = await Promise.all([
+    getRuntimeDataset<{ bankAccounts: BankAccount[]; reconciliationItems: ReconciliationItem[] }>("accounting"),
+    getRuntimeDataset<{ closeTasks: CloseTask[] }>("workflow"),
+  ])
+
+  bankAccounts = accounting.bankAccounts
+  reconciliationItems = accounting.reconciliationItems
+  closeTasks = workflow.closeTasks
+}
 
 export async function getCloseTasks(filters: FinanceFilters): Promise<CloseTask[]> {
+  await ensureCloseState()
   await delay()
   return closeTasks.filter(task => matchesFinanceFilters(task, filters) && isInDateRange(task.dueDate, filters.dateRange))
 }
@@ -37,6 +52,7 @@ export async function getCloseStatus(filters: FinanceFilters): Promise<CloseStat
 }
 
 export async function getReconciliationData(filters: FinanceFilters, bankAccountId?: string): Promise<ReconciliationData> {
+  await ensureCloseState()
   await delay()
 
   const filtered = reconciliationItems.filter(item => {

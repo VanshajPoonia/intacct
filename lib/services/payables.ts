@@ -1,6 +1,13 @@
-import { bills } from '@/lib/mock-data/payables'
-import type { Bill, FinanceFilters, PaginatedResponse, SortConfig } from '@/lib/types'
-import { delay, isInDateRange, matchesFinanceFilters, paginate, sortItems } from './base'
+import type { Bill, FinanceFilters, PaginatedResponse, SortConfig } from "@/lib/types"
+import { delay, isInDateRange, matchesFinanceFilters, paginate, sortItems } from "./base"
+import { getRuntimeDataset } from "./runtime-data"
+
+let bills: Bill[] = []
+
+async function ensurePayablesState() {
+  const dataset = await getRuntimeDataset<{ bills: Bill[] }>("payables")
+  bills = dataset.bills
+}
 
 export async function getBills(
   filters: FinanceFilters,
@@ -10,6 +17,7 @@ export async function getBills(
   page: number = 1,
   pageSize: number = 10
 ): Promise<PaginatedResponse<Bill>> {
+  await ensurePayablesState()
   await delay()
 
   let filtered = bills.filter(bill => {

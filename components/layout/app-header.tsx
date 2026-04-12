@@ -95,9 +95,9 @@ export function AppHeader({ onSearchClick, className }: AppHeaderProps) {
                 <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-72 rounded-sm">
+              <DropdownMenuContent align="start" className="w-72 rounded-sm">
               <DropdownMenuLabel className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Demo Role
+                Role Context
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               {availableRoles.map(role => (

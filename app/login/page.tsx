@@ -6,19 +6,18 @@ import { useAuth } from "@/lib/auth/context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2, Building2, AlertCircle, Eye, EyeOff } from "lucide-react"
 
 export default function LoginPage() {
   const router = useRouter()
   const { login, isLoading } = useAuth()
   
-  const [email, setEmail] = useState("")
+  const [organization, setOrganization] = useState("")
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -28,7 +27,7 @@ export default function LoginPage() {
     setIsSubmitting(true)
 
     try {
-      const result = await login(email, password)
+      const result = await login(organization, username, password)
       if (result.success) {
         router.push("/")
       } else {
@@ -39,11 +38,6 @@ export default function LoginPage() {
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  const fillDemoCredentials = () => {
-    setEmail("demo@intacct.com")
-    setPassword("demo")
   }
 
   return (
@@ -65,7 +59,7 @@ export default function LoginPage() {
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">Sign in</CardTitle>
             <CardDescription className="text-center">
-              Enter your credentials to access your account
+              Enter your organization, username, and password to access your account
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -78,17 +72,31 @@ export default function LoginPage() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="organization">Organization</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="organization"
+                  type="text"
+                  placeholder="northstar"
+                  value={organization}
+                  onChange={(e) => setOrganization(e.target.value)}
                   disabled={isSubmitting || isLoading}
                   required
-                  autoComplete="email"
+                  autoComplete="organization"
                   autoFocus
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="ava.mitchell"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  disabled={isSubmitting || isLoading}
+                  required
+                  autoComplete="username"
                 />
               </div>
 
@@ -132,21 +140,10 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="remember"
-                  checked={rememberMe}
-                  onCheckedChange={(checked) => setRememberMe(checked as boolean)}
-                />
-                <Label htmlFor="remember" className="text-sm font-normal cursor-pointer">
-                  Remember me for 30 days
-                </Label>
-              </div>
-
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isSubmitting || isLoading || !email || !password}
+                disabled={isSubmitting || isLoading || !organization || !username || !password}
               >
                 {isSubmitting ? (
                   <>
@@ -159,27 +156,6 @@ export default function LoginPage() {
               </Button>
             </form>
           </CardContent>
-          <CardFooter className="flex flex-col space-y-4">
-            <div className="relative w-full">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or</span>
-              </div>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={fillDemoCredentials}
-            >
-              Use demo credentials
-            </Button>
-            <p className="text-xs text-center text-muted-foreground">
-              Demo: demo@intacct.com / demo
-            </p>
-          </CardFooter>
         </Card>
 
         {/* Footer */}

@@ -1,16 +1,16 @@
-import { journalEntries, reconciliationItems } from '@/lib/mock-data/accounting'
-import { activityTimeline, closeTasks, versionHistory, workflowApprovalItems } from '@/lib/mock-data/workflow'
-import { currentUser, users } from '@/lib/mock-data/identity'
-import { departments, entities, projects } from '@/lib/mock-data/organization'
-import { bills, payableApprovalItems } from '@/lib/mock-data/payables'
-import {
-  workQueueActionDefinitions,
-  workQueueImportErrors,
-  workQueueItemOverrides,
-  workQueueMissingDocumentIssues,
-  workQueueSections,
-} from '@/lib/mock-data/work-queue'
 import type {
+  ActivityItem,
+  ApprovalItem,
+  Bill,
+  CloseTask,
+  Department,
+  Entity,
+  JournalEntry,
+  Project,
+  ReconciliationItem,
+  Task,
+  User,
+  VersionHistoryItem,
   RoleId,
   SavedView,
   ShellRouteLink,
@@ -34,6 +34,7 @@ import type {
   WorkQueuePriority,
   WorkQueueSavedViewInput,
   WorkQueueSectionId,
+  WorkQueueSectionDefinition,
   WorkQueueSectionSummary,
   WorkQueueStatus,
   WorkQueueSummary,
@@ -42,23 +43,108 @@ import type {
 } from '@/lib/types'
 import { delay, paginate, sortItems } from './base'
 import { getRolePermissions } from './identity'
+import { getRuntimeDataset } from './runtime-data'
 import { getSavedViews, saveView } from './search-views'
 
 const defaultActiveSectionId: WorkQueueSectionId = 'needs_review'
 
-const workQueueOverrideStore = workQueueItemOverrides.map(override => ({ ...override }))
-const workQueueMissingDocumentStore = workQueueMissingDocumentIssues.map(issue => ({
-  ...issue,
-  requiredDocuments: [...issue.requiredDocuments],
-}))
-const workQueueImportErrorStore = workQueueImportErrors.map(error => ({ ...error }))
+let journalEntries: JournalEntry[] = []
+let reconciliationItems: ReconciliationItem[] = []
+let activityTimeline: ActivityItem[] = []
+let closeTasks: CloseTask[] = []
+let versionHistory: VersionHistoryItem[] = []
+let workflowApprovalItems: ApprovalItem[] = []
+let currentUser: User | null = null
+let users: User[] = []
+let departments: Department[] = []
+let entities: Entity[] = []
+let projects: Project[] = []
+let bills: Bill[] = []
+let payableApprovalItems: ApprovalItem[] = []
+let workQueueSections: WorkQueueSectionDefinition[] = []
+let workQueueActionDefinitions: WorkQueueActionDefinition[] = []
+let workQueueImportErrors: WorkQueueImportError[] = []
+let workQueueItemOverrides: WorkQueueItemStateOverride[] = []
+let workQueueMissingDocumentIssues: WorkQueueMissingDocumentIssue[] = []
 
-const entityMap = new Map(entities.map(entity => [entity.id, entity]))
-const departmentMap = new Map(departments.map(department => [department.id, department]))
-const projectMap = new Map(projects.map(project => [project.id, project]))
-const billMap = new Map(bills.map(bill => [bill.id, bill]))
-const sectionMap = new Map(workQueueSections.map(section => [section.id, section]))
-const actionMap = new Map(workQueueActionDefinitions.map(action => [action.id, action]))
+let workQueueOverrideStore: WorkQueueItemStateOverride[] = []
+let workQueueMissingDocumentStore: WorkQueueMissingDocumentIssue[] = []
+let workQueueImportErrorStore: WorkQueueImportError[] = []
+
+let entityMap = new Map<string, Entity>()
+let departmentMap = new Map<string, Department>()
+let projectMap = new Map<string, Project>()
+let billMap = new Map<string, Bill>()
+let sectionMap = new Map<WorkQueueSectionId, WorkQueueSectionDefinition>()
+let actionMap = new Map<WorkQueueActionId, WorkQueueActionDefinition>()
+let workQueueStatePromise: Promise<void> | null = null
+
+async function ensureWorkQueueState() {
+  if (workQueueStatePromise) {
+    return workQueueStatePromise
+  }
+
+  workQueueStatePromise = (async () => {
+    const [accounting, workflow, identity, organization, payables, workQueue] = await Promise.all([
+      getRuntimeDataset<{ journalEntries: JournalEntry[]; reconciliationItems: ReconciliationItem[] }>("accounting"),
+      getRuntimeDataset<{
+        activityTimeline: ActivityItem[]
+        closeTasks: CloseTask[]
+        versionHistory: VersionHistoryItem[]
+        workflowApprovalItems: ApprovalItem[]
+      }>("workflow"),
+      getRuntimeDataset<{ currentUser: User; users: User[] }>("identity"),
+      getRuntimeDataset<{ departments: Department[]; entities: Entity[]; projects: Project[] }>("organization"),
+      getRuntimeDataset<{ bills: Bill[]; payableApprovalItems: ApprovalItem[] }>("payables"),
+      getRuntimeDataset<{
+        workQueueActionDefinitions: WorkQueueActionDefinition[]
+        workQueueImportErrors: WorkQueueImportError[]
+        workQueueItemOverrides: WorkQueueItemStateOverride[]
+        workQueueMissingDocumentIssues: WorkQueueMissingDocumentIssue[]
+        workQueueSections: WorkQueueSectionDefinition[]
+      }>("work_queue"),
+    ])
+
+    journalEntries = accounting.journalEntries
+    reconciliationItems = accounting.reconciliationItems
+    activityTimeline = workflow.activityTimeline
+    closeTasks = workflow.closeTasks
+    versionHistory = workflow.versionHistory
+    workflowApprovalItems = workflow.workflowApprovalItems
+    currentUser = identity.currentUser
+    users = identity.users
+    departments = organization.departments
+    entities = organization.entities
+    projects = organization.projects
+    bills = payables.bills
+    payableApprovalItems = payables.payableApprovalItems
+    workQueueSections = workQueue.workQueueSections
+    workQueueActionDefinitions = workQueue.workQueueActionDefinitions
+    workQueueImportErrors = workQueue.workQueueImportErrors
+    workQueueItemOverrides = workQueue.workQueueItemOverrides
+    workQueueMissingDocumentIssues = workQueue.workQueueMissingDocumentIssues
+
+    workQueueOverrideStore = workQueueItemOverrides.map(override => ({ ...override }))
+    workQueueMissingDocumentStore = workQueueMissingDocumentIssues.map(issue => ({
+      ...issue,
+      requiredDocuments: [...issue.requiredDocuments],
+    }))
+    workQueueImportErrorStore = workQueueImportErrors.map(error => ({ ...error }))
+
+    entityMap = new Map(entities.map(entity => [entity.id, entity]))
+    departmentMap = new Map(departments.map(department => [department.id, department]))
+    projectMap = new Map(projects.map(project => [project.id, project]))
+    billMap = new Map(bills.map(bill => [bill.id, bill]))
+    sectionMap = new Map(workQueueSections.map(section => [section.id, section]))
+    actionMap = new Map(workQueueActionDefinitions.map(action => [action.id, action]))
+  })()
+
+  try {
+    await workQueueStatePromise
+  } finally {
+    workQueueStatePromise = null
+  }
+}
 
 const workQueueColumns: Record<WorkQueueColumnId, WorkQueueColumnDefinition> = {
   item: {
@@ -936,14 +1022,19 @@ function buildDetailSections(item: WorkQueueItem): WorkQueueDetailSection[] {
   return []
 }
 
+function getActiveUser(userId?: string): User {
+  return users.find(user => user.id === (userId ?? currentUser?.id)) ?? currentUser ?? users[0]
+}
+
 function getActiveUserId(userId?: string) {
-  return userId ?? currentUser.id
+  return getActiveUser(userId).id
 }
 
 export async function getWorkQueueSections(
   filters: WorkQueueFilters,
   userId?: string
 ): Promise<WorkQueueSectionSummary[]> {
+  await ensureWorkQueueState()
   await delay()
   const activeUserId = getActiveUserId(userId)
   const items = buildAllQueueItems(activeUserId)
@@ -955,6 +1046,7 @@ export async function getWorkQueueItems(
   tableState: WorkQueueTableState,
   userId?: string
 ): Promise<WorkQueueItemsResponse> {
+  await ensureWorkQueueState()
   await delay()
   const activeUserId = getActiveUserId(userId)
   const items = buildAllQueueItems(activeUserId)
@@ -974,6 +1066,7 @@ export async function getWorkQueueItems(
 }
 
 export async function getWorkQueueSummary(filters: WorkQueueFilters, userId?: string): Promise<WorkQueueSummary> {
+  await ensureWorkQueueState()
   await delay()
   const activeUserId = getActiveUserId(userId)
   const items = buildAllQueueItems(activeUserId)
@@ -981,6 +1074,7 @@ export async function getWorkQueueSummary(filters: WorkQueueFilters, userId?: st
 }
 
 export async function getWorkQueueItemDetail(itemId: string, userId?: string): Promise<WorkQueueDetail | null> {
+  await ensureWorkQueueState()
   await delay()
   const activeUserId = getActiveUserId(userId)
   const item = buildAllQueueItems(activeUserId).find(candidate => candidate.id === itemId)
@@ -1008,6 +1102,7 @@ export async function getWorkQueueItemDetail(itemId: string, userId?: string): P
 }
 
 export async function getWorkQueueFilterOptions(filters: WorkQueueFilters, _userId?: string): Promise<WorkQueueFilterOptions> {
+  await ensureWorkQueueState()
   await delay()
 
   const scopedDepartments = departments.filter(department => {
@@ -1035,6 +1130,7 @@ export async function getWorkQueueFilterOptions(filters: WorkQueueFilters, _user
 }
 
 export async function getWorkQueueSavedViews(roleId?: RoleId): Promise<SavedView[]> {
+  await ensureWorkQueueState()
   const views = await getSavedViews('work-queue')
   if (!roleId) {
     return views
@@ -1044,6 +1140,7 @@ export async function getWorkQueueSavedViews(roleId?: RoleId): Promise<SavedView
 }
 
 export async function saveWorkQueueView(input: WorkQueueSavedViewInput): Promise<SavedView> {
+  await ensureWorkQueueState()
   return saveView({
     id: input.id,
     name: input.name,
@@ -1058,7 +1155,7 @@ export async function saveWorkQueueView(input: WorkQueueSavedViewInput): Promise
 }
 
 function applyItemMutation(itemId: string, input: WorkQueueMutationInput, actingUserId: string) {
-  const actingUser = users.find(user => user.id === actingUserId) ?? currentUser
+  const actingUser = getActiveUser(actingUserId)
 
   if (itemId.startsWith('wq-missing-doc-')) {
     const issue = workQueueMissingDocumentStore.find(candidate => candidate.id === itemId)
@@ -1155,6 +1252,7 @@ export async function applyWorkQueueAction(
   filters?: WorkQueueFilters,
   userId?: string
 ): Promise<WorkQueueMutationResult> {
+  await ensureWorkQueueState()
   await delay()
   const activeUserId = getActiveUserId(userId)
   applyItemMutation(itemId, input, activeUserId)
@@ -1174,6 +1272,7 @@ export async function applyBulkWorkQueueAction(
   filters?: WorkQueueFilters,
   userId?: string
 ): Promise<WorkQueueMutationResult> {
+  await ensureWorkQueueState()
   await delay()
   const activeUserId = getActiveUserId(userId)
   itemIds.forEach(itemId => applyItemMutation(itemId, input, activeUserId))
@@ -1188,6 +1287,7 @@ export async function applyBulkWorkQueueAction(
 }
 
 export async function getWorkQueueCurrentUserPermissions(userId?: string) {
-  const activeUser = users.find(user => user.id === getActiveUserId(userId)) ?? currentUser
+  await ensureWorkQueueState()
+  const activeUser = getActiveUser(userId)
   return getRolePermissions(activeUser.role)
 }

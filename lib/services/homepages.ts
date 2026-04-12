@@ -1,6 +1,3 @@
-import { payableDocuments } from '@/lib/mock-data/payables'
-import { customers, receivableDocuments } from '@/lib/mock-data/receivables'
-import { workflowDocuments } from '@/lib/mock-data/workflow'
 import type {
   ApprovalItem,
   Bill,
@@ -36,6 +33,7 @@ import {
   getTrialBalance,
 } from './reporting'
 import { getSavedViews } from './search-views'
+import { getRuntimeDataset } from './runtime-data'
 import {
   type AuditLogEntry,
   getApiKeys,
@@ -46,6 +44,37 @@ import {
   getUsers,
   getWorkflows,
 } from './legacy'
+
+let payableDocuments: any[] = []
+let customers: any[] = []
+let receivableDocuments: any[] = []
+let workflowDocuments: any[] = []
+let homepageStatePromise: Promise<void> | null = null
+
+async function ensureHomepageState() {
+  if (homepageStatePromise) {
+    return homepageStatePromise
+  }
+
+  homepageStatePromise = (async () => {
+    const [payables, receivables, workflow] = await Promise.all([
+      getRuntimeDataset<{ payableDocuments: any[] }>("payables"),
+      getRuntimeDataset<{ customers: any[]; receivableDocuments: any[] }>("receivables"),
+      getRuntimeDataset<{ workflowDocuments: any[] }>("workflow"),
+    ])
+
+    payableDocuments = payables.payableDocuments
+    customers = receivables.customers
+    receivableDocuments = receivables.receivableDocuments
+    workflowDocuments = workflow.workflowDocuments
+  })()
+
+  try {
+    await homepageStatePromise
+  } finally {
+    homepageStatePromise = null
+  }
+}
 
 const roleFallbacks: Partial<Record<RoleId, RoleId>> = {
   ap_clerk: 'ap_specialist',
@@ -1513,6 +1542,7 @@ async function getAdminHomepageData(filters: FinanceFilters): Promise<RoleHomepa
 }
 
 export async function getRoleHomepageData(roleId: RoleId, filters: FinanceFilters): Promise<RoleHomepageData> {
+  await ensureHomepageState()
   switch (toCanonicalRoleId(roleId)) {
     case 'accountant':
       return getAccountantHomepageData(filters)

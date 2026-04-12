@@ -1,13 +1,3 @@
-import { budgetTargets } from '@/lib/mock-data/reporting'
-import {
-  budgetLines,
-  budgetSubmissions,
-  budgetVersions,
-  forecastAssumptions,
-  forecastDrivers,
-  forecastScenarios,
-} from '@/lib/mock-data/planning'
-import { departments, entities, projects } from '@/lib/mock-data/organization'
 import type {
   BudgetLine,
   BudgetSubmission,
@@ -27,6 +17,8 @@ import type {
   WorkspaceTabItem,
 } from '@/lib/types'
 import { delay, isInDateRange, matchesFinanceFilters, paginate, sortItems } from './base'
+import { getDepartments, getEntities, getProjects } from './master-data'
+import { getRuntimeDataset, updateRuntimeDataset } from './runtime-data'
 import { buildDetailField, buildOverviewRow, formatDateLabel, formatDateTimeLabel, formatMoney, getStatusTone } from './workspace-support'
 
 interface WorkspaceQuery {
@@ -40,16 +32,77 @@ interface WorkspaceQuery {
   pageSize?: number
 }
 
-const budgetVersionStore = budgetVersions.map(version => ({ ...version }))
-const budgetLineStore = budgetLines.map(line => ({ ...line }))
-const forecastScenarioStore = forecastScenarios.map(scenario => ({ ...scenario }))
-const forecastDriverStore = forecastDrivers.map(driver => ({ ...driver }))
-const forecastAssumptionStore = forecastAssumptions.map(assumption => ({ ...assumption }))
-const budgetSubmissionStore = budgetSubmissions.map(submission => ({ ...submission }))
+let budgetTargets: Array<{
+  category: string
+  entityId: string
+  departmentId?: string
+  projectId?: string
+  budget: number
+  actual: number
+}> = []
+let budgetVersionStore: BudgetVersion[] = []
+let budgetLineStore: BudgetLine[] = []
+let forecastScenarioStore: ForecastScenario[] = []
+let forecastDriverStore: ForecastDriver[] = []
+let forecastAssumptionStore: ForecastAssumption[] = []
+let budgetSubmissionStore: BudgetSubmission[] = []
 
-const entityMap = new Map(entities.map(entity => [entity.id, entity]))
-const departmentMap = new Map(departments.map(department => [department.id, department]))
-const projectMap = new Map(projects.map(project => [project.id, project]))
+let entityMap = new Map<string, { id: string; name: string; code: string }>()
+let departmentMap = new Map<string, { id: string; name: string }>()
+let projectMap = new Map<string, { id: string; name: string }>()
+let budgetsForecastingStatePromise: Promise<void> | null = null
+
+async function ensureBudgetsForecastingState() {
+  if (budgetsForecastingStatePromise) {
+    return budgetsForecastingStatePromise
+  }
+
+  budgetsForecastingStatePromise = (async () => {
+    const [reporting, planning, entities, departments, projects] = await Promise.all([
+      getRuntimeDataset<{ budgetTargets: typeof budgetTargets }>("reporting"),
+      getRuntimeDataset<{
+        budgetLines: BudgetLine[]
+        budgetSubmissions: BudgetSubmission[]
+        budgetVersions: BudgetVersion[]
+        forecastAssumptions: ForecastAssumption[]
+        forecastDrivers: ForecastDriver[]
+        forecastScenarios: ForecastScenario[]
+      }>("planning"),
+      getEntities(),
+      getDepartments(),
+      getProjects(),
+    ])
+
+    budgetTargets = reporting.budgetTargets.map(target => ({ ...target }))
+    budgetVersionStore = planning.budgetVersions.map(version => ({ ...version }))
+    budgetLineStore = planning.budgetLines.map(line => ({ ...line }))
+    forecastScenarioStore = planning.forecastScenarios.map(scenario => ({ ...scenario }))
+    forecastDriverStore = planning.forecastDrivers.map(driver => ({ ...driver }))
+    forecastAssumptionStore = planning.forecastAssumptions.map(assumption => ({ ...assumption }))
+    budgetSubmissionStore = planning.budgetSubmissions.map(submission => ({ ...submission }))
+
+    entityMap = new Map(entities.map(entity => [entity.id, { id: entity.id, name: entity.name, code: entity.code }]))
+    departmentMap = new Map(departments.map(department => [department.id, { id: department.id, name: department.name }]))
+    projectMap = new Map(projects.map(project => [project.id, { id: project.id, name: project.name }]))
+  })()
+
+  try {
+    await budgetsForecastingStatePromise
+  } finally {
+    budgetsForecastingStatePromise = null
+  }
+}
+
+async function persistPlanningState() {
+  await updateRuntimeDataset("planning", {
+    budgetLines: budgetLineStore,
+    budgetSubmissions: budgetSubmissionStore,
+    budgetVersions: budgetVersionStore,
+    forecastAssumptions: forecastAssumptionStore,
+    forecastDrivers: forecastDriverStore,
+    forecastScenarios: forecastScenarioStore,
+  })
+}
 
 const defaultSorts: Record<BudgetsForecastingSectionId, SortConfig> = {
   budget_versions: { key: 'updatedAt', direction: 'desc' },
@@ -257,6 +310,7 @@ export async function getBudgetsForecastingTabs(
   filters: FinanceFilters,
   roleId?: RoleId
 ): Promise<WorkspaceTabItem[]> {
+  await ensureBudgetsForecastingState()
   await delay()
 
   const varianceRows = buildVarianceRows(filters)
@@ -301,6 +355,7 @@ export async function getBudgetsForecastingOverview(
   filters: FinanceFilters,
   roleId: RoleId = 'accountant'
 ): Promise<ModuleOverviewData> {
+  await ensureBudgetsForecastingState()
   await delay()
 
   const scopedVersions = budgetVersionStore.filter(version => matchesFinanceFilters(version, filters))
@@ -381,6 +436,7 @@ export async function getBudgetVersionsWorkspace(
   filters: FinanceFilters,
   query: WorkspaceQuery = {}
 ): Promise<WorkspaceListResponse<BudgetVersion>> {
+  await ensureBudgetsForecastingState()
   await delay()
 
   const scopedRows = budgetVersionStore
@@ -441,6 +497,7 @@ export async function getBudgetVersionsWorkspace(
 }
 
 export async function getBudgetVersionDetail(id: string): Promise<WorkspaceDetailData | null> {
+  await ensureBudgetsForecastingState()
   await delay()
   const version = budgetVersionStore.find(candidate => candidate.id === id)
   if (!version) {
@@ -506,6 +563,7 @@ export async function getBudgetVarianceDetail(
   id: string,
   filters: FinanceFilters
 ): Promise<WorkspaceDetailData | null> {
+  await ensureBudgetsForecastingState()
   await delay()
   const row = buildVarianceRows(filters).find(candidate => candidate.id === id)
   if (!row) {
@@ -546,6 +604,7 @@ export async function getForecastScenariosWorkspace(
   filters: FinanceFilters,
   query: WorkspaceQuery = {}
 ): Promise<WorkspaceListResponse<ForecastScenario>> {
+  await ensureBudgetsForecastingState()
   await delay()
 
   const scopedRows = forecastScenarioStore
@@ -606,6 +665,7 @@ export async function getForecastScenariosWorkspace(
 }
 
 export async function getForecastScenarioDetail(id: string): Promise<WorkspaceDetailData | null> {
+  await ensureBudgetsForecastingState()
   await delay()
   const scenario = forecastScenarioStore.find(candidate => candidate.id === id)
   if (!scenario) {
@@ -661,6 +721,7 @@ export async function getBudgetVarianceWorkspace(
   filters: FinanceFilters,
   query: WorkspaceQuery = {}
 ): Promise<WorkspaceListResponse<BudgetVarianceRow>> {
+  await ensureBudgetsForecastingState()
   await delay()
 
   const scopedRows = buildVarianceRows(filters)
@@ -724,6 +785,7 @@ export async function getBudgetSubmissionsWorkspace(
   filters: FinanceFilters,
   query: WorkspaceQuery = {}
 ): Promise<WorkspaceListResponse<BudgetSubmission>> {
+  await ensureBudgetsForecastingState()
   await delay()
 
   const scopedRows = budgetSubmissionStore
@@ -784,6 +846,7 @@ export async function getBudgetSubmissionsWorkspace(
 }
 
 export async function getBudgetSubmissionDetail(id: string): Promise<WorkspaceDetailData | null> {
+  await ensureBudgetsForecastingState()
   await delay()
   const submission = budgetSubmissionStore.find(candidate => candidate.id === id)
   if (!submission) {
@@ -824,6 +887,7 @@ export async function getBudgetSubmissionDetail(id: string): Promise<WorkspaceDe
 export async function saveBudgetVersion(
   input: Partial<BudgetVersion> & Pick<BudgetVersion, 'name' | 'entityId' | 'ownerId' | 'ownerName' | 'versionType'>
 ): Promise<BudgetVersion> {
+  await ensureBudgetsForecastingState()
   await delay()
 
   if (input.id) {
@@ -832,6 +896,7 @@ export async function saveBudgetVersion(
       Object.assign(existing, input, {
         updatedAt: new Date(),
       })
+      await persistPlanningState()
       return { ...existing }
     }
   }
@@ -877,12 +942,14 @@ export async function saveBudgetVersion(
     dueDate: created.submissionDueDate ?? new Date('2026-04-15'),
   })
 
+  await persistPlanningState()
   return { ...created }
 }
 
 export async function saveForecastScenario(
   input: Partial<ForecastScenario> & Pick<ForecastScenario, 'name' | 'entityId' | 'basedOnBudgetVersionId' | 'ownerId' | 'ownerName'>
 ): Promise<ForecastScenario> {
+  await ensureBudgetsForecastingState()
   await delay()
 
   if (input.id) {
@@ -891,6 +958,7 @@ export async function saveForecastScenario(
       Object.assign(existing, input, {
         updatedAt: new Date(),
       })
+      await persistPlanningState()
       return { ...existing }
     }
   }
@@ -919,6 +987,7 @@ export async function saveForecastScenario(
   }
 
   forecastScenarioStore.unshift(created)
+  await persistPlanningState()
   return { ...created }
 }
 
@@ -926,6 +995,7 @@ export async function updateBudgetSubmission(
   id: string,
   updates: Partial<BudgetSubmission>
 ): Promise<BudgetSubmission | null> {
+  await ensureBudgetsForecastingState()
   await delay()
   const existing = budgetSubmissionStore.find(submission => submission.id === id)
   if (!existing) {
@@ -936,5 +1006,6 @@ export async function updateBudgetSubmission(
     submittedAt: updates.status === 'submitted' ? new Date() : existing.submittedAt,
   })
 
+  await persistPlanningState()
   return { ...existing }
 }

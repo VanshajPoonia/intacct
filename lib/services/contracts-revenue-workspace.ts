@@ -1,14 +1,7 @@
-import { contracts } from '@/lib/mock-data/receivables'
-import {
-  performanceObligations,
-  revenueRecognitionEvents,
-  revenueScheduleLines,
-  revenueSchedules,
-} from '@/lib/mock-data/contracts-revenue'
-import { entities } from '@/lib/mock-data/organization'
 import type {
   Contract,
   ContractsRevenueSectionId,
+  Entity,
   FinanceFilters,
   ModuleOverviewData,
   PerformanceObligation,
@@ -23,6 +16,8 @@ import type {
   WorkspaceTabItem,
 } from '@/lib/types'
 import { delay, isInDateRange, matchesFinanceFilters, paginate, sortItems } from './base'
+import { getEntities } from './master-data'
+import { getRuntimeDataset, updateRuntimeDataset } from './runtime-data'
 import { buildDetailField, buildOverviewRow, formatDateLabel, formatDateTimeLabel, formatMoney, getStatusTone } from './workspace-support'
 
 interface WorkspaceQuery {
@@ -35,13 +30,59 @@ interface WorkspaceQuery {
   pageSize?: number
 }
 
-const contractStore = contracts.map(contract => ({ ...contract }))
-const scheduleStore = revenueSchedules.map(schedule => ({ ...schedule }))
-const scheduleLineStore = revenueScheduleLines.map(line => ({ ...line }))
-const obligationStore = performanceObligations.map(obligation => ({ ...obligation }))
-const recognitionEventStore = revenueRecognitionEvents.map(event => ({ ...event }))
+let contractStore: Contract[] = []
+let scheduleStore: RevenueSchedule[] = []
+let scheduleLineStore: RevenueScheduleLine[] = []
+let obligationStore: PerformanceObligation[] = []
+let recognitionEventStore: RevenueRecognitionEvent[] = []
+let entityMap = new Map<string, Entity>()
+let contractsRevenueStatePromise: Promise<void> | null = null
 
-const entityMap = new Map(entities.map(entity => [entity.id, entity]))
+async function ensureContractsRevenueState() {
+  if (contractsRevenueStatePromise) {
+    return contractsRevenueStatePromise
+  }
+
+  contractsRevenueStatePromise = (async () => {
+    const [receivables, contractsRevenue, entities] = await Promise.all([
+      getRuntimeDataset<{ contracts: Contract[] }>("receivables"),
+      getRuntimeDataset<{
+        performanceObligations: PerformanceObligation[]
+        revenueRecognitionEvents: RevenueRecognitionEvent[]
+        revenueScheduleLines: RevenueScheduleLine[]
+        revenueSchedules: RevenueSchedule[]
+      }>("contracts_revenue"),
+      getEntities(),
+    ])
+
+    contractStore = receivables.contracts.map(contract => ({ ...contract }))
+    scheduleStore = contractsRevenue.revenueSchedules.map(schedule => ({ ...schedule }))
+    scheduleLineStore = contractsRevenue.revenueScheduleLines.map(line => ({ ...line }))
+    obligationStore = contractsRevenue.performanceObligations.map(obligation => ({ ...obligation }))
+    recognitionEventStore = contractsRevenue.revenueRecognitionEvents.map(event => ({ ...event }))
+    entityMap = new Map(entities.map(entity => [entity.id, entity]))
+  })()
+
+  try {
+    await contractsRevenueStatePromise
+  } finally {
+    contractsRevenueStatePromise = null
+  }
+}
+
+async function persistContractsRevenueState() {
+  await Promise.all([
+    updateRuntimeDataset("receivables", {
+      contracts: contractStore,
+    }),
+    updateRuntimeDataset("contracts_revenue", {
+      performanceObligations: obligationStore,
+      revenueRecognitionEvents: recognitionEventStore,
+      revenueScheduleLines: scheduleLineStore,
+      revenueSchedules: scheduleStore,
+    }),
+  ])
+}
 
 const defaultSorts: Record<ContractsRevenueSectionId, SortConfig> = {
   contracts: { key: 'createdAt', direction: 'desc' },
@@ -186,6 +227,7 @@ export function getContractsRevenueDefaultSection(roleId?: RoleId): ContractsRev
 }
 
 export async function getContractsRevenueTabs(filters: FinanceFilters, roleId?: RoleId): Promise<WorkspaceTabItem[]> {
+  await ensureContractsRevenueState()
   await delay()
 
   const defaultSection = getContractsRevenueDefaultSection(roleId)
@@ -205,6 +247,7 @@ export async function getContractsRevenueOverview(
   filters: FinanceFilters,
   roleId: RoleId = 'accountant'
 ): Promise<ModuleOverviewData> {
+  await ensureContractsRevenueState()
   await delay()
 
   const scopedContracts = contractStore.filter(contract => matchesFinanceFilters(contract, filters))
@@ -241,6 +284,7 @@ export async function getContractsWorkspace(
   filters: FinanceFilters,
   query: WorkspaceQuery = {}
 ): Promise<WorkspaceListResponse<Contract>> {
+  await ensureContractsRevenueState()
   await delay()
 
   const scopedRows = contractStore
@@ -273,6 +317,7 @@ export async function getContractsWorkspace(
 }
 
 export async function getContractDetail(id: string): Promise<WorkspaceDetailData | null> {
+  await ensureContractsRevenueState()
   await delay()
   const contract = contractStore.find(candidate => candidate.id === id)
   if (!contract) {
@@ -329,6 +374,7 @@ export async function getRevenueSchedulesWorkspace(
   filters: FinanceFilters,
   query: WorkspaceQuery = {}
 ): Promise<WorkspaceListResponse<RevenueSchedule>> {
+  await ensureContractsRevenueState()
   await delay()
 
   const scopedRows = scheduleStore
@@ -361,6 +407,7 @@ export async function getRevenueSchedulesWorkspace(
 }
 
 export async function getRevenueScheduleDetail(id: string): Promise<WorkspaceDetailData | null> {
+  await ensureContractsRevenueState()
   await delay()
   const schedule = scheduleStore.find(candidate => candidate.id === id)
   if (!schedule) {
@@ -412,6 +459,7 @@ export async function getRevenueRecognitionWorkspace(
   query: WorkspaceQuery = {},
   mode: 'queue' | 'exceptions' = 'queue'
 ): Promise<WorkspaceListResponse<RevenueRecognitionEvent>> {
+  await ensureContractsRevenueState()
   await delay()
 
   const scopedRows = recognitionEventStore
@@ -441,6 +489,7 @@ export async function getRevenueRecognitionWorkspace(
 }
 
 export async function getRevenueRecognitionDetail(id: string): Promise<WorkspaceDetailData | null> {
+  await ensureContractsRevenueState()
   await delay()
   const event = recognitionEventStore.find(candidate => candidate.id === id)
   if (!event) {
@@ -480,12 +529,14 @@ export async function getRevenueRecognitionDetail(id: string): Promise<Workspace
 export async function saveContract(
   input: Partial<Contract> & Pick<Contract, 'name' | 'customerId' | 'customerName' | 'entityId' | 'contractValue' | 'startDate' | 'endDate'>
 ): Promise<Contract> {
+  await ensureContractsRevenueState()
   await delay()
 
   if (input.id) {
     const existing = contractStore.find(contract => contract.id === input.id)
     if (existing) {
       Object.assign(existing, input)
+      await persistContractsRevenueState()
       return { ...existing }
     }
   }
@@ -509,10 +560,12 @@ export async function saveContract(
   }
 
   contractStore.unshift(created)
+  await persistContractsRevenueState()
   return { ...created }
 }
 
 export async function postRevenueRecognition(eventId: string): Promise<RevenueRecognitionEvent | null> {
+  await ensureContractsRevenueState()
   await delay()
   const event = recognitionEventStore.find(candidate => candidate.id === eventId)
   if (!event) {
@@ -541,10 +594,12 @@ export async function postRevenueRecognition(eventId: string): Promise<RevenueRe
     scheduleLine.journalEntryId = event.journalEntryId
   }
 
+  await persistContractsRevenueState()
   return { ...event }
 }
 
 export async function releaseRevenueRecognitionHold(eventId: string): Promise<RevenueRecognitionEvent | null> {
+  await ensureContractsRevenueState()
   await delay()
   const event = recognitionEventStore.find(candidate => candidate.id === eventId)
   if (!event) {
@@ -565,5 +620,6 @@ export async function releaseRevenueRecognitionHold(eventId: string): Promise<Re
     scheduleLine.note = 'Hold released from contracts workspace.'
   }
 
+  await persistContractsRevenueState()
   return { ...event }
 }

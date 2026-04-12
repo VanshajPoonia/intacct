@@ -1,15 +1,9 @@
-import {
-  assetBooks,
-  assetLifecycleEvents,
-  depreciationScheduleLines,
-  fixedAssets,
-} from '@/lib/mock-data/fixed-assets'
-import { entities } from '@/lib/mock-data/organization'
 import type {
   AssetBook,
   AssetLifecycleEvent,
   DepreciationPreview,
   DepreciationScheduleLine,
+  Entity,
   FinanceFilters,
   FixedAsset,
   FixedAssetsSectionId,
@@ -22,6 +16,8 @@ import type {
   WorkspaceTabItem,
 } from '@/lib/types'
 import { delay, isInDateRange, matchesFinanceFilters, paginate, sortItems } from './base'
+import { getEntities } from './master-data'
+import { getRuntimeDataset, updateRuntimeDataset } from './runtime-data'
 import { buildDetailField, buildOverviewRow, formatDateLabel, formatDateTimeLabel, formatMoney, getStatusTone } from './workspace-support'
 
 interface WorkspaceQuery {
@@ -34,12 +30,51 @@ interface WorkspaceQuery {
   pageSize?: number
 }
 
-const fixedAssetStore = fixedAssets.map(asset => ({ ...asset }))
-const assetBookStore = assetBooks.map(book => ({ ...book }))
-const depreciationStore = depreciationScheduleLines.map(line => ({ ...line }))
-const lifecycleStore = assetLifecycleEvents.map(event => ({ ...event }))
+let fixedAssetStore: FixedAsset[] = []
+let assetBookStore: AssetBook[] = []
+let depreciationStore: DepreciationScheduleLine[] = []
+let lifecycleStore: AssetLifecycleEvent[] = []
+let entityMap = new Map<string, Entity>()
+let fixedAssetsStatePromise: Promise<void> | null = null
 
-const entityMap = new Map(entities.map(entity => [entity.id, entity]))
+async function ensureFixedAssetsState() {
+  if (fixedAssetsStatePromise) {
+    return fixedAssetsStatePromise
+  }
+
+  fixedAssetsStatePromise = (async () => {
+    const [fixedAssetsState, entities] = await Promise.all([
+      getRuntimeDataset<{
+        fixedAssets: FixedAsset[]
+        assetBooks: AssetBook[]
+        depreciationScheduleLines: DepreciationScheduleLine[]
+        assetLifecycleEvents: AssetLifecycleEvent[]
+      }>("fixed_assets"),
+      getEntities(),
+    ])
+
+    fixedAssetStore = fixedAssetsState.fixedAssets.map(asset => ({ ...asset }))
+    assetBookStore = fixedAssetsState.assetBooks.map(book => ({ ...book }))
+    depreciationStore = fixedAssetsState.depreciationScheduleLines.map(line => ({ ...line }))
+    lifecycleStore = fixedAssetsState.assetLifecycleEvents.map(event => ({ ...event }))
+    entityMap = new Map(entities.map(entity => [entity.id, entity]))
+  })()
+
+  try {
+    await fixedAssetsStatePromise
+  } finally {
+    fixedAssetsStatePromise = null
+  }
+}
+
+async function persistFixedAssetsState() {
+  await updateRuntimeDataset("fixed_assets", {
+    assetBooks: assetBookStore,
+    assetLifecycleEvents: lifecycleStore,
+    depreciationScheduleLines: depreciationStore,
+    fixedAssets: fixedAssetStore,
+  })
+}
 
 const defaultSorts: Record<FixedAssetsSectionId, SortConfig> = {
   asset_register: { key: 'updatedAt', direction: 'desc' },
@@ -187,6 +222,7 @@ export function getFixedAssetsDefaultSection(roleId?: RoleId): FixedAssetsSectio
 }
 
 export async function getFixedAssetsTabs(filters: FinanceFilters, roleId?: RoleId): Promise<WorkspaceTabItem[]> {
+  await ensureFixedAssetsState()
   await delay()
 
   const defaultSection = getFixedAssetsDefaultSection(roleId)
@@ -205,6 +241,7 @@ export async function getFixedAssetsOverview(
   filters: FinanceFilters,
   roleId: RoleId = 'accountant'
 ): Promise<ModuleOverviewData> {
+  await ensureFixedAssetsState()
   await delay()
 
   const scopedAssets = fixedAssetStore.filter(asset => matchesFinanceFilters(asset, filters))
@@ -243,6 +280,7 @@ export async function getFixedAssetsWorkspace(
   filters: FinanceFilters,
   query: WorkspaceQuery = {}
 ): Promise<WorkspaceListResponse<FixedAsset>> {
+  await ensureFixedAssetsState()
   await delay()
 
   const scopedRows = fixedAssetStore
@@ -276,6 +314,7 @@ export async function getFixedAssetsWorkspace(
 }
 
 export async function getFixedAssetDetail(id: string): Promise<WorkspaceDetailData | null> {
+  await ensureFixedAssetsState()
   await delay()
   const asset = fixedAssetStore.find(candidate => candidate.id === id)
   if (!asset) {
@@ -344,6 +383,7 @@ export async function getDepreciationWorkspace(
   filters: FinanceFilters,
   query: WorkspaceQuery = {}
 ): Promise<WorkspaceListResponse<DepreciationScheduleLine>> {
+  await ensureFixedAssetsState()
   await delay()
 
   const scopedRows = depreciationStore
@@ -371,6 +411,7 @@ export async function getDepreciationWorkspace(
 }
 
 export async function getDepreciationRunDetail(id: string): Promise<WorkspaceDetailData | null> {
+  await ensureFixedAssetsState()
   await delay()
   const line = depreciationStore.find(candidate => candidate.id === id)
   if (!line) {
@@ -412,6 +453,7 @@ export async function getAssetLifecycleWorkspace(
   filters: FinanceFilters,
   query: WorkspaceQuery = {}
 ): Promise<WorkspaceListResponse<AssetLifecycleEvent>> {
+  await ensureFixedAssetsState()
   await delay()
 
   const scopedRows = lifecycleStore
@@ -439,6 +481,7 @@ export async function getAssetLifecycleWorkspace(
 }
 
 export async function getAssetLifecycleEventDetail(id: string): Promise<WorkspaceDetailData | null> {
+  await ensureFixedAssetsState()
   await delay()
   const event = lifecycleStore.find(candidate => candidate.id === id)
   if (!event) {
@@ -478,12 +521,14 @@ export async function getAssetLifecycleEventDetail(id: string): Promise<Workspac
 export async function saveFixedAsset(
   input: Partial<FixedAsset> & Pick<FixedAsset, 'name' | 'entityId' | 'category' | 'cost'>
 ): Promise<FixedAsset> {
+  await ensureFixedAssetsState()
   await delay()
 
   if (input.id) {
     const existing = fixedAssetStore.find(asset => asset.id === input.id)
     if (existing) {
       Object.assign(existing, input, { updatedAt: new Date() })
+      await persistFixedAssetsState()
       return { ...existing }
     }
   }
@@ -530,10 +575,12 @@ export async function saveFixedAsset(
     userName: 'Ava Mitchell',
   })
 
+  await persistFixedAssetsState()
   return { ...created }
 }
 
 export async function runDepreciationPreview(assetId: string): Promise<DepreciationPreview | null> {
+  await ensureFixedAssetsState()
   await delay()
   const asset = fixedAssetStore.find(candidate => candidate.id === assetId)
   if (!asset) {
@@ -552,6 +599,7 @@ export async function runDepreciationPreview(assetId: string): Promise<Depreciat
 }
 
 export async function disposeFixedAsset(id: string): Promise<FixedAsset | null> {
+  await ensureFixedAssetsState()
   await delay()
   const asset = fixedAssetStore.find(candidate => candidate.id === id)
   if (!asset) {
@@ -575,5 +623,6 @@ export async function disposeFixedAsset(id: string): Promise<FixedAsset | null> 
     userName: 'Ava Mitchell',
   })
 
+  await persistFixedAssetsState()
   return { ...asset }
 }

@@ -1,17 +1,45 @@
-import { departments, entities, projects } from '@/lib/mock-data/organization'
 import type {
+  Department,
+  Entity,
   FinanceFilters,
   PlatformWorkspaceQuery,
   PlatformWorkspaceRecord,
+  Project,
   SortConfig,
   WorkspaceColumnDefinition,
   WorkspaceFilterDefinition,
 } from '@/lib/types'
 import { isInDateRange, matchesFinanceFilters, paginate, sortItems, unique } from './base'
+import { getRuntimeDataset } from './runtime-data'
 
-const entityMap = new Map(entities.map(entity => [entity.id, entity]))
-const departmentMap = new Map(departments.map(department => [department.id, department]))
-const projectMap = new Map(projects.map(project => [project.id, project]))
+let entityMap = new Map<string, Entity>()
+let departmentMap = new Map<string, Department>()
+let projectMap = new Map<string, Project>()
+let platformWorkspaceSupportPromise: Promise<void> | null = null
+
+export async function ensurePlatformWorkspaceSupport() {
+  if (platformWorkspaceSupportPromise) {
+    return platformWorkspaceSupportPromise
+  }
+
+  platformWorkspaceSupportPromise = (async () => {
+    const organization = await getRuntimeDataset<{
+      entities: Entity[]
+      departments: Department[]
+      projects: Project[]
+    }>("organization")
+
+    entityMap = new Map(organization.entities.map(entity => [entity.id, entity]))
+    departmentMap = new Map(organization.departments.map(department => [department.id, department]))
+    projectMap = new Map(organization.projects.map(project => [project.id, project]))
+  })()
+
+  try {
+    await platformWorkspaceSupportPromise
+  } finally {
+    platformWorkspaceSupportPromise = null
+  }
+}
 
 export function matchesSearch(values: Array<string | undefined>, search?: string) {
   if (!search?.trim()) {

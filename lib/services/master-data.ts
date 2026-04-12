@@ -1,19 +1,49 @@
-import type { Account, Entity, FinanceFilters, JournalEntry, PaginatedResponse, SortConfig, Transaction } from "@/lib/types"
+import type {
+  Account,
+  Department,
+  Dimension,
+  Employee,
+  Entity,
+  FinanceFilters,
+  JournalEntry,
+  Location,
+  PaginatedResponse,
+  Project,
+  SortConfig,
+  Transaction,
+} from "@/lib/types"
 import { delay, isInDateRange, matchesFinanceFilters, paginate, sortItems } from "./base"
 import { getRuntimeDataset } from "./runtime-data"
 
 let entities: Entity[] = []
+let departments: Department[] = []
+let locations: Location[] = []
+let projects: Project[] = []
+let employees: Employee[] = []
+let dimensions: Dimension[] = []
 let accounts: Account[] = []
 let transactions: Transaction[] = []
 let journalEntries: JournalEntry[] = []
 
 async function ensureMasterDataState() {
-  const [{ entities: nextEntities }, accounting] = await Promise.all([
-    getRuntimeDataset<{ entities: Entity[] }>("organization"),
+  const [organization, accounting] = await Promise.all([
+    getRuntimeDataset<{
+      entities: Entity[]
+      departments: Department[]
+      locations: Location[]
+      projects: Project[]
+      employees: Employee[]
+      dimensions: Dimension[]
+    }>("organization"),
     getRuntimeDataset<{ accounts: Account[]; transactions: Transaction[]; journalEntries: JournalEntry[] }>("accounting"),
   ])
 
-  entities = nextEntities
+  entities = organization.entities
+  departments = organization.departments
+  locations = organization.locations
+  projects = organization.projects
+  employees = organization.employees
+  dimensions = organization.dimensions
   accounts = accounting.accounts
   transactions = accounting.transactions
   journalEntries = accounting.journalEntries
@@ -23,6 +53,36 @@ export async function getEntities(): Promise<Entity[]> {
   await ensureMasterDataState()
   await delay()
   return [...entities]
+}
+
+export async function getDepartments(): Promise<Department[]> {
+  await ensureMasterDataState()
+  await delay()
+  return [...departments]
+}
+
+export async function getLocations(): Promise<Location[]> {
+  await ensureMasterDataState()
+  await delay()
+  return [...locations]
+}
+
+export async function getProjects(): Promise<Project[]> {
+  await ensureMasterDataState()
+  await delay()
+  return [...projects]
+}
+
+export async function getEmployees(): Promise<Employee[]> {
+  await ensureMasterDataState()
+  await delay()
+  return [...employees]
+}
+
+export async function getDimensions(): Promise<Dimension[]> {
+  await ensureMasterDataState()
+  await delay()
+  return [...dimensions]
 }
 
 export async function getTransactions(

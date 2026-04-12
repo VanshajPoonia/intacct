@@ -1,8 +1,3 @@
-import { accounts, journalEntries, transactions } from "@/lib/mock-data/accounting"
-import { revenueRecognitionEvents, revenueScheduleLines, revenueSchedules, performanceObligations } from "@/lib/mock-data/contracts-revenue"
-import { fixedAssets, assetBooks, assetLifecycleEvents, depreciationScheduleLines } from "@/lib/mock-data/fixed-assets"
-import { payableDocuments, payments, bills, vendors } from "@/lib/mock-data/payables"
-import { contracts, customers, invoices, receivableDocuments } from "@/lib/mock-data/receivables"
 import type {
   Account,
   AssetBook,
@@ -28,7 +23,7 @@ import type {
   Vendor,
 } from "@/lib/types"
 import { delay, isInDateRange } from "./base"
-import { fetchInternalApi, InternalApiError, shouldUseSupabaseDataSource } from "./internal-api"
+import { fetchInternalApi, InternalApiError } from "./internal-api"
 import {
   hydrateCustomer,
   hydrateDocument,
@@ -38,12 +33,80 @@ import {
   type SerializedCustomer,
   type SerializedInvoiceDetailRouteData,
 } from "./receivables-hydration"
+import { getRuntimeDataset } from "./runtime-data"
 import {
   getBankAccountById,
   getReconciliationItems,
   getReconciliationSummary,
   getTransactions as getLegacyTransactions,
 } from "./legacy"
+
+let accounts: Account[] = []
+let journalEntries: JournalEntry[] = []
+let transactions: Transaction[] = []
+let revenueRecognitionEvents: RevenueRecognitionEvent[] = []
+let revenueScheduleLines: RevenueScheduleLine[] = []
+let revenueSchedules: RevenueSchedule[] = []
+let performanceObligations: PerformanceObligation[] = []
+let fixedAssets: FixedAsset[] = []
+let assetBooks: AssetBook[] = []
+let assetLifecycleEvents: any[] = []
+let depreciationScheduleLines: DepreciationScheduleLine[] = []
+let payableDocuments: Document[] = []
+let payments: Payment[] = []
+let bills: Bill[] = []
+let vendors: Vendor[] = []
+let contracts: Contract[] = []
+let detailRouteStatePromise: Promise<void> | null = null
+
+async function ensureDetailRouteState() {
+  if (detailRouteStatePromise) {
+    return detailRouteStatePromise
+  }
+
+  detailRouteStatePromise = (async () => {
+    const [accounting, contractsRevenue, fixedAssetsState, payables, receivables] = await Promise.all([
+      getRuntimeDataset<{ accounts: Account[]; journalEntries: JournalEntry[]; transactions: Transaction[] }>("accounting"),
+      getRuntimeDataset<{
+        revenueRecognitionEvents: RevenueRecognitionEvent[]
+        revenueScheduleLines: RevenueScheduleLine[]
+        revenueSchedules: RevenueSchedule[]
+        performanceObligations: PerformanceObligation[]
+      }>("contracts_revenue"),
+      getRuntimeDataset<{
+        fixedAssets: FixedAsset[]
+        assetBooks: AssetBook[]
+        assetLifecycleEvents: any[]
+        depreciationScheduleLines: DepreciationScheduleLine[]
+      }>("fixed_assets"),
+      getRuntimeDataset<{ payableDocuments: Document[]; payments: Payment[]; bills: Bill[]; vendors: Vendor[] }>("payables"),
+      getRuntimeDataset<{ contracts: Contract[] }>("receivables"),
+    ])
+
+    accounts = accounting.accounts
+    journalEntries = accounting.journalEntries
+    transactions = accounting.transactions
+    revenueRecognitionEvents = contractsRevenue.revenueRecognitionEvents
+    revenueScheduleLines = contractsRevenue.revenueScheduleLines
+    revenueSchedules = contractsRevenue.revenueSchedules
+    performanceObligations = contractsRevenue.performanceObligations
+    fixedAssets = fixedAssetsState.fixedAssets
+    assetBooks = fixedAssetsState.assetBooks
+    assetLifecycleEvents = fixedAssetsState.assetLifecycleEvents
+    depreciationScheduleLines = fixedAssetsState.depreciationScheduleLines
+    payableDocuments = payables.payableDocuments
+    payments = payables.payments
+    bills = payables.bills
+    vendors = payables.vendors
+    contracts = receivables.contracts
+  })()
+
+  try {
+    await detailRouteStatePromise
+  } finally {
+    detailRouteStatePromise = null
+  }
+}
 
 export interface BillDetailRouteData {
   bill: Bill
@@ -275,16 +338,19 @@ function buildReceiptsForInvoice(invoice: Invoice): Receipt[] {
 }
 
 export async function getPayablesBillById(id: string): Promise<Bill | null> {
+  await ensureDetailRouteState()
   await delay()
   return bills.find(candidate => candidate.id === id) ?? null
 }
 
 export async function getPayablesVendorById(id: string): Promise<Vendor | null> {
+  await ensureDetailRouteState()
   await delay()
   return vendors.find(candidate => candidate.id === id) ?? null
 }
 
 export async function getPayablesBillPayments(id: string, filters?: FinanceFilters): Promise<Payment[]> {
+  await ensureDetailRouteState()
   await delay()
 
   return filterByOptionalDateRange(
@@ -295,6 +361,7 @@ export async function getPayablesBillPayments(id: string, filters?: FinanceFilte
 }
 
 export async function getPayablesBillDocuments(id: string): Promise<Document[]> {
+  await ensureDetailRouteState()
   await delay()
   return payableDocuments.filter(document => document.relatedEntityId === id)
 }
@@ -321,140 +388,94 @@ export async function getBillDetailRouteData(id: string, filters?: FinanceFilter
 }
 
 export async function getReceivablesInvoiceById(id: string): Promise<Invoice | null> {
-  if (shouldUseSupabaseDataSource()) {
-    try {
-      const detail = await fetchInternalApi<SerializedInvoiceDetailRouteData>(`/api/receivables/invoices/${id}`)
-      return hydrateInvoice(detail.invoice)
-    } catch (error) {
-      if (error instanceof InternalApiError && error.status === 404) {
-        return null
-      }
-      throw error
+  try {
+    const detail = await fetchInternalApi<SerializedInvoiceDetailRouteData>(`/api/receivables/invoices/${id}`)
+    return hydrateInvoice(detail.invoice)
+  } catch (error) {
+    if (error instanceof InternalApiError && error.status === 404) {
+      return null
     }
+    throw error
   }
-
-  await delay()
-  return invoices.find(candidate => candidate.id === id) ?? null
 }
 
 export async function getReceivablesCustomerById(id: string): Promise<Customer | null> {
-  if (shouldUseSupabaseDataSource()) {
-    try {
-      const customer = await fetchInternalApi<SerializedCustomer>(`/api/receivables/customers/${id}`)
-      return hydrateCustomer(customer)
-    } catch (error) {
-      if (error instanceof InternalApiError && error.status === 404) {
-        return null
-      }
-      throw error
+  try {
+    const customer = await fetchInternalApi<SerializedCustomer>(`/api/receivables/customers/${id}`)
+    return hydrateCustomer(customer)
+  } catch (error) {
+    if (error instanceof InternalApiError && error.status === 404) {
+      return null
     }
+    throw error
   }
-
-  await delay()
-  return customers.find(candidate => candidate.id === id) ?? null
 }
 
 export async function getReceivablesInvoiceDocuments(id: string): Promise<Document[]> {
-  if (shouldUseSupabaseDataSource()) {
-    try {
-      const detail = await fetchInternalApi<SerializedInvoiceDetailRouteData>(`/api/receivables/invoices/${id}`)
-      return detail.documents.map(hydrateDocument)
-    } catch (error) {
-      if (error instanceof InternalApiError && error.status === 404) {
-        return []
-      }
-      throw error
+  try {
+    const detail = await fetchInternalApi<SerializedInvoiceDetailRouteData>(`/api/receivables/invoices/${id}`)
+    return detail.documents.map(hydrateDocument)
+  } catch (error) {
+    if (error instanceof InternalApiError && error.status === 404) {
+      return []
     }
+    throw error
   }
-
-  await delay()
-  return receivableDocuments.filter(document => document.relatedEntityId === id)
 }
 
 export async function getReceivablesInvoiceReceipts(id: string, filters?: FinanceFilters): Promise<Receipt[]> {
-  if (shouldUseSupabaseDataSource()) {
-    const searchParams = new URLSearchParams()
+  const searchParams = new URLSearchParams()
 
-    if (filters?.entityId) {
-      searchParams.set("entityId", filters.entityId)
+  if (filters?.entityId) {
+    searchParams.set("entityId", filters.entityId)
+  }
+
+  if (filters?.dateRange) {
+    searchParams.set("dateStart", filters.dateRange.startDate.toISOString())
+    searchParams.set("dateEnd", filters.dateRange.endDate.toISOString())
+    if (filters.dateRange.preset) {
+      searchParams.set("datePreset", filters.dateRange.preset)
     }
+  }
 
-    if (filters?.dateRange) {
-      searchParams.set("dateStart", filters.dateRange.startDate.toISOString())
-      searchParams.set("dateEnd", filters.dateRange.endDate.toISOString())
-      if (filters.dateRange.preset) {
-        searchParams.set("datePreset", filters.dateRange.preset)
-      }
+  const detail = await fetchInternalApi<SerializedInvoiceDetailRouteData>(
+    `/api/receivables/invoices/${id}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
+  )
+
+  return detail.receipts.map(hydrateReceipt)
+}
+
+export async function getInvoiceDetailRouteData(id: string, filters?: FinanceFilters): Promise<InvoiceDetailRouteData | null> {
+  const searchParams = new URLSearchParams()
+
+  if (filters?.entityId) {
+    searchParams.set("entityId", filters.entityId)
+  }
+
+  if (filters?.dateRange) {
+    searchParams.set("dateStart", filters.dateRange.startDate.toISOString())
+    searchParams.set("dateEnd", filters.dateRange.endDate.toISOString())
+    if (filters.dateRange.preset) {
+      searchParams.set("datePreset", filters.dateRange.preset)
     }
+  }
 
+  try {
     const detail = await fetchInternalApi<SerializedInvoiceDetailRouteData>(
       `/api/receivables/invoices/${id}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
     )
 
-    return detail.receipts.map(hydrateReceipt)
-  }
-
-  await delay()
-
-  const invoice = invoices.find(candidate => candidate.id === id)
-  if (!invoice) {
-    return []
-  }
-
-  return filterByOptionalDateRange(buildReceiptsForInvoice(invoice), receipt => receipt.date, filters)
-}
-
-export async function getInvoiceDetailRouteData(id: string, filters?: FinanceFilters): Promise<InvoiceDetailRouteData | null> {
-  if (shouldUseSupabaseDataSource()) {
-    const searchParams = new URLSearchParams()
-
-    if (filters?.entityId) {
-      searchParams.set("entityId", filters.entityId)
+    return hydrateInvoiceDetailRouteData(detail)
+  } catch (error) {
+    if (error instanceof InternalApiError && error.status === 404) {
+      return null
     }
-
-    if (filters?.dateRange) {
-      searchParams.set("dateStart", filters.dateRange.startDate.toISOString())
-      searchParams.set("dateEnd", filters.dateRange.endDate.toISOString())
-      if (filters.dateRange.preset) {
-        searchParams.set("datePreset", filters.dateRange.preset)
-      }
-    }
-
-    try {
-      const detail = await fetchInternalApi<SerializedInvoiceDetailRouteData>(
-        `/api/receivables/invoices/${id}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
-      )
-
-      return hydrateInvoiceDetailRouteData(detail)
-    } catch (error) {
-      if (error instanceof InternalApiError && error.status === 404) {
-        return null
-      }
-      throw error
-    }
-  }
-
-  const invoice = await getReceivablesInvoiceById(id)
-
-  if (!invoice) {
-    return null
-  }
-
-  const [customer, receipts, documents] = await Promise.all([
-    getReceivablesCustomerById(invoice.customerId),
-    getReceivablesInvoiceReceipts(id, filters),
-    getReceivablesInvoiceDocuments(id),
-  ])
-
-  return {
-    invoice,
-    customer,
-    receipts,
-    documents,
+    throw error
   }
 }
 
 export async function getLedgerJournalEntryById(id: string): Promise<JournalEntry | null> {
+  await ensureDetailRouteState()
   await delay()
   return journalEntries.find(candidate => candidate.id === id) ?? null
 }
@@ -465,11 +486,13 @@ export async function getJournalEntryDetailRouteData(id: string): Promise<Journa
 }
 
 export async function getLedgerAccountById(id: string): Promise<Account | null> {
+  await ensureDetailRouteState()
   await delay()
   return accounts.find(candidate => candidate.id === id) ?? null
 }
 
 export async function getLedgerJournalsByAccountId(accountId: string, filters?: FinanceFilters): Promise<JournalEntry[]> {
+  await ensureDetailRouteState()
   await delay()
 
   return journalEntries
@@ -478,6 +501,7 @@ export async function getLedgerJournalsByAccountId(accountId: string, filters?: 
 }
 
 export async function getLedgerTransactionsByAccountId(accountId: string, filters?: FinanceFilters): Promise<Transaction[]> {
+  await ensureDetailRouteState()
   await delay()
 
   const scoped = transactions.filter(transaction => transaction.accountId === accountId)
@@ -540,16 +564,19 @@ export async function getBankAccountDetailRouteData(id: string, filters: Finance
 }
 
 export async function getContractsRevenueContractById(id: string): Promise<Contract | null> {
+  await ensureDetailRouteState()
   await delay()
   return contracts.find(candidate => candidate.id === id) ?? null
 }
 
 export async function getContractsRevenueScheduleByContractId(contractId: string): Promise<RevenueSchedule | null> {
+  await ensureDetailRouteState()
   await delay()
   return revenueSchedules.find(candidate => candidate.contractId === contractId) ?? null
 }
 
 export async function getContractsRevenueScheduleLinesByContractId(contractId: string, filters?: FinanceFilters): Promise<RevenueScheduleLine[]> {
+  await ensureDetailRouteState()
   await delay()
   const schedule = revenueSchedules.find(candidate => candidate.contractId === contractId)
   if (!schedule) {
@@ -564,11 +591,13 @@ export async function getContractsRevenueScheduleLinesByContractId(contractId: s
 }
 
 export async function getContractsRevenueObligationsByContractId(contractId: string): Promise<PerformanceObligation[]> {
+  await ensureDetailRouteState()
   await delay()
   return performanceObligations.filter(candidate => candidate.contractId === contractId)
 }
 
 export async function getContractsRevenueEventsByContractId(contractId: string, filters?: FinanceFilters): Promise<RevenueRecognitionEvent[]> {
+  await ensureDetailRouteState()
   await delay()
 
   return filterByOptionalDateRange(
@@ -604,16 +633,19 @@ export async function getContractDetailRouteData(id: string, filters?: FinanceFi
 }
 
 export async function getFixedAssetsAssetById(id: string): Promise<FixedAsset | null> {
+  await ensureDetailRouteState()
   await delay()
   return fixedAssets.find(candidate => candidate.id === id) ?? null
 }
 
 export async function getFixedAssetsBookByAssetId(assetId: string): Promise<AssetBook | null> {
+  await ensureDetailRouteState()
   await delay()
   return assetBooks.find(candidate => candidate.assetId === assetId) ?? null
 }
 
 export async function getFixedAssetsDepreciationByAssetId(assetId: string, filters?: FinanceFilters): Promise<DepreciationScheduleLine[]> {
+  await ensureDetailRouteState()
   await delay()
 
   return filterByOptionalDateRange(
@@ -624,6 +656,7 @@ export async function getFixedAssetsDepreciationByAssetId(assetId: string, filte
 }
 
 export async function getFixedAssetsLifecycleByAssetId(assetId: string, filters?: FinanceFilters) {
+  await ensureDetailRouteState()
   await delay()
 
   return filterByOptionalDateRange(

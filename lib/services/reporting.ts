@@ -1,8 +1,3 @@
-import { accounts, bankAccounts, consolidationAdjustments, journalEntries, transactions } from '@/lib/mock-data/accounting'
-import { bills, payableApprovalItems } from '@/lib/mock-data/payables'
-import { invoices } from '@/lib/mock-data/receivables'
-import { budgetTargets } from '@/lib/mock-data/reporting'
-import { workflowApprovalItems } from '@/lib/mock-data/workflow'
 import type {
   Account,
   AccountType,
@@ -18,6 +13,58 @@ import type {
   TrialBalanceRow,
 } from '@/lib/types'
 import { delay, getDateRangeFactor, getEntityWeight, isInDateRange, matchesFinanceFilters } from './base'
+import { getRuntimeDataset } from './runtime-data'
+
+let accounts: Account[] = []
+let bankAccounts: any[] = []
+let consolidationAdjustments: Array<{ label: string; amount: number }> = []
+let journalEntries: any[] = []
+let transactions: any[] = []
+let bills: any[] = []
+let payableApprovalItems: any[] = []
+let invoices: any[] = []
+let budgetTargets: any[] = []
+let workflowApprovalItems: any[] = []
+let reportingStatePromise: Promise<void> | null = null
+
+async function ensureReportingState() {
+  if (reportingStatePromise) {
+    return reportingStatePromise
+  }
+
+  reportingStatePromise = (async () => {
+    const [accounting, payables, receivables, reporting, workflow] = await Promise.all([
+      getRuntimeDataset<{
+        accounts: Account[]
+        bankAccounts: any[]
+        consolidationAdjustments: Array<{ label: string; amount: number }>
+        journalEntries: any[]
+        transactions: any[]
+      }>("accounting"),
+      getRuntimeDataset<{ bills: any[]; payableApprovalItems: any[] }>("payables"),
+      getRuntimeDataset<{ invoices: any[] }>("receivables"),
+      getRuntimeDataset<{ budgetTargets: any[] }>("reporting"),
+      getRuntimeDataset<{ workflowApprovalItems: any[] }>("workflow"),
+    ])
+
+    accounts = accounting.accounts
+    bankAccounts = accounting.bankAccounts
+    consolidationAdjustments = accounting.consolidationAdjustments
+    journalEntries = accounting.journalEntries
+    transactions = accounting.transactions
+    bills = payables.bills
+    payableApprovalItems = payables.payableApprovalItems
+    invoices = receivables.invoices
+    budgetTargets = reporting.budgetTargets
+    workflowApprovalItems = workflow.workflowApprovalItems
+  })()
+
+  try {
+    await reportingStatePromise
+  } finally {
+    reportingStatePromise = null
+  }
+}
 
 const CONSOLIDATED_ENTITY_IDS = ['e1', 'e2', 'e3'] as const
 
@@ -98,8 +145,8 @@ function getAccountMovement(account: Account, filters: FinanceFilters) {
     .filter(entry => matchesFinanceFilters(entry, filters) && isInDateRange(entry.date, filters.dateRange))
     .reduce((sum, entry) => {
       const entryMovement = entry.lines
-        .filter(line => line.accountId === account.id && matchesLineDimensions(line, filters))
-        .reduce((lineSum, line) => lineSum + getJournalLineNaturalAmount(account.type, line.debit, line.credit), 0)
+        .filter((line: any) => line.accountId === account.id && matchesLineDimensions(line, filters))
+        .reduce((lineSum: number, line: any) => lineSum + getJournalLineNaturalAmount(account.type, line.debit, line.credit), 0)
 
       return sum + entryMovement
     }, 0)
@@ -305,6 +352,7 @@ function aggregateCashFlows(statements: CashFlowData[]): CashFlowData {
 }
 
 export async function getPnL(filters: FinanceFilters): Promise<PnLData> {
+  await ensureReportingState()
   await delay()
 
   const factor = getDateRangeFactor(filters.dateRange)
@@ -378,10 +426,12 @@ export async function getPnL(filters: FinanceFilters): Promise<PnLData> {
 }
 
 export async function getIncomeStatementData(filters: FinanceFilters): Promise<IncomeStatementData> {
+  await ensureReportingState()
   return getPnL(filters)
 }
 
 export async function getBalanceSheet(filters: FinanceFilters): Promise<BalanceSheetData> {
+  await ensureReportingState()
   await delay()
 
   const endingBalances = buildAccountEndingBalances(filters)
@@ -485,10 +535,12 @@ export async function getBalanceSheet(filters: FinanceFilters): Promise<BalanceS
 }
 
 export async function getBalanceSheetData(filters: FinanceFilters): Promise<BalanceSheetData> {
+  await ensureReportingState()
   return getBalanceSheet(filters)
 }
 
 export async function getCashFlow(filters: FinanceFilters): Promise<CashFlowData> {
+  await ensureReportingState()
   await delay()
 
   const factor = Math.max(getDateRangeFactor(filters.dateRange), 0.1)
@@ -550,10 +602,12 @@ export async function getCashFlow(filters: FinanceFilters): Promise<CashFlowData
 }
 
 export async function getCashFlowData(filters: FinanceFilters): Promise<CashFlowData> {
+  await ensureReportingState()
   return getCashFlow(filters)
 }
 
 export async function getTrialBalance(filters: FinanceFilters): Promise<TrialBalanceRow[]> {
+  await ensureReportingState()
   await delay()
 
   const factor = getDateRangeFactor(filters.dateRange)
@@ -579,6 +633,7 @@ export async function getTrialBalance(filters: FinanceFilters): Promise<TrialBal
 }
 
 export async function getBudgetVsActual(filters: FinanceFilters): Promise<BudgetActualData[]> {
+  await ensureReportingState()
   await delay()
 
   const factor = getDateRangeFactor(filters.dateRange)
@@ -604,6 +659,7 @@ export async function getBudgetVsActual(filters: FinanceFilters): Promise<Budget
 }
 
 export async function getDashboardMetrics(filters: FinanceFilters): Promise<DashboardMetricsResponse> {
+  await ensureReportingState()
   await delay()
 
   const [pnl, balanceSheet, budgetVsActual] = await Promise.all([
@@ -655,6 +711,7 @@ export async function getDashboardMetrics(filters: FinanceFilters): Promise<Dash
 }
 
 export async function getConsolidatedFinancials(filters: FinanceFilters): Promise<ConsolidatedFinancials> {
+  await ensureReportingState()
   const entityIds = getScopedEntityIds({ ...filters, entityId: 'e4' })
 
   const statementFilters = entityIds.map(entityId => ({

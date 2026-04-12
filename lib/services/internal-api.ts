@@ -23,10 +23,6 @@ function getApiBaseUrl() {
   )
 }
 
-export function shouldUseSupabaseDataSource() {
-  return process.env.NEXT_PUBLIC_DATA_SOURCE === "supabase"
-}
-
 export async function fetchInternalApi<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,

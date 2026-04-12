@@ -30,7 +30,7 @@ import type {
   BankAccount,
   CorporateCardTransaction,
 } from '@/lib/types'
-import { fetchInternalApi, InternalApiError, shouldUseSupabaseDataSource } from './internal-api'
+import { fetchInternalApi, InternalApiError } from './internal-api'
 import {
   hydrateCustomer,
   hydrateInvoice,
@@ -761,64 +761,28 @@ export async function getCustomers(
   page: number = 1,
   pageSize: number = 10
 ): Promise<PaginatedResponse<Customer>> {
-  if (shouldUseSupabaseDataSource()) {
-    const searchParams = new URLSearchParams()
+  const searchParams = new URLSearchParams()
 
-    if (search) {
-      searchParams.set('search', search)
-    }
-
-    status?.forEach(value => searchParams.append('status', value))
-
-    if (sort) {
-      searchParams.set('sortKey', sort.key)
-      searchParams.set('sortDirection', sort.direction)
-    }
-
-    searchParams.set('page', String(page))
-    searchParams.set('pageSize', String(pageSize))
-
-    const result = await fetchInternalApi<PaginatedResponse<SerializedCustomer>>(`/api/receivables/customers?${searchParams.toString()}`)
-
-    return {
-      ...result,
-      data: result.data.map(hydrateCustomer),
-    }
-  }
-
-  await delay(SIMULATED_DELAY)
-  
-  let filtered = [...customers]
-  
-  if (status && status.length > 0) {
-    filtered = filtered.filter(c => status.includes(c.status))
-  }
-  
   if (search) {
-    const s = search.toLowerCase()
-    filtered = filtered.filter(c => 
-      c.name.toLowerCase().includes(s) ||
-      c.customerId?.toLowerCase().includes(s) ||
-      c.contactEmail?.toLowerCase().includes(s)
-    )
+    searchParams.set('search', search)
   }
-  
+
+  status?.forEach(value => searchParams.append('status', value))
+
   if (sort) {
-    filtered.sort((a, b) => {
-      const aVal = a[sort.key as keyof Customer]
-      const bVal = b[sort.key as keyof Customer]
-      if (aVal === undefined || bVal === undefined) return 0
-      const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
-      return sort.direction === 'asc' ? comparison : -comparison
-    })
+    searchParams.set('sortKey', sort.key)
+    searchParams.set('sortDirection', sort.direction)
   }
-  
-  const total = filtered.length
-  const totalPages = Math.ceil(total / pageSize)
-  const start = (page - 1) * pageSize
-  const data = filtered.slice(start, start + pageSize)
-  
-  return { data, total, page, pageSize, totalPages }
+
+  searchParams.set('page', String(page))
+  searchParams.set('pageSize', String(pageSize))
+
+  const result = await fetchInternalApi<PaginatedResponse<SerializedCustomer>>(`/api/receivables/customers?${searchParams.toString()}`)
+
+  return {
+    ...result,
+    data: result.data.map(hydrateCustomer),
+  }
 }
 
 export async function createCustomer(data: Partial<Customer>): Promise<{ success: boolean; customer?: Customer }> {
@@ -934,20 +898,15 @@ export async function updateVendor(id: string, data: Partial<Vendor>): Promise<{
 }
 
 export async function getCustomerById(id: string): Promise<Customer | null> {
-  if (shouldUseSupabaseDataSource()) {
-    try {
-      const customer = await fetchInternalApi<SerializedCustomer>(`/api/receivables/customers/${id}`)
-      return hydrateCustomer(customer)
-    } catch (error) {
-      if (error instanceof InternalApiError && error.status === 404) {
-        return null
-      }
-      throw error
+  try {
+    const customer = await fetchInternalApi<SerializedCustomer>(`/api/receivables/customers/${id}`)
+    return hydrateCustomer(customer)
+  } catch (error) {
+    if (error instanceof InternalApiError && error.status === 404) {
+      return null
     }
+    throw error
   }
-
-  await delay(SIMULATED_DELAY)
-  return customers.find(c => c.id === id) || null
 }
 
 export async function getEmployees(): Promise<Employee[]> {
@@ -1758,60 +1717,27 @@ export async function getInvoices(
 }
 
 export async function getInvoiceById(id: string): Promise<Invoice | null> {
-  if (shouldUseSupabaseDataSource()) {
-    try {
-      const detail = await fetchInternalApi<SerializedInvoiceDetailRouteData>(`/api/receivables/invoices/${id}`)
-      return hydrateInvoiceDetailRouteData(detail).invoice
-    } catch (error) {
-      if (error instanceof InternalApiError && error.status === 404) {
-        return null
-      }
-      throw error
+  try {
+    const detail = await fetchInternalApi<SerializedInvoiceDetailRouteData>(`/api/receivables/invoices/${id}`)
+    return hydrateInvoiceDetailRouteData(detail).invoice
+  } catch (error) {
+    if (error instanceof InternalApiError && error.status === 404) {
+      return null
     }
+    throw error
   }
-
-  await delay(SIMULATED_DELAY)
-  return mockInvoices.find(i => i.id === id) || null
 }
 
 export async function createInvoice(invoice: Partial<Invoice>): Promise<{ success: boolean; invoice?: Invoice }> {
-  if (shouldUseSupabaseDataSource()) {
-    const result = await fetchInternalApi<{ success: boolean; invoice: SerializedInvoice }>('/api/receivables/invoices', {
-      method: 'POST',
-      body: JSON.stringify(invoice),
-    })
+  const result = await fetchInternalApi<{ success: boolean; invoice: SerializedInvoice }>('/api/receivables/invoices', {
+    method: 'POST',
+    body: JSON.stringify(invoice),
+  })
 
-    return {
-      success: result.success,
-      invoice: hydrateInvoice(result.invoice),
-    }
+  return {
+    success: result.success,
+    invoice: hydrateInvoice(result.invoice),
   }
-
-  await delay(SIMULATED_DELAY)
-  
-  const newInvoice: Invoice = {
-    id: `inv${mockInvoices.length + 1}`,
-    number: `INV-2024-${String(mockInvoices.length + 1).padStart(3, '0')}`,
-    customerId: invoice.customerId || '',
-    customerName: invoice.customerName || '',
-    date: invoice.date || new Date(),
-    dueDate: invoice.dueDate || new Date(),
-    amount: invoice.amount || 0,
-    openBalance: invoice.amount || 0,
-    currency: 'USD',
-    status: 'draft',
-    collectionStatus: 'none',
-    description: invoice.description,
-    lineItems: invoice.lineItems || [],
-    entityId: invoice.entityId || 'e1',
-    departmentId: invoice.departmentId,
-    departmentName: invoice.departmentName,
-    billingAddress: invoice.billingAddress,
-    memo: invoice.memo,
-    createdAt: new Date(),
-  }
-  mockInvoices.push(newInvoice)
-  return { success: true, invoice: newInvoice }
 }
 
 export async function updateInvoice(id: string, updates: Partial<Invoice>): Promise<{ success: boolean; invoice?: Invoice }> {
@@ -1825,41 +1751,21 @@ export async function updateInvoice(id: string, updates: Partial<Invoice>): Prom
 }
 
 export async function sendInvoice(id: string): Promise<{ success: boolean }> {
-  if (shouldUseSupabaseDataSource()) {
-    const result = await fetchInternalApi<{ success: boolean; invoice: SerializedInvoice }>(`/api/receivables/invoices/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action: 'send' }),
-    })
+  const result = await fetchInternalApi<{ success: boolean; invoice: SerializedInvoice }>(`/api/receivables/invoices/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action: 'send' }),
+  })
 
-    return { success: result.success }
-  }
-
-  await delay(SIMULATED_DELAY)
-  const invoice = mockInvoices.find(i => i.id === id)
-  if (invoice && invoice.status === 'draft') {
-    invoice.status = 'sent'
-    return { success: true }
-  }
-  return { success: false }
+  return { success: result.success }
 }
 
 export async function voidInvoice(id: string): Promise<{ success: boolean }> {
-  if (shouldUseSupabaseDataSource()) {
-    const result = await fetchInternalApi<{ success: boolean; invoice: SerializedInvoice }>(`/api/receivables/invoices/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action: 'void' }),
-    })
+  const result = await fetchInternalApi<{ success: boolean; invoice: SerializedInvoice }>(`/api/receivables/invoices/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action: 'void' }),
+  })
 
-    return { success: result.success }
-  }
-
-  await delay(SIMULATED_DELAY)
-  const invoice = mockInvoices.find(i => i.id === id)
-  if (invoice && invoice.status !== 'paid') {
-    invoice.status = 'voided'
-    return { success: true }
-  }
-  return { success: false }
+  return { success: result.success }
 }
 
 // ============ RECEIPT SERVICES ============

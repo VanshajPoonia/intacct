@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "supabase:setup": "bash scripts/setup-supabase.sh"
+    "supabase:setup": "bash scripts/setup-supabase.sh",
+    "supabase:sync-data": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/sync-runtime-datasets.mjs",
+    "supabase:bootstrap-auth": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/bootstrap-auth-users.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

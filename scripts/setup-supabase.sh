@@ -46,6 +46,12 @@ if [ -n "${SUPABASE_PROJECT_REF:-}" ]; then
   fi
 fi
 
+echo "Syncing runtime datasets into Supabase..."
+npm run supabase:sync-data
+
+echo "Bootstrapping Supabase auth users..."
+npm run supabase:bootstrap-auth
+
 echo ""
 echo "Local Supabase Studio: http://127.0.0.1:54323"
 echo "Use NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY and SUPABASE_SECRET_KEY for hosted projects."

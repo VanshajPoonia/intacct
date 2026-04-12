@@ -78,11 +78,15 @@ export interface UserPreferences {
 
 export interface User {
   id: string
+  organizationId?: string
+  organizationSlug?: string
+  username?: string
   email: string
   firstName: string
   lastName: string
   displayName?: string
   role: RoleId
+  roleIds?: RoleId[]
   status: 'active' | 'inactive' | 'pending'
   entityIds: string[]
   primaryEntityId?: string
@@ -90,21 +94,38 @@ export interface User {
   lastLoginAt?: Date
   createdAt: Date
   avatar?: string
+  isGlobalAdmin?: boolean
+  impersonation?: AuthImpersonation
   preferences?: UserPreferences
 }
 
 export interface AuthUser {
   id: string
+  organizationId: string
+  organizationSlug: string
+  username: string
   email: string
   firstName: string
   lastName: string
   role: RoleId
+  roleIds: RoleId[]
   avatar?: string
   entityIds: string[]
+  primaryEntityId?: string
+  isGlobalAdmin: boolean
+  impersonation?: AuthImpersonation
+}
+
+export interface AuthImpersonation {
+  actorProfileId: string
+  actorDisplayName: string
+  actorEmail: string
+  targetProfileId: string
+  startedAt: Date
 }
 
 export interface AuthSession {
   user: AuthUser
-  accessToken: string
-  expiresAt: Date
+  accessToken?: string
+  expiresAt?: Date
 }

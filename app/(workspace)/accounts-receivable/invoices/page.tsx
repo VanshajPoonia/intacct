@@ -1,7 +1,7 @@
 // @ts-nocheck
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { AppShell } from "@/components/layout/app-shell"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -65,7 +65,7 @@ function formatCurrency(value: number) {
 }
 
 function StatusBadge({ status, isOverdue }: { status: string; isOverdue?: boolean }) {
-  if (isOverdue && status !== 'paid' && status !== 'void') {
+  if (isOverdue && status !== 'paid' && status !== 'voided') {
     return (
       <Badge variant="outline" className="text-xs font-medium bg-red-100 text-red-700 border-red-200 gap-1">
         <AlertCircle className="h-3 w-3" />
@@ -79,7 +79,7 @@ function StatusBadge({ status, isOverdue }: { status: string; isOverdue?: boolea
     sent: { className: 'bg-blue-100 text-blue-700 border-blue-200', label: 'Sent' },
     partial: { className: 'bg-amber-100 text-amber-700 border-amber-200', label: 'Partial' },
     paid: { className: 'bg-emerald-100 text-emerald-700 border-emerald-200', label: 'Paid' },
-    void: { className: 'bg-gray-100 text-gray-700 border-gray-200', label: 'Void' },
+    voided: { className: 'bg-gray-100 text-gray-700 border-gray-200', label: 'Voided' },
   }
   
   const variant = variants[status] || { className: 'bg-gray-100 text-gray-700', label: status }
@@ -137,14 +137,14 @@ export default function InvoicesPage() {
   const pageSize = 10
 
   // Default filters for service calls
-  const defaultFilters: DashboardFilters = {
+  const defaultFilters = useMemo<DashboardFilters>(() => ({
     entityId: 'e4', // All entities
     dateRange: {
       startDate: new Date(new Date().getFullYear(), 0, 1),
       endDate: new Date(),
       preset: 'this_year'
     }
-  }
+  }), [])
 
   const fetchInvoices = useCallback(async () => {
     setLoading(true)
@@ -161,7 +161,7 @@ export default function InvoicesPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, statusFilter, sort, page])
+  }, [defaultFilters, search, statusFilter, sort, page])
 
   useEffect(() => {
     fetchInvoices()
@@ -195,13 +195,13 @@ export default function InvoicesPage() {
   // Calculate summary stats from data
   const now = new Date()
   const totalOutstanding = invoices?.data
-    .filter(i => i.status !== 'paid' && i.status !== 'void')
+    .filter(i => i.status !== 'paid' && i.status !== 'voided')
     .reduce((sum, i) => sum + (i.amount - (i.amountPaid || 0)), 0) || 0
   const overdueCount = invoices?.data.filter(i => 
-    i.status !== 'paid' && i.status !== 'void' && new Date(i.dueDate) < now
+    i.status !== 'paid' && i.status !== 'voided' && new Date(i.dueDate) < now
   ).length || 0
   const overdueAmount = invoices?.data
-    .filter(i => i.status !== 'paid' && i.status !== 'void' && new Date(i.dueDate) < now)
+    .filter(i => i.status !== 'paid' && i.status !== 'voided' && new Date(i.dueDate) < now)
     .reduce((sum, i) => sum + (i.amount - (i.amountPaid || 0)), 0) || 0
 
   return (
@@ -284,7 +284,8 @@ export default function InvoicesPage() {
                 <SelectItem value="sent">Sent</SelectItem>
                 <SelectItem value="partial">Partial</SelectItem>
                 <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="void">Void</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
+                <SelectItem value="voided">Voided</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -353,7 +354,7 @@ export default function InvoicesPage() {
                     </TableRow>
                   ) : (
                     invoices?.data.map((invoice) => {
-                      const isOverdue = invoice.status !== 'paid' && invoice.status !== 'void' && new Date(invoice.dueDate) < now
+                      const isOverdue = invoice.status !== 'paid' && invoice.status !== 'voided' && new Date(invoice.dueDate) < now
                       const balance = invoice.openBalance ?? (invoice.amount - (invoice.amountPaid || 0))
                       const daysOverdue = isOverdue ? differenceInDays(now, new Date(invoice.dueDate)) : 0
                       
@@ -415,15 +416,21 @@ export default function InvoicesPage() {
                                   Edit Invoice
                                 </DropdownMenuItem>
                                 {invoice.status === 'draft' && (
-                                  <DropdownMenuItem>
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleSend(invoice.id) }}>
                                     <Send className="h-4 w-4 mr-2" />
                                     Send Invoice
                                   </DropdownMenuItem>
                                 )}
-                                {balance > 0 && invoice.status !== 'void' && (
+                                {balance > 0 && invoice.status !== 'voided' && (
                                   <DropdownMenuItem>
                                     <CreditCard className="h-4 w-4 mr-2" />
                                     Record Payment
+                                  </DropdownMenuItem>
+                                )}
+                                {invoice.status !== 'paid' && invoice.status !== 'voided' && (
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleVoid(invoice.id) }}>
+                                    <AlertCircle className="h-4 w-4 mr-2" />
+                                    Void Invoice
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuSeparator />

@@ -168,6 +168,7 @@ export function CreateInvoiceModal({ open, onClose, onSuccess }: CreateInvoiceMo
       return
     }
 
+    const selectedDepartment = departments.find(dept => dept.id === departmentId)
     setSaving(true)
     const result = await createInvoice({
       customerId,
@@ -175,9 +176,15 @@ export function CreateInvoiceModal({ open, onClose, onSuccess }: CreateInvoiceMo
       date: invoiceDate,
       dueDate,
       amount: total,
+      status: action === 'send' ? 'sent' : 'draft',
+      sentAt: action === 'send' ? new Date() : undefined,
       description,
       lineItems: lineItems.filter(l => l.amount > 0),
       entityId,
+      departmentId: departmentId || undefined,
+      departmentName: selectedDepartment?.name,
+      billingAddress: billingAddress || undefined,
+      memo: memo || undefined,
     })
 
     if (result.success) {

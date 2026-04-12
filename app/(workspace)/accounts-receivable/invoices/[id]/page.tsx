@@ -1,416 +1,382 @@
 "use client"
 
-import { use, useState, useMemo } from "react"
 import Link from "next/link"
-import { ArrowLeft, Building2, Calendar, Check, CreditCard, Download, Edit, FileText, Mail, MoreHorizontal, Paperclip, Plus, Receipt, Send, Trash2, User } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { startTransition, use, useEffect, useState } from "react"
+import { differenceInCalendarDays } from "date-fns"
+import { AlertTriangle, CreditCard, ExternalLink, Mail, Receipt, Send } from "lucide-react"
+import { EmptyState } from "@/components/finance/empty-state"
+import { LoadingSkeleton } from "@/components/finance/loading-skeleton"
+import {
+  type RecordDetailBadgeItem,
+  type RecordDetailMetricItem,
+  RecordDetailPage,
+  RecordDetailPanel,
+} from "@/components/finance/record-detail-page"
+import { StatusBadge } from "@/components/finance/status-badge"
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-provider"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Textarea } from "@/components/ui/textarea"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { mockInvoices, mockCustomers, mockReceipts } from "@/lib/mock-data"
-import { formatCurrency, formatDate } from "@/lib/services"
+import { getInvoiceDetailRouteData, type InvoiceDetailRouteData } from "@/lib/services"
+import { formatCurrency, formatDate } from "@/lib/utils"
+
+function getTone(status: string): RecordDetailBadgeItem["tone"] {
+  switch (status) {
+    case "paid":
+      return "positive"
+    case "sent":
+    case "partial":
+    case "reminder_sent":
+      return "warning"
+    case "overdue":
+    case "voided":
+    case "written_off":
+      return "critical"
+    default:
+      return "neutral"
+  }
+}
+
+function InvoiceTimeline({ detail }: { detail: InvoiceDetailRouteData }) {
+  const { invoice, receipts, customer } = detail
+  const items = [
+    {
+      id: "created",
+      label: "Invoice created",
+      detail: `${invoice.number} was generated for ${customer?.name ?? invoice.customerName}.`,
+      date: invoice.createdAt,
+    },
+    ...(invoice.sentAt
+      ? [
+          {
+            id: "sent",
+            label: "Invoice sent",
+            detail: `Delivery completed on ${formatDate(invoice.sentAt)}.`,
+            date: invoice.sentAt,
+          },
+        ]
+      : []),
+    ...(invoice.collectionStatus !== "none"
+      ? [
+          {
+            id: "collections",
+            label: "Collections updated",
+            detail: `Collection status is ${invoice.collectionStatus.replace(/_/g, " ")}.`,
+            date: invoice.sentAt ?? invoice.createdAt,
+          },
+        ]
+      : []),
+    ...receipts.map(receipt => ({
+      id: receipt.id,
+      label: `Receipt ${receipt.number}`,
+      detail: `${receipt.method.toUpperCase()} payment applied for ${formatCurrency(receipt.amount, receipt.currency)}.`,
+      date: receipt.date,
+    })),
+  ].sort((left, right) => right.date.getTime() - left.date.getTime())
+
+  return (
+    <div className="space-y-3">
+      {items.map(item => (
+        <div key={item.id} className="rounded-sm border border-border/70 bg-background px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-medium text-foreground">{item.label}</div>
+            <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{formatDate(item.date)}</div>
+          </div>
+          <div className="mt-1 text-sm text-muted-foreground">{item.detail}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const [comment, setComment] = useState("")
+  const { activeEntity, dateRange } = useWorkspaceShell()
+  const [detail, setDetail] = useState<InvoiceDetailRouteData | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const dateRangeStart = dateRange?.startDate.getTime() ?? null
+  const dateRangeEnd = dateRange?.endDate.getTime() ?? null
 
-  const invoice = useMemo(() => mockInvoices.find(i => i.id === id) || mockInvoices[0], [id])
-  const customer = useMemo(() => mockCustomers.find(c => c.id === invoice.customerId) || mockCustomers[0], [invoice.customerId])
-  const relatedReceipts = useMemo(() => mockReceipts.filter(r => r.invoiceId === invoice.id), [invoice.id])
+  useEffect(() => {
+    if (!dateRange) {
+      return
+    }
 
-  const statusColors: Record<string, string> = {
-    draft: "bg-muted text-muted-foreground",
-    sent: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-    viewed: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-    paid: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-    overdue: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-    partial: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+
+    getInvoiceDetailRouteData(id, {
+      entityId: activeEntity?.id,
+      dateRange,
+    })
+      .then(result => {
+        if (cancelled) {
+          return
+        }
+
+        startTransition(() => {
+          setDetail(result)
+          setLoading(false)
+        })
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError("We couldn’t load this invoice right now.")
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeEntity?.id, dateRange, dateRangeEnd, dateRangeStart, id])
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <LoadingSkeleton type="page" />
+      </div>
+    )
   }
 
-  const paidAmount = relatedReceipts.reduce((sum, r) => sum + r.amount, 0)
-  const balanceDue = invoice.amount - paidAmount
+  if (error) {
+    return (
+      <div className="p-6">
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Invoice Unavailable</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
 
-  const timeline = [
-    { id: 1, type: "created", user: "Alex Johnson", date: invoice.createdAt, description: "Invoice created" },
-    { id: 2, type: "sent", user: "Alex Johnson", date: invoice.createdAt, description: `Sent to ${customer.email}` },
-    ...(invoice.status !== "draft"
-      ? [{ id: 3, type: "viewed", user: customer.name, date: invoice.createdAt, description: "Invoice viewed by customer" }]
-      : []),
-    ...(paidAmount > 0
-      ? [{ id: 4, type: "payment", user: "System", date: invoice.dueDate, description: `Payment received - ${formatCurrency(paidAmount)}` }]
-      : []),
+  if (!detail) {
+    return (
+      <div className="p-6">
+        <EmptyState
+          type="invoices"
+          title="Invoice not found"
+          description="This invoice could not be found in the current demo dataset."
+        />
+      </div>
+    )
+  }
+
+  const { invoice, customer, receipts, documents } = detail
+  const receivedAmount = receipts.reduce((sum, receipt) => sum + receipt.amount, 0) || invoice.amountPaid || 0
+  const balanceDue = Math.max(invoice.openBalance ?? invoice.amount - receivedAmount, 0)
+  const daysPastDue = differenceInCalendarDays(new Date(), invoice.dueDate)
+  const isOverdue = daysPastDue > 0 && balanceDue > 0 && invoice.status !== "paid"
+
+  const badges: RecordDetailBadgeItem[] = [
+    { id: "status", label: isOverdue ? "overdue" : invoice.status, tone: getTone(isOverdue ? "overdue" : invoice.status) },
+    { id: "collections", label: invoice.collectionStatus.replace(/_/g, " "), tone: getTone(invoice.collectionStatus) },
+    { id: "entity", label: invoice.entityId.toUpperCase(), tone: "neutral" },
   ]
 
-  const lineItems = [
-    { id: 1, description: "Consulting Services - Phase 1", quantity: 40, rate: invoice.amount * 0.015, amount: invoice.amount * 0.6 },
-    { id: 2, description: "Project Management", quantity: 20, rate: invoice.amount * 0.01, amount: invoice.amount * 0.2 },
-    { id: 3, description: "Technical Support", quantity: 15, rate: invoice.amount * 0.0133, amount: invoice.amount * 0.2 },
+  const metrics: RecordDetailMetricItem[] = [
+    { id: "amount", label: "Invoice Amount", value: formatCurrency(invoice.amount, invoice.currency), detail: invoice.description ?? invoice.customerName, tone: "accent" },
+    { id: "received", label: "Cash Applied", value: formatCurrency(receivedAmount, invoice.currency), detail: `${receipts.length} receipt event${receipts.length === 1 ? "" : "s"}`, tone: receivedAmount ? "positive" : "neutral" },
+    { id: "balance", label: "Open Balance", value: formatCurrency(balanceDue, invoice.currency), detail: invoice.collectionStatus.replace(/_/g, " "), tone: balanceDue ? "warning" : "positive" },
+    {
+      id: "due",
+      label: "Due Window",
+      value: isOverdue ? `${daysPastDue} days overdue` : `${Math.max(differenceInCalendarDays(invoice.dueDate, new Date()), 0)} days remaining`,
+      detail: `Due ${formatDate(invoice.dueDate)}`,
+      tone: isOverdue ? "critical" : "neutral",
+    },
   ]
 
   return (
-    <div className="flex flex-col">
-      {/* Header */}
-      <div className="sticky top-0 z-10 border-b bg-background">
-        <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" asChild>
-              <Link href="/accounts-receivable/invoices">
-                <ArrowLeft className="h-4 w-4" />
+    <RecordDetailPage
+      backHref="/accounts-receivable/invoices"
+      title={invoice.number}
+      subtitle={`${invoice.customerName} · ${invoice.description ?? "Customer billing"} · Issued ${formatDate(invoice.date)}`}
+      badges={badges}
+      metrics={metrics}
+      actions={
+        <>
+          {invoice.status === "draft" ? (
+            <Button size="sm" className="rounded-sm">
+              <Send className="mr-2 h-4 w-4" />
+              Send Invoice
+            </Button>
+          ) : null}
+          {(invoice.status === "sent" || isOverdue) && balanceDue > 0 ? (
+            <Button variant="outline" size="sm" className="rounded-sm">
+              <Mail className="mr-2 h-4 w-4" />
+              Send Reminder
+            </Button>
+          ) : null}
+          {balanceDue > 0 ? (
+            <Button size="sm" className="rounded-sm" asChild>
+              <Link href="/accounts-receivable/receipts">
+                <CreditCard className="mr-2 h-4 w-4" />
+                Record Receipt
               </Link>
             </Button>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl font-semibold">{invoice.invoiceNumber}</h1>
-                <Badge className={statusColors[invoice.status]}>{invoice.status}</Badge>
+          ) : null}
+          <Button variant="outline" size="sm" className="rounded-sm" asChild>
+            <Link href={`/accounts-receivable/customers/${invoice.customerId}`}>
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Open Customer
+            </Link>
+          </Button>
+        </>
+      }
+      rightRail={
+        <>
+          <RecordDetailPanel title="Customer Context">
+            <dl className="space-y-3">
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Customer</dt>
+                <dd className="mt-1 text-sm font-medium text-foreground">{customer?.name ?? invoice.customerName}</dd>
               </div>
-              <p className="text-sm text-muted-foreground">
-                <Link href={`/accounts-receivable/customers/${customer.id}`} className="hover:underline">
-                  {customer.name}
-                </Link>
-                {" "}&middot; Due {formatDate(invoice.dueDate)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {invoice.status === "draft" && (
-              <Button size="sm">
-                <Send className="mr-2 h-4 w-4" />
-                Send Invoice
-              </Button>
-            )}
-            {(invoice.status === "sent" || invoice.status === "overdue") && (
-              <>
-                <Button variant="outline" size="sm">
-                  <Mail className="mr-2 h-4 w-4" />
-                  Send Reminder
-                </Button>
-                <Button size="sm">
-                  <Receipt className="mr-2 h-4 w-4" />
-                  Record Payment
-                </Button>
-              </>
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit Invoice
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Download className="mr-2 h-4 w-4" />
-                  Download PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Paperclip className="mr-2 h-4 w-4" />
-                  Add Attachment
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Void Invoice
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Payment Terms</dt>
+                <dd className="mt-1 text-sm text-foreground">{customer?.paymentTerms ?? "Standard"}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Credit Limit</dt>
+                <dd className="mt-1 text-sm text-foreground">{customer ? formatCurrency(customer.creditLimit, customer.currency) : "Unavailable"}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Customer Balance</dt>
+                <dd className="mt-1 text-sm text-foreground">{customer ? formatCurrency(customer.balance, customer.currency) : "Unavailable"}</dd>
+              </div>
+            </dl>
+          </RecordDetailPanel>
+
+          <RecordDetailPanel title="Collections Snapshot">
+            <dl className="space-y-3">
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Collection Status</dt>
+                <dd className="mt-1 text-sm text-foreground">{invoice.collectionStatus.replace(/_/g, " ")}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Billing Address</dt>
+                <dd className="mt-1 text-sm text-foreground">{invoice.billingAddress ?? customer?.billingAddress ?? "Not captured"}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Memo</dt>
+                <dd className="mt-1 text-sm text-foreground">{invoice.memo ?? customer?.collectionNotes ?? "None"}</dd>
+              </div>
+            </dl>
+          </RecordDetailPanel>
+        </>
+      }
+    >
+      {isOverdue ? (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Collections follow-up required</AlertTitle>
+          <AlertDescription>
+            This invoice has been overdue for {daysPastDue} days and still has {formatCurrency(balanceDue, invoice.currency)} outstanding.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      <RecordDetailPanel title="Invoice Lines" description="Revenue lines and dimensional tags included on the customer invoice.">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Description</TableHead>
+                <TableHead>Revenue Account</TableHead>
+                <TableHead>Department</TableHead>
+                <TableHead>Project</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {invoice.lineItems.map(line => (
+                <TableRow key={line.id}>
+                  <TableCell className="font-medium text-foreground">{line.description}</TableCell>
+                  <TableCell>
+                    <Link href={`/general-ledger/chart-of-accounts/${line.accountId}`} className="text-sm text-primary hover:underline">
+                      {line.accountName}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{line.departmentName ?? "Unassigned"}</TableCell>
+                  <TableCell>{line.projectName ?? "None"}</TableCell>
+                  <TableCell className="text-right font-medium">{formatCurrency(line.amount, invoice.currency)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
-      </div>
+      </RecordDetailPanel>
 
-      {/* Content */}
-      <div className="flex-1 p-6">
-        <div className="mx-auto max-w-6xl">
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Main Content */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Summary Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Invoice Summary</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Invoice Amount</p>
-                      <p className="text-2xl font-bold">{formatCurrency(invoice.amount)}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Amount Received</p>
-                      <p className="text-2xl font-bold text-green-600">{formatCurrency(paidAmount)}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Balance Due</p>
-                      <p className="text-2xl font-bold">{formatCurrency(balanceDue)}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Days Outstanding</p>
-                      <p className="text-2xl font-bold">
-                        {Math.max(0, Math.ceil((Date.now() - new Date(invoice.createdAt).getTime()) / (1000 * 60 * 60 * 24)))}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Tabs */}
-              <Tabs defaultValue="lines" className="space-y-4">
-                <TabsList>
-                  <TabsTrigger value="lines">Line Items</TabsTrigger>
-                  <TabsTrigger value="payments">Payments</TabsTrigger>
-                  <TabsTrigger value="emails">Email History</TabsTrigger>
-                  <TabsTrigger value="activity">Activity</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="lines">
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle className="text-base">Line Items</CardTitle>
-                      <Button variant="outline" size="sm">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Line
-                      </Button>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Description</TableHead>
-                            <TableHead className="text-right">Qty</TableHead>
-                            <TableHead className="text-right">Rate</TableHead>
-                            <TableHead className="text-right">Amount</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {lineItems.map(item => (
-                            <TableRow key={item.id}>
-                              <TableCell className="font-medium">{item.description}</TableCell>
-                              <TableCell className="text-right">{item.quantity}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(item.rate)}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
-                            </TableRow>
-                          ))}
-                          <TableRow className="bg-muted/50">
-                            <TableCell colSpan={3} className="font-semibold">Subtotal</TableCell>
-                            <TableCell className="text-right font-semibold">{formatCurrency(invoice.amount)}</TableCell>
-                          </TableRow>
-                          <TableRow className="bg-muted/50">
-                            <TableCell colSpan={3} className="font-semibold">Tax (0%)</TableCell>
-                            <TableCell className="text-right font-semibold">{formatCurrency(0)}</TableCell>
-                          </TableRow>
-                          <TableRow className="bg-primary/5">
-                            <TableCell colSpan={3} className="font-bold">Total</TableCell>
-                            <TableCell className="text-right font-bold">{formatCurrency(invoice.amount)}</TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="payments">
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle className="text-base">Payment History</CardTitle>
-                      <Button variant="outline" size="sm">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Record Payment
-                      </Button>
-                    </CardHeader>
-                    <CardContent>
-                      {relatedReceipts.length > 0 ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Date</TableHead>
-                              <TableHead>Method</TableHead>
-                              <TableHead>Reference</TableHead>
-                              <TableHead className="text-right">Amount</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {relatedReceipts.map(receipt => (
-                              <TableRow key={receipt.id}>
-                                <TableCell>{formatDate(receipt.receiptDate)}</TableCell>
-                                <TableCell className="capitalize">{receipt.method}</TableCell>
-                                <TableCell>{receipt.referenceNumber || "-"}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(receipt.amount)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      ) : (
-                        <div className="py-8 text-center text-muted-foreground">
-                          <Receipt className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                          <p>No payments recorded yet</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="emails">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Email History</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex items-start gap-3 rounded-lg border p-4">
-                          <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <p className="font-medium">Invoice Sent</p>
-                              <Badge variant="outline" className="text-green-600">Delivered</Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground">To: {customer.email}</p>
-                            <p className="text-xs text-muted-foreground mt-1">{formatDate(invoice.createdAt)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="activity">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Activity Log</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {timeline.map((event, index) => (
-                          <div key={event.id} className="flex gap-3">
-                            <div className="relative">
-                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                                {event.type === "payment" ? (
-                                  <Check className="h-4 w-4 text-green-600" />
-                                ) : event.type === "sent" ? (
-                                  <Send className="h-4 w-4" />
-                                ) : (
-                                  <User className="h-4 w-4" />
-                                )}
-                              </div>
-                              {index < timeline.length - 1 && (
-                                <div className="absolute left-4 top-8 h-full w-px bg-border" />
-                              )}
-                            </div>
-                            <div className="flex-1 pb-4">
-                              <p className="font-medium">{event.description}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {event.user} &middot; {formatDate(event.date)}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-            </div>
-
-            {/* Sidebar */}
-            <div className="space-y-6">
-              {/* Customer Info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Customer</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Link href={`/accounts-receivable/customers/${customer.id}`} className="block group">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback>{customer.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium group-hover:underline">{customer.name}</p>
-                        <p className="text-sm text-muted-foreground">{customer.email}</p>
-                      </div>
-                    </div>
-                  </Link>
-                  <Separator className="my-4" />
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Payment Terms</span>
-                      <span>{customer.paymentTerms}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Credit Limit</span>
-                      <span>{formatCurrency(customer.creditLimit)}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Invoice Details */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Invoice Number</span>
-                    <span className="font-medium">{invoice.invoiceNumber}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Invoice Date</span>
-                    <span>{formatDate(invoice.createdAt)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Due Date</span>
-                    <span>{formatDate(invoice.dueDate)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Entity</span>
-                    <span>Acme Corp</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Currency</span>
-                    <span>USD</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Comments */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Internal Notes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback>You</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <Textarea
-                          placeholder="Add an internal note..."
-                          value={comment}
-                          onChange={(e) => setComment(e.target.value)}
-                          className="min-h-[80px]"
-                        />
-                        <div className="mt-2 flex justify-end">
-                          <Button size="sm" disabled={!comment.trim()}>
-                            Add Note
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+      <RecordDetailPanel title="Receipts" description="Applied customer cash against this invoice.">
+        {receipts.length ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Receipt</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Method</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {receipts.map(receipt => (
+                  <TableRow key={receipt.id}>
+                    <TableCell className="font-medium text-foreground">{receipt.number}</TableCell>
+                    <TableCell>{formatDate(receipt.date)}</TableCell>
+                    <TableCell className="uppercase">{receipt.method}</TableCell>
+                    <TableCell>
+                      <StatusBadge status={receipt.status} />
+                    </TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(receipt.amount, receipt.currency)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
-        </div>
-      </div>
-    </div>
+        ) : (
+          <EmptyState
+            type="default"
+            title="No receipts applied yet"
+            description="Customer payments will appear here after cash is logged or matched."
+          />
+        )}
+      </RecordDetailPanel>
+
+      <RecordDetailPanel title="Documents" description="Invoice PDFs and customer-facing packet history.">
+        {documents.length ? (
+          <div className="space-y-3">
+            {documents.map(document => (
+              <div key={document.id} className="flex items-start justify-between gap-4 rounded-sm border border-border/70 bg-background px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Receipt className="h-4 w-4 text-muted-foreground" />
+                    <div className="text-sm font-medium text-foreground">{document.title}</div>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {document.fileName ?? document.number} · Version {document.version} · Updated {formatDate(document.updatedAt)}
+                  </div>
+                </div>
+                <StatusBadge status={document.status} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            type="default"
+            title="No invoice documents"
+            description="Generated invoice files and supporting attachments will appear here."
+          />
+        )}
+      </RecordDetailPanel>
+
+      <RecordDetailPanel title="Activity" description="Customer delivery, collections, and cash application milestones.">
+        <InvoiceTimeline detail={detail} />
+      </RecordDetailPanel>
+    </RecordDetailPage>
   )
 }

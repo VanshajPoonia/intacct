@@ -1,414 +1,405 @@
 "use client"
 
-import { use, useState, useMemo } from "react"
 import Link from "next/link"
-import { ArrowLeft, Building2, Calendar, Check, CreditCard, Download, Edit, FileText, MoreHorizontal, Paperclip, Plus, Receipt, Send, Trash2, User } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { startTransition, use, useEffect, useState } from "react"
+import { differenceInCalendarDays } from "date-fns"
+import { AlertTriangle, Check, CreditCard, Download, ExternalLink, FileText, Send } from "lucide-react"
+import { EmptyState } from "@/components/finance/empty-state"
+import { LoadingSkeleton } from "@/components/finance/loading-skeleton"
+import {
+  type RecordDetailBadgeItem,
+  type RecordDetailMetricItem,
+  RecordDetailPage,
+  RecordDetailPanel,
+} from "@/components/finance/record-detail-page"
+import { StatusBadge } from "@/components/finance/status-badge"
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-provider"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Textarea } from "@/components/ui/textarea"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { mockBills, mockVendors, mockPayments } from "@/lib/mock-data"
-import { formatCurrency, formatDate } from "@/lib/services"
+import { getBillDetailRouteData, type BillDetailRouteData } from "@/lib/services"
+import { formatCurrency, formatDate } from "@/lib/utils"
+
+function getTone(status: string): RecordDetailBadgeItem["tone"] {
+  switch (status) {
+    case "paid":
+    case "approved":
+      return "positive"
+    case "pending":
+    case "draft":
+      return "warning"
+    case "voided":
+    case "rejected":
+      return "critical"
+    default:
+      return "neutral"
+  }
+}
+
+function TimelineList({
+  detail,
+}: {
+  detail: BillDetailRouteData
+}) {
+  const { bill, payments } = detail
+  const timeline = [
+    {
+      id: "created",
+      label: "Bill created",
+      detail: `${bill.number} was entered${bill.createdAt ? ` on ${formatDate(bill.createdAt)}` : ""}.`,
+      date: bill.createdAt,
+    },
+    ...(bill.submittedAt
+      ? [
+          {
+            id: "submitted",
+            label: "Submitted for approval",
+            detail: `${bill.submittedBy ?? "Finance"} submitted the bill for workflow review.`,
+            date: bill.submittedAt,
+          },
+        ]
+      : []),
+    ...(bill.approvedAt
+      ? [
+          {
+            id: "approved",
+            label: "Approved for payment",
+            detail: `${bill.approvedBy ?? "Controller"} approved the bill for disbursement.`,
+            date: bill.approvedAt,
+          },
+        ]
+      : []),
+    ...(bill.rejectedAt
+      ? [
+          {
+            id: "rejected",
+            label: "Returned for rework",
+            detail: bill.rejectionReason ?? `${bill.rejectedBy ?? "Controller"} sent the bill back for correction.`,
+            date: bill.rejectedAt,
+          },
+        ]
+      : []),
+    ...payments.map(payment => ({
+      id: payment.id,
+      label: `Payment ${payment.number}`,
+      detail: `${payment.method.toUpperCase()} payment ${payment.reference ? `(${payment.reference}) ` : ""}for ${formatCurrency(payment.amount, payment.currency)}.`,
+      date: payment.date,
+    })),
+  ]
+    .sort((left, right) => right.date.getTime() - left.date.getTime())
+
+  return (
+    <div className="space-y-3">
+      {timeline.map(item => (
+        <div key={item.id} className="rounded-sm border border-border/70 bg-background px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-medium text-foreground">{item.label}</div>
+            <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{formatDate(item.date)}</div>
+          </div>
+          <div className="mt-1 text-sm text-muted-foreground">{item.detail}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function BillDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const [comment, setComment] = useState("")
+  const { activeEntity, dateRange } = useWorkspaceShell()
+  const [detail, setDetail] = useState<BillDetailRouteData | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const dateRangeStart = dateRange?.startDate.getTime() ?? null
+  const dateRangeEnd = dateRange?.endDate.getTime() ?? null
 
-  const bill = useMemo(() => mockBills.find(b => b.id === id) || mockBills[0], [id])
-  const vendor = useMemo(() => mockVendors.find(v => v.id === bill.vendorId) || mockVendors[0], [bill.vendorId])
-  const relatedPayments = useMemo(() => mockPayments.filter(p => p.billId === bill.id), [bill.id])
+  useEffect(() => {
+    if (!dateRange) {
+      return
+    }
 
-  const statusColors: Record<string, string> = {
-    draft: "bg-muted text-muted-foreground",
-    pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-    approved: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-    paid: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-    overdue: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-    rejected: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+
+    getBillDetailRouteData(id, {
+      entityId: activeEntity?.id,
+      dateRange,
+    })
+      .then(result => {
+        if (cancelled) {
+          return
+        }
+
+        startTransition(() => {
+          setDetail(result)
+          setLoading(false)
+        })
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError("We couldn’t load this bill right now.")
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeEntity?.id, dateRange, dateRangeEnd, dateRangeStart, id])
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <LoadingSkeleton type="page" />
+      </div>
+    )
   }
 
-  const timeline = [
-    { id: 1, type: "created", user: "Sarah Chen", date: bill.createdAt, description: "Bill created" },
-    { id: 2, type: "submitted", user: "Sarah Chen", date: bill.createdAt, description: "Submitted for approval" },
-    ...(bill.status !== "draft" && bill.status !== "pending"
-      ? [{ id: 3, type: "approved", user: "Mike Wilson", date: bill.dueDate, description: "Approved by manager" }]
-      : []),
-    ...(bill.status === "paid"
-      ? [{ id: 4, type: "paid", user: "System", date: bill.dueDate, description: `Payment processed - ${formatCurrency(bill.amount)}` }]
-      : []),
+  if (error) {
+    return (
+      <div className="p-6">
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Bill Unavailable</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
+  if (!detail) {
+    return (
+      <div className="p-6">
+        <EmptyState
+          type="bills"
+          title="Bill not found"
+          description="This bill could not be found in the current demo dataset."
+        />
+      </div>
+    )
+  }
+
+  const { bill, vendor, payments, documents } = detail
+  const paidAmount = payments.reduce((sum, payment) => sum + payment.amount, 0) || bill.amountPaid || 0
+  const balanceDue = Math.max(bill.amount - paidAmount, 0)
+  const daysUntilDue = differenceInCalendarDays(bill.dueDate, new Date())
+  const isOverdue = daysUntilDue < 0 && bill.status !== "paid" && bill.status !== "voided"
+
+  const badges: RecordDetailBadgeItem[] = [
+    { id: "status", label: bill.status, tone: getTone(bill.status) },
+    { id: "approval", label: bill.approvalStatus.replace(/_/g, " "), tone: getTone(bill.approvalStatus) },
+    { id: "entity", label: bill.entityId.toUpperCase(), tone: "neutral" },
   ]
 
-  const lineItems = [
-    { id: 1, description: "Professional Services - Q4", account: "6000 - Professional Fees", department: "Engineering", amount: bill.amount * 0.6 },
-    { id: 2, description: "Software Licenses", account: "6100 - Software & Subscriptions", department: "Engineering", amount: bill.amount * 0.25 },
-    { id: 3, description: "Consulting Fees", account: "6000 - Professional Fees", department: "Operations", amount: bill.amount * 0.15 },
+  const metrics: RecordDetailMetricItem[] = [
+    { id: "amount", label: "Bill Amount", value: formatCurrency(bill.amount, bill.currency), detail: bill.description ?? bill.vendorName, tone: "accent" },
+    { id: "paid", label: "Amount Paid", value: formatCurrency(paidAmount, bill.currency), detail: `${payments.length} payment event${payments.length === 1 ? "" : "s"}`, tone: paidAmount ? "positive" : "neutral" },
+    { id: "balance", label: "Open Balance", value: formatCurrency(balanceDue, bill.currency), detail: bill.paymentStatus.replace(/_/g, " "), tone: balanceDue ? "warning" : "positive" },
+    {
+      id: "due",
+      label: "Due Window",
+      value: isOverdue ? `${Math.abs(daysUntilDue)} days overdue` : `${Math.max(daysUntilDue, 0)} days remaining`,
+      detail: `Due ${formatDate(bill.dueDate)}`,
+      tone: isOverdue ? "critical" : "neutral",
+    },
   ]
 
   return (
-    <div className="flex flex-col">
-      {/* Header */}
-      <div className="sticky top-0 z-10 border-b bg-background">
-        <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" asChild>
-              <Link href="/accounts-payable/bills">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
+    <RecordDetailPage
+      backHref="/accounts-payable/bills"
+      title={bill.number}
+      subtitle={`${bill.vendorName} · ${bill.terms ?? "Standard terms"} · Entered ${formatDate(bill.date)}`}
+      badges={badges}
+      metrics={metrics}
+      actions={
+        <>
+          {bill.status === "pending" ? (
+            <Button variant="outline" size="sm" className="rounded-sm">
+              <Send className="mr-2 h-4 w-4" />
+              Request Info
             </Button>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl font-semibold">{bill.billNumber}</h1>
-                <Badge className={statusColors[bill.status]}>{bill.status}</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                <Link href={`/accounts-payable/vendors/${vendor.id}`} className="hover:underline">
-                  {vendor.name}
-                </Link>
-                {" "}&middot; Due {formatDate(bill.dueDate)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {bill.status === "pending" && (
-              <>
-                <Button variant="outline" size="sm">
-                  <Send className="mr-2 h-4 w-4" />
-                  Request Info
-                </Button>
-                <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                  <Check className="mr-2 h-4 w-4" />
-                  Approve
-                </Button>
-              </>
-            )}
-            {bill.status === "approved" && (
-              <Button size="sm">
+          ) : null}
+          {bill.status === "approved" ? (
+            <Button size="sm" className="rounded-sm" asChild>
+              <Link href="/accounts-payable/payments">
                 <CreditCard className="mr-2 h-4 w-4" />
                 Schedule Payment
-              </Button>
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit Bill
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Download className="mr-2 h-4 w-4" />
-                  Download PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Paperclip className="mr-2 h-4 w-4" />
-                  Add Attachment
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Bill
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+              </Link>
+            </Button>
+          ) : null}
+          <Button variant="outline" size="sm" className="rounded-sm" asChild>
+            <Link href={`/accounts-payable/vendors/${bill.vendorId}`}>
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Open Vendor
+            </Link>
+          </Button>
+        </>
+      }
+      rightRail={
+        <>
+          <RecordDetailPanel title="Vendor Context">
+            <dl className="space-y-3">
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Vendor</dt>
+                <dd className="mt-1 text-sm font-medium text-foreground">{vendor?.name ?? bill.vendorName}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Payment Terms</dt>
+                <dd className="mt-1 text-sm text-foreground">{vendor?.paymentTerms ?? bill.terms ?? "Standard"}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Preferred Method</dt>
+                <dd className="mt-1 text-sm text-foreground">{vendor?.preferredPaymentMethod?.toUpperCase() ?? "Not set"}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Vendor Balance</dt>
+                <dd className="mt-1 text-sm text-foreground">{vendor ? formatCurrency(vendor.balance, vendor.currency) : "Unavailable"}</dd>
+              </div>
+            </dl>
+          </RecordDetailPanel>
+
+          <RecordDetailPanel title="Approval State">
+            <dl className="space-y-3">
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Submitted</dt>
+                <dd className="mt-1 text-sm text-foreground">
+                  {bill.submittedAt ? `${formatDate(bill.submittedAt)} by ${bill.submittedBy ?? "Finance"}` : "Not submitted"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Approved</dt>
+                <dd className="mt-1 text-sm text-foreground">
+                  {bill.approvedAt ? `${formatDate(bill.approvedAt)} by ${bill.approvedBy ?? "Controller"}` : "Awaiting approval"}
+                </dd>
+              </div>
+              {bill.rejectionReason ? (
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Rejection Note</dt>
+                  <dd className="mt-1 text-sm text-foreground">{bill.rejectionReason}</dd>
+                </div>
+              ) : null}
+            </dl>
+          </RecordDetailPanel>
+        </>
+      }
+    >
+      {isOverdue ? (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Payment attention needed</AlertTitle>
+          <AlertDescription>
+            This bill is past due and still carries an open balance of {formatCurrency(balanceDue, bill.currency)}.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      <RecordDetailPanel title="Line Items" description="Coding and dimensional detail that will post to the ledger.">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Description</TableHead>
+                <TableHead>Account</TableHead>
+                <TableHead>Department</TableHead>
+                <TableHead>Project</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {bill.lineItems.map(line => (
+                <TableRow key={line.id}>
+                  <TableCell className="font-medium text-foreground">{line.description}</TableCell>
+                  <TableCell>
+                    <Link href={`/general-ledger/chart-of-accounts/${line.accountId}`} className="text-sm text-primary hover:underline">
+                      {line.accountName}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{line.departmentName ?? "Unassigned"}</TableCell>
+                  <TableCell>{line.projectName ?? "None"}</TableCell>
+                  <TableCell className="text-right font-medium">{formatCurrency(line.amount, bill.currency)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
-      </div>
+      </RecordDetailPanel>
 
-      {/* Content */}
-      <div className="flex-1 p-6">
-        <div className="mx-auto max-w-6xl">
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Main Content */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Summary Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Bill Summary</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Bill Amount</p>
-                      <p className="text-2xl font-bold">{formatCurrency(bill.amount)}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Amount Paid</p>
-                      <p className="text-2xl font-bold">{formatCurrency(bill.status === "paid" ? bill.amount : 0)}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Balance Due</p>
-                      <p className="text-2xl font-bold">{formatCurrency(bill.status === "paid" ? 0 : bill.amount)}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Days Until Due</p>
-                      <p className="text-2xl font-bold">
-                        {Math.max(0, Math.ceil((new Date(bill.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Tabs */}
-              <Tabs defaultValue="lines" className="space-y-4">
-                <TabsList>
-                  <TabsTrigger value="lines">Line Items</TabsTrigger>
-                  <TabsTrigger value="payments">Payments</TabsTrigger>
-                  <TabsTrigger value="attachments">Attachments</TabsTrigger>
-                  <TabsTrigger value="activity">Activity</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="lines">
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle className="text-base">Line Items</CardTitle>
-                      <Button variant="outline" size="sm">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Line
-                      </Button>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Description</TableHead>
-                            <TableHead>Account</TableHead>
-                            <TableHead>Department</TableHead>
-                            <TableHead className="text-right">Amount</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {lineItems.map(item => (
-                            <TableRow key={item.id}>
-                              <TableCell className="font-medium">{item.description}</TableCell>
-                              <TableCell>{item.account}</TableCell>
-                              <TableCell>{item.department}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
-                            </TableRow>
-                          ))}
-                          <TableRow className="bg-muted/50">
-                            <TableCell colSpan={3} className="font-semibold">Total</TableCell>
-                            <TableCell className="text-right font-semibold">{formatCurrency(bill.amount)}</TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="payments">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Payment History</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {relatedPayments.length > 0 ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Date</TableHead>
-                              <TableHead>Method</TableHead>
-                              <TableHead>Reference</TableHead>
-                              <TableHead className="text-right">Amount</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {relatedPayments.map(payment => (
-                              <TableRow key={payment.id}>
-                                <TableCell>{formatDate(payment.paymentDate)}</TableCell>
-                                <TableCell className="capitalize">{payment.method}</TableCell>
-                                <TableCell>{payment.referenceNumber || "-"}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      ) : (
-                        <div className="py-8 text-center text-muted-foreground">
-                          <Receipt className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                          <p>No payments recorded yet</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="attachments">
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle className="text-base">Attachments</CardTitle>
-                      <Button variant="outline" size="sm">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Upload
-                      </Button>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid gap-3">
-                        <div className="flex items-center gap-3 rounded-lg border p-3">
-                          <div className="rounded bg-red-100 p-2 dark:bg-red-900/30">
-                            <FileText className="h-5 w-5 text-red-600 dark:text-red-400" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-medium">invoice_{bill.billNumber}.pdf</p>
-                            <p className="text-sm text-muted-foreground">245 KB &middot; Uploaded {formatDate(bill.createdAt)}</p>
-                          </div>
-                          <Button variant="ghost" size="icon">
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="activity">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Activity Log</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {timeline.map((event, index) => (
-                          <div key={event.id} className="flex gap-3">
-                            <div className="relative">
-                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                                {event.type === "paid" ? (
-                                  <Check className="h-4 w-4 text-green-600" />
-                                ) : (
-                                  <User className="h-4 w-4" />
-                                )}
-                              </div>
-                              {index < timeline.length - 1 && (
-                                <div className="absolute left-4 top-8 h-full w-px bg-border" />
-                              )}
-                            </div>
-                            <div className="flex-1 pb-4">
-                              <p className="font-medium">{event.description}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {event.user} &middot; {formatDate(event.date)}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-            </div>
-
-            {/* Sidebar */}
-            <div className="space-y-6">
-              {/* Vendor Info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Vendor</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Link href={`/accounts-payable/vendors/${vendor.id}`} className="block group">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback>{vendor.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium group-hover:underline">{vendor.name}</p>
-                        <p className="text-sm text-muted-foreground">{vendor.email}</p>
-                      </div>
-                    </div>
-                  </Link>
-                  <Separator className="my-4" />
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Payment Terms</span>
-                      <span>{vendor.paymentTerms}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Default Account</span>
-                      <span>6000</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Bill Details */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Bill Number</span>
-                    <span className="font-medium">{bill.billNumber}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Bill Date</span>
-                    <span>{formatDate(bill.createdAt)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Due Date</span>
-                    <span>{formatDate(bill.dueDate)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Entity</span>
-                    <span>Acme Corp</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Currency</span>
-                    <span>USD</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Comments */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Comments</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback>SC</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 rounded-lg bg-muted p-3">
-                        <p className="text-sm font-medium">Sarah Chen</p>
-                        <p className="text-sm text-muted-foreground">Please review the attached invoice for accuracy.</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{formatDate(bill.createdAt)}</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback>You</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <Textarea
-                          placeholder="Add a comment..."
-                          value={comment}
-                          onChange={(e) => setComment(e.target.value)}
-                          className="min-h-[80px]"
-                        />
-                        <div className="mt-2 flex justify-end">
-                          <Button size="sm" disabled={!comment.trim()}>
-                            Post Comment
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+      <RecordDetailPanel title="Payments" description="Cleared and scheduled payment activity linked to this bill.">
+        {payments.length ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Payment</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Method</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {payments.map(payment => (
+                  <TableRow key={payment.id}>
+                    <TableCell className="font-medium text-foreground">{payment.number}</TableCell>
+                    <TableCell>{formatDate(payment.date)}</TableCell>
+                    <TableCell className="uppercase">{payment.method}</TableCell>
+                    <TableCell>
+                      <StatusBadge status={payment.status} />
+                    </TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(payment.amount, payment.currency)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
-        </div>
-      </div>
-    </div>
+        ) : (
+          <EmptyState
+            type="default"
+            title="No payments linked yet"
+            description="Approved bills will show scheduled or completed payments here."
+          />
+        )}
+      </RecordDetailPanel>
+
+      <RecordDetailPanel
+        title="Supporting Documents"
+        description="Bill packet, attachments, and scan metadata used during review."
+        actions={
+          <Button variant="outline" size="sm" className="rounded-sm">
+            <Download className="mr-2 h-4 w-4" />
+            Download Packet
+          </Button>
+        }
+      >
+        {documents.length ? (
+          <div className="space-y-3">
+            {documents.map(document => (
+              <div key={document.id} className="flex items-start justify-between gap-4 rounded-sm border border-border/70 bg-background px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <div className="text-sm font-medium text-foreground">{document.title}</div>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {document.fileName ?? document.number} · Version {document.version} · Updated {formatDate(document.updatedAt)}
+                  </div>
+                </div>
+                <StatusBadge status={document.status} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            type="default"
+            title="No documents attached"
+            description="Receipts, invoices, and supporting files will appear here when attached to the bill."
+          />
+        )}
+      </RecordDetailPanel>
+
+      <RecordDetailPanel title="Activity" description="Workflow and payment milestones for this document.">
+        <TimelineList detail={detail} />
+      </RecordDetailPanel>
+    </RecordDetailPage>
   )
 }

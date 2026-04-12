@@ -1,38 +1,31 @@
-// @ts-nocheck
 "use client"
 
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import {
+  Building2,
+  Calendar,
+  CreditCard,
+  ExternalLink,
+  FileText,
+  Mail,
+  Receipt,
+} from "lucide-react"
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
 } from "@/components/ui/sheet"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { format } from "date-fns"
-import { 
-  Calendar, 
-  FileText, 
-  Building2, 
-  User, 
-  Hash,
-  DollarSign,
-  ExternalLink,
-  Printer,
-  Download,
-  Send,
-  CreditCard,
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  Ban
-} from "lucide-react"
-import type { Invoice } from "@/lib/types"
-import { useState, useEffect } from "react"
-import { getInvoiceById, sendInvoice, voidInvoice } from "@/lib/services"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { getInvoiceDetailRouteData, type InvoiceDetailRouteData } from "@/lib/services"
+import { formatCurrency, formatDate } from "@/lib/utils"
+import { StatusBadge } from "../finance/status-badge"
 
 interface InvoiceDrawerProps {
   invoiceId: string | null
@@ -41,374 +34,240 @@ interface InvoiceDrawerProps {
   onUpdate?: () => void
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(value)
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const variants: Record<string, { className: string; label: string; icon: React.ReactNode }> = {
-    draft: { className: 'bg-gray-100 text-gray-700 border-gray-200', label: 'Draft', icon: <FileText className="h-3 w-3" /> },
-    sent: { className: 'bg-blue-100 text-blue-700 border-blue-200', label: 'Sent', icon: <Send className="h-3 w-3" /> },
-    partial: { className: 'bg-amber-100 text-amber-700 border-amber-200', label: 'Partial', icon: <Clock className="h-3 w-3" /> },
-    paid: { className: 'bg-emerald-100 text-emerald-700 border-emerald-200', label: 'Paid', icon: <CheckCircle className="h-3 w-3" /> },
-    overdue: { className: 'bg-red-100 text-red-700 border-red-200', label: 'Overdue', icon: <AlertCircle className="h-3 w-3" /> },
-    void: { className: 'bg-gray-100 text-gray-700 border-gray-200', label: 'Void', icon: <Ban className="h-3 w-3" /> },
-  }
-  
-  const variant = variants[status] || { className: 'bg-gray-100 text-gray-700', label: status, icon: null }
-  
-  return (
-    <Badge variant="outline" className={`text-xs font-medium gap-1 ${variant.className}`}>
-      {variant.icon}
-      {variant.label}
-    </Badge>
-  )
-}
-
-function DetailRow({ 
-  icon: Icon, 
-  label, 
-  value, 
-  valueClassName 
-}: { 
-  icon: React.ElementType
+function DetailRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Building2
   label: string
-  value: string | React.ReactNode
-  valueClassName?: string
+  value: string
 }) {
   return (
     <div className="flex items-start gap-3 py-2.5">
-      <div className="p-1.5 bg-muted rounded">
+      <div className="rounded-sm bg-muted p-1.5">
         <Icon className="h-4 w-4 text-muted-foreground" />
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={`text-sm font-medium ${valueClassName || ''}`}>{value}</p>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs text-muted-foreground">{label}</div>
+        <div className="text-sm font-medium text-foreground">{value}</div>
       </div>
     </div>
   )
 }
 
-export function InvoiceDrawer({ invoiceId, open, onClose, onUpdate }: InvoiceDrawerProps) {
-  const [invoice, setInvoice] = useState<Invoice | null>(null)
+export function InvoiceDrawer({ invoiceId, open, onClose }: InvoiceDrawerProps) {
+  const [detail, setDetail] = useState<InvoiceDetailRouteData | null>(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (open && invoiceId) {
-      setLoading(true)
-      getInvoiceById(invoiceId).then((data) => {
-        setInvoice(data)
-        setLoading(false)
+    if (!open || !invoiceId) {
+      setDetail(null)
+      return
+    }
+
+    let cancelled = false
+    setLoading(true)
+
+    getInvoiceDetailRouteData(invoiceId)
+      .then(result => {
+        if (!cancelled) {
+          setDetail(result)
+          setLoading(false)
+        }
       })
-    } else {
-      setInvoice(null)
+      .catch(() => {
+        if (!cancelled) {
+          setDetail(null)
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
     }
-  }, [open, invoiceId])
+  }, [invoiceId, open])
 
-  const handleSend = async () => {
-    if (invoice) {
-      await sendInvoice(invoice.id)
-      onUpdate?.()
-    }
-  }
-
-  const handleVoid = async () => {
-    if (invoice) {
-      await voidInvoice(invoice.id)
-      onUpdate?.()
-    }
-  }
-
-  if (!invoice && !loading) return null
-
-  const isOverdue = invoice && invoice.status !== 'paid' && invoice.status !== 'voided' && new Date(invoice.dueDate) < new Date()
-  const amountDue = invoice ? invoice.amount - (invoice.amountPaid || 0) : 0
-  const daysOverdue = isOverdue && invoice ? Math.floor((new Date().getTime() - new Date(invoice.dueDate).getTime()) / (1000 * 60 * 60 * 24)) : 0
+  const invoice = detail?.invoice
+  const customer = detail?.customer
+  const receipts = detail?.receipts ?? []
+  const documents = detail?.documents ?? []
+  const receivedAmount = receipts.reduce((sum, receipt) => sum + receipt.amount, 0) || invoice?.amountPaid || 0
+  const balanceDue = invoice ? Math.max(invoice.openBalance ?? invoice.amount - receivedAmount, 0) : 0
 
   return (
-    <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <SheetContent className="w-[500px] sm:w-[600px] overflow-y-auto">
-        <SheetHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <SheetTitle className="text-lg">Invoice Details</SheetTitle>
-            <StatusBadge status={isOverdue && invoice.status !== 'paid' ? 'overdue' : invoice.status} />
-          </div>
-          <SheetDescription className="text-left font-mono">
-            {invoice.number}
-          </SheetDescription>
+    <Sheet open={open} onOpenChange={isOpen => !isOpen && onClose()}>
+      <SheetContent className="w-full p-0 sm:max-w-2xl">
+        <SheetHeader className="border-b px-6 py-4">
+          {loading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-40" />
+              <Skeleton className="h-4 w-56" />
+            </div>
+          ) : invoice ? (
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <SheetTitle className="text-lg">{invoice.number}</SheetTitle>
+                  <SheetDescription className="mt-1 text-left">
+                    {invoice.customerName} · Due {formatDate(invoice.dueDate)}
+                  </SheetDescription>
+                </div>
+                <StatusBadge status={invoice.status === "sent" && balanceDue > 0 && new Date(invoice.dueDate) < new Date() ? "overdue" : invoice.status} />
+              </div>
+            </>
+          ) : (
+            <>
+              <SheetTitle className="text-lg">Invoice unavailable</SheetTitle>
+              <SheetDescription className="text-left">This invoice could not be loaded from the current demo dataset.</SheetDescription>
+            </>
+          )}
         </SheetHeader>
 
-        <Tabs defaultValue="details" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="lines">Line Items</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="activity">Activity</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="details" className="space-y-6 mt-4">
-            {/* Amount Section */}
-            <div className="bg-muted/50 rounded-lg p-4">
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Total Amount</p>
-                  <p className="text-xl font-semibold tabular-nums">{formatCurrency(invoice.amount)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Amount Paid</p>
-                  <p className="text-xl font-semibold tabular-nums text-emerald-600">
-                    {formatCurrency(invoice.amountPaid || 0)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Amount Due</p>
-                  <p className={`text-xl font-semibold tabular-nums ${amountDue > 0 && isOverdue ? 'text-red-600' : ''}`}>
-                    {formatCurrency(amountDue)}
-                  </p>
-                </div>
-              </div>
-              {isOverdue && amountDue > 0 && (
-                <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-center">
-                  <p className="text-xs text-red-700 font-medium">
-                    {daysOverdue} days overdue
-                  </p>
-                </div>
-              )}
+        {loading ? (
+          <div className="space-y-4 p-6">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-48 w-full" />
+          </div>
+        ) : invoice ? (
+          <Tabs defaultValue="details" className="flex h-full flex-col">
+            <div className="border-b px-6">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="lines">Lines</TabsTrigger>
+                <TabsTrigger value="receipts">Receipts</TabsTrigger>
+                <TabsTrigger value="documents">Docs</TabsTrigger>
+              </TabsList>
             </div>
 
-            <Separator />
+            <div className="max-h-[calc(100vh-180px)] overflow-y-auto px-6 py-5">
+              <TabsContent value="details" className="space-y-5">
+                <div className="grid grid-cols-3 gap-4 rounded-sm border border-border/70 bg-muted/30 px-4 py-4">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Invoice Amount</div>
+                    <div className="mt-1 text-xl font-semibold">{formatCurrency(invoice.amount, invoice.currency)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Cash Applied</div>
+                    <div className="mt-1 text-xl font-semibold text-emerald-600">{formatCurrency(receivedAmount, invoice.currency)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Open Balance</div>
+                    <div className="mt-1 text-xl font-semibold">{formatCurrency(balanceDue, invoice.currency)}</div>
+                  </div>
+                </div>
 
-            {/* Customer & Dates */}
-            <div className="space-y-1">
-              <h3 className="text-sm font-medium mb-3">Invoice Information</h3>
-              
-              <DetailRow
-                icon={Building2}
-                label="Customer"
-                value={invoice.customerName}
-              />
-              
-              <DetailRow
-                icon={Calendar}
-                label="Invoice Date"
-                value={format(invoice.date, 'MMMM d, yyyy')}
-              />
-              
-              <DetailRow
-                icon={Calendar}
-                label="Due Date"
-                value={
-                  <span className={isOverdue && amountDue > 0 ? 'text-red-600' : ''}>
-                    {format(invoice.dueDate, 'MMMM d, yyyy')}
-                  </span>
-                }
-              />
+                <div>
+                  <DetailRow icon={Building2} label="Customer" value={customer?.name ?? invoice.customerName} />
+                  <DetailRow icon={Calendar} label="Invoice Date" value={formatDate(invoice.date)} />
+                  <DetailRow icon={Calendar} label="Due Date" value={formatDate(invoice.dueDate)} />
+                  <DetailRow icon={Mail} label="Collection Status" value={invoice.collectionStatus.replace(/_/g, " ")} />
+                  <DetailRow icon={FileText} label="Billing Address" value={invoice.billingAddress ?? customer?.billingAddress ?? "Not captured"} />
+                </div>
 
-              {invoice.terms && (
-                <DetailRow
-                  icon={FileText}
-                  label="Payment Terms"
-                  value={invoice.terms}
-                />
-              )}
-              
-              <DetailRow
-                icon={Hash}
-                label="Entity"
-                value={invoice.entityId === 'e1' ? 'Acme Corporation' : 
-                       invoice.entityId === 'e2' ? 'Acme West' : 
-                       invoice.entityId === 'e3' ? 'Acme Europe' : 'Unknown'}
-              />
-            </div>
+                <Separator />
 
-            <Separator />
-
-            {/* Dimensions */}
-            <div className="space-y-1">
-              <h3 className="text-sm font-medium mb-3">Dimensions</h3>
-              
-              {invoice.departmentName && (
-                <DetailRow
-                  icon={Building2}
-                  label="Department"
-                  value={invoice.departmentName}
-                />
-              )}
-              
-              {invoice.billingAddress && (
-                <DetailRow
-                  icon={FileText}
-                  label="Billing Address"
-                  value={invoice.billingAddress}
-                />
-              )}
-
-              {invoice.memo && (
-                <DetailRow
-                  icon={FileText}
-                  label="Memo"
-                  value={invoice.memo}
-                />
-              )}
-            </div>
-
-            <Separator />
-
-            {/* Actions */}
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium mb-3">Actions</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {invoice.status === 'draft' && (
-                  <Button variant="default" size="sm" className="justify-start">
-                    <Send className="h-4 w-4 mr-2" />
-                    Send Invoice
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" className="rounded-sm">
+                    <Mail className="mr-2 h-4 w-4" />
+                    Send Reminder
                   </Button>
-                )}
-                {amountDue > 0 && invoice.status !== 'void' && (
-                  <Button variant="outline" size="sm" className="justify-start">
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Record Payment
+                  <Button variant="outline" size="sm" className="rounded-sm" asChild>
+                    <Link href={`/accounts-receivable/customers/${invoice.customerId}`}>
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Open Customer
+                    </Link>
                   </Button>
-                )}
-                <Button variant="outline" size="sm" className="justify-start">
-                  <Printer className="h-4 w-4 mr-2" />
-                  Print
-                </Button>
-                <Button variant="outline" size="sm" className="justify-start">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download PDF
-                </Button>
-                <Button variant="outline" size="sm" className="justify-start">
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  View in AR
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
+                </div>
+              </TabsContent>
 
-          <TabsContent value="lines" className="mt-4">
-            <div className="space-y-3">
-              {invoice.lines && invoice.lines.length > 0 ? (
-                <>
-                  <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted">
-                        <tr>
-                          <th className="text-left p-2 font-medium">Description</th>
-                          <th className="text-right p-2 font-medium">Qty</th>
-                          <th className="text-right p-2 font-medium">Rate</th>
-                          <th className="text-right p-2 font-medium">Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {invoice.lines.map((line, index) => (
-                          <tr key={index} className="border-t">
-                            <td className="p-2">{line.description}</td>
-                            <td className="p-2 text-right tabular-nums">{line.quantity}</td>
-                            <td className="p-2 text-right tabular-nums">{formatCurrency(line.rate)}</td>
-                            <td className="p-2 text-right tabular-nums font-medium">{formatCurrency(line.amount)}</td>
-                          </tr>
+              <TabsContent value="lines">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Account</TableHead>
+                        <TableHead>Project</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {invoice.lineItems.map(line => (
+                        <TableRow key={line.id}>
+                          <TableCell className="font-medium text-foreground">{line.description}</TableCell>
+                          <TableCell>{line.accountName}</TableCell>
+                          <TableCell>{line.projectName ?? "None"}</TableCell>
+                          <TableCell className="text-right font-medium">{formatCurrency(line.amount, invoice.currency)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="receipts">
+                {receipts.length ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Receipt</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Method</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {receipts.map(receipt => (
+                          <TableRow key={receipt.id}>
+                            <TableCell className="font-medium text-foreground">{receipt.number}</TableCell>
+                            <TableCell>{formatDate(receipt.date)}</TableCell>
+                            <TableCell className="uppercase">{receipt.method}</TableCell>
+                            <TableCell>
+                              <StatusBadge status={receipt.status} />
+                            </TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(receipt.amount, receipt.currency)}</TableCell>
+                          </TableRow>
                         ))}
-                      </tbody>
-                      <tfoot className="border-t bg-muted/50">
-                        <tr>
-                          <td colSpan={3} className="p-2 text-right font-medium">Total</td>
-                          <td className="p-2 text-right tabular-nums font-semibold">{formatCurrency(invoice.amount)}</td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                      </TableBody>
+                    </Table>
                   </div>
-                </>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No line items</p>
-                </div>
-              )}
-            </div>
-          </TabsContent>
+                ) : (
+                  <div className="rounded-sm border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+                    No receipts have been applied to this invoice yet.
+                  </div>
+                )}
+              </TabsContent>
 
-          <TabsContent value="payments" className="mt-4">
-            <div className="space-y-3">
-              {invoice.payments && invoice.payments.length > 0 ? (
-                <div className="space-y-2">
-                  {invoice.payments.map((payment, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="text-sm font-medium">{payment.method}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(payment.date, 'MMM d, yyyy')} - {payment.reference}
-                        </p>
+              <TabsContent value="documents">
+                {documents.length ? (
+                  <div className="space-y-3">
+                    {documents.map(document => (
+                      <div key={document.id} className="flex items-start justify-between gap-4 rounded-sm border border-border/70 bg-background px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <Receipt className="h-4 w-4 text-muted-foreground" />
+                            <div className="text-sm font-medium text-foreground">{document.title}</div>
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {document.fileName ?? document.number} · Updated {formatDate(document.updatedAt)}
+                          </div>
+                        </div>
+                        <StatusBadge status={document.status} />
                       </div>
-                      <p className="text-sm font-semibold tabular-nums text-emerald-600">
-                        +{formatCurrency(payment.amount)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <CreditCard className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No payments recorded</p>
-                  {amountDue > 0 && (
-                    <Button variant="outline" size="sm" className="mt-3">
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      Record Payment
-                    </Button>
-                  )}
-                </div>
-              )}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="activity" className="mt-4">
-            <div className="space-y-4">
-              {/* Activity Timeline */}
-              <div className="space-y-3">
-                {invoice.sentAt && (
-                  <div className="flex gap-3">
-                    <div className="w-2 h-2 mt-2 rounded-full bg-blue-500 shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Invoice sent</p>
-                      <p className="text-xs text-muted-foreground">{format(invoice.sentAt, 'MMM d, yyyy h:mm a')}</p>
-                    </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-sm border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+                    No invoice documents are attached yet.
                   </div>
                 )}
-                {invoice.paidAt && (
-                  <div className="flex gap-3">
-                    <div className="w-2 h-2 mt-2 rounded-full bg-emerald-500 shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Payment received</p>
-                      <p className="text-xs text-muted-foreground">{format(invoice.paidAt, 'MMM d, yyyy h:mm a')}</p>
-                    </div>
-                  </div>
-                )}
-                <div className="flex gap-3">
-                  <div className="w-2 h-2 mt-2 rounded-full bg-gray-400 shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Invoice created</p>
-                    <p className="text-xs text-muted-foreground">{format(invoice.createdAt, 'MMM d, yyyy h:mm a')}</p>
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Notes section placeholder */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium">Notes</h3>
-                <div className="text-center py-6 text-muted-foreground border rounded-lg border-dashed">
-                  <Clock className="h-6 w-6 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No notes yet</p>
-                </div>
-              </div>
+              </TabsContent>
             </div>
-          </TabsContent>
-        </Tabs>
+          </Tabs>
+        ) : null}
       </SheetContent>
     </Sheet>
   )

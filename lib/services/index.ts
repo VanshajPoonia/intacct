@@ -56,6 +56,21 @@ export {
   getTrialBalance,
 } from './reporting'
 
+export type {
+  ReportComparisonRow,
+  ReportDetailData,
+  ReportRunHistoryItem,
+  ReportsCenterData,
+  ReportsCenterEntry,
+  ReportsCenterSection,
+  ReportSummaryMetric,
+} from './report-center'
+
+export {
+  getReportDetailData,
+  getReportsCenterData,
+} from './report-center'
+
 export {
   getCloseStatus,
   getCloseTasks,
@@ -107,6 +122,38 @@ export {
   getControllerHomepageData,
   getRoleHomepageData,
 } from './homepages'
+
+export type {
+  AccountDetailRouteData,
+  BankAccountDetailRouteData,
+  BillDetailRouteData,
+  ContractDetailRouteData,
+  FixedAssetDetailRouteData,
+  InvoiceDetailRouteData,
+  JournalEntryDetailRouteData,
+} from './detail-routes'
+
+export {
+  getAccountDetailRouteData,
+  getBankAccountDetailRouteData,
+  getBillDetailRouteData,
+  getContractDetailRouteData,
+  getFixedAssetDetailRouteData,
+  getInvoiceDetailRouteData,
+  getJournalEntryDetailRouteData,
+  getLedgerAccountById,
+  getLedgerJournalEntryById,
+  getLedgerJournalsByAccountId,
+  getLedgerTransactionsByAccountId,
+  getPayablesBillById,
+  getPayablesBillDocuments,
+  getPayablesBillPayments,
+  getPayablesVendorById,
+  getReceivablesCustomerById,
+  getReceivablesInvoiceById,
+  getReceivablesInvoiceDocuments,
+  getReceivablesInvoiceReceipts,
+} from './detail-routes'
 
 export {
   getChartAccountWorkspaceDetail,
@@ -197,6 +244,15 @@ export {
 } from './platform-overviews'
 
 export {
+  getAllocationsWorkspaceList,
+  getExpenseWorkspace,
+  getOrderManagementWorkspace,
+  getProjectsWorkspace,
+  getRecurringJournalsWorkspaceList,
+  getTimeTrackingWorkspace,
+} from './operations-workspaces'
+
+export {
   getBankAccountWorkspaceDetail,
   getCashAccountsWorkspace,
   getCashManagementOverview,
@@ -281,6 +337,7 @@ export {
   createExpenseEntry,
   createInvoice,
   createPayment,
+  createProject,
   createPurchaseOrder,
   createReceipt,
   createRecurringJournal,

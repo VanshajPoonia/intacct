@@ -4779,6 +4779,40 @@ export async function updateProjectStatus(id: string, status: ProjectDetail['sta
   return { success: false }
 }
 
+export async function createProject(project: Partial<ProjectDetail>): Promise<{ success: boolean; project?: ProjectDetail }> {
+  await delay(SIMULATED_DELAY)
+
+  const budget = project.budget || 0
+  const revenue = project.revenue || 0
+  const actualCost = project.actualCost || 0
+  const profitMargin = revenue === 0 ? 0 : ((revenue - actualCost) / revenue) * 100
+
+  const newProject: ProjectDetail = {
+    id: `proj${mockProjectDetails.length + 1}`,
+    name: project.name || "New Project",
+    code: project.code || `PROJ-${String(mockProjectDetails.length + 1).padStart(3, "0")}`,
+    status: project.status || "planning",
+    customerId: project.customerId,
+    customerName: project.customerName,
+    managerId: project.managerId || "u1",
+    managerName: project.managerName || "Current User",
+    startDate: project.startDate || new Date(),
+    endDate: project.endDate,
+    budget,
+    actualCost,
+    revenue,
+    profitMargin: Number(profitMargin.toFixed(1)),
+    percentComplete: project.percentComplete || 0,
+    entityId: project.entityId || "e1",
+    departmentId: project.departmentId,
+    description: project.description,
+    createdAt: new Date(),
+  }
+
+  mockProjectDetails.push(newProject)
+  return { success: true, project: newProject }
+}
+
 // ============ TIME ENTRY SERVICES ============
 
 const mockTimeEntries: TimeEntry[] = [

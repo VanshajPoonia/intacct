@@ -1,4 +1,4 @@
-import { accounts, journalEntries } from "@/lib/mock-data/accounting"
+import { accounts, journalEntries, transactions } from "@/lib/mock-data/accounting"
 import { revenueRecognitionEvents, revenueScheduleLines, revenueSchedules, performanceObligations } from "@/lib/mock-data/contracts-revenue"
 import { fixedAssets, assetBooks, assetLifecycleEvents, depreciationScheduleLines } from "@/lib/mock-data/fixed-assets"
 import { payableDocuments, payments, bills, vendors } from "@/lib/mock-data/payables"
@@ -28,6 +28,16 @@ import type {
   Vendor,
 } from "@/lib/types"
 import { delay, isInDateRange } from "./base"
+import { fetchInternalApi, InternalApiError, shouldUseSupabaseDataSource } from "./internal-api"
+import {
+  hydrateCustomer,
+  hydrateDocument,
+  hydrateInvoice,
+  hydrateInvoiceDetailRouteData,
+  hydrateReceipt,
+  type SerializedCustomer,
+  type SerializedInvoiceDetailRouteData,
+} from "./receivables-hydration"
 import {
   getBankAccountById,
   getReconciliationItems,
@@ -230,7 +240,7 @@ function buildBankBalanceTrend(account: BankAccount, transactions: Transaction[]
   return normalized
 }
 
-function buildReceiptsForInvoice(invoice: Invoice) {
+function buildReceiptsForInvoice(invoice: Invoice): Receipt[] {
   if (!invoice.amountPaid) {
     return [] as Receipt[]
   }
@@ -311,21 +321,79 @@ export async function getBillDetailRouteData(id: string, filters?: FinanceFilter
 }
 
 export async function getReceivablesInvoiceById(id: string): Promise<Invoice | null> {
+  if (shouldUseSupabaseDataSource()) {
+    try {
+      const detail = await fetchInternalApi<SerializedInvoiceDetailRouteData>(`/api/receivables/invoices/${id}`)
+      return hydrateInvoice(detail.invoice)
+    } catch (error) {
+      if (error instanceof InternalApiError && error.status === 404) {
+        return null
+      }
+      throw error
+    }
+  }
+
   await delay()
   return invoices.find(candidate => candidate.id === id) ?? null
 }
 
 export async function getReceivablesCustomerById(id: string): Promise<Customer | null> {
+  if (shouldUseSupabaseDataSource()) {
+    try {
+      const customer = await fetchInternalApi<SerializedCustomer>(`/api/receivables/customers/${id}`)
+      return hydrateCustomer(customer)
+    } catch (error) {
+      if (error instanceof InternalApiError && error.status === 404) {
+        return null
+      }
+      throw error
+    }
+  }
+
   await delay()
   return customers.find(candidate => candidate.id === id) ?? null
 }
 
 export async function getReceivablesInvoiceDocuments(id: string): Promise<Document[]> {
+  if (shouldUseSupabaseDataSource()) {
+    try {
+      const detail = await fetchInternalApi<SerializedInvoiceDetailRouteData>(`/api/receivables/invoices/${id}`)
+      return detail.documents.map(hydrateDocument)
+    } catch (error) {
+      if (error instanceof InternalApiError && error.status === 404) {
+        return []
+      }
+      throw error
+    }
+  }
+
   await delay()
   return receivableDocuments.filter(document => document.relatedEntityId === id)
 }
 
 export async function getReceivablesInvoiceReceipts(id: string, filters?: FinanceFilters): Promise<Receipt[]> {
+  if (shouldUseSupabaseDataSource()) {
+    const searchParams = new URLSearchParams()
+
+    if (filters?.entityId) {
+      searchParams.set("entityId", filters.entityId)
+    }
+
+    if (filters?.dateRange) {
+      searchParams.set("dateStart", filters.dateRange.startDate.toISOString())
+      searchParams.set("dateEnd", filters.dateRange.endDate.toISOString())
+      if (filters.dateRange.preset) {
+        searchParams.set("datePreset", filters.dateRange.preset)
+      }
+    }
+
+    const detail = await fetchInternalApi<SerializedInvoiceDetailRouteData>(
+      `/api/receivables/invoices/${id}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
+    )
+
+    return detail.receipts.map(hydrateReceipt)
+  }
+
   await delay()
 
   const invoice = invoices.find(candidate => candidate.id === id)
@@ -337,6 +405,35 @@ export async function getReceivablesInvoiceReceipts(id: string, filters?: Financ
 }
 
 export async function getInvoiceDetailRouteData(id: string, filters?: FinanceFilters): Promise<InvoiceDetailRouteData | null> {
+  if (shouldUseSupabaseDataSource()) {
+    const searchParams = new URLSearchParams()
+
+    if (filters?.entityId) {
+      searchParams.set("entityId", filters.entityId)
+    }
+
+    if (filters?.dateRange) {
+      searchParams.set("dateStart", filters.dateRange.startDate.toISOString())
+      searchParams.set("dateEnd", filters.dateRange.endDate.toISOString())
+      if (filters.dateRange.preset) {
+        searchParams.set("datePreset", filters.dateRange.preset)
+      }
+    }
+
+    try {
+      const detail = await fetchInternalApi<SerializedInvoiceDetailRouteData>(
+        `/api/receivables/invoices/${id}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
+      )
+
+      return hydrateInvoiceDetailRouteData(detail)
+    } catch (error) {
+      if (error instanceof InternalApiError && error.status === 404) {
+        return null
+      }
+      throw error
+    }
+  }
+
   const invoice = await getReceivablesInvoiceById(id)
 
   if (!invoice) {

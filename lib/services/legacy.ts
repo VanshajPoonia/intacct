@@ -43,6 +43,15 @@ import {
   bankAccounts,
   corporateCardTransactions,
 } from '@/lib/mock-data'
+import { fetchInternalApi, InternalApiError, shouldUseSupabaseDataSource } from './internal-api'
+import {
+  hydrateCustomer,
+  hydrateInvoice,
+  hydrateInvoiceDetailRouteData,
+  type SerializedCustomer,
+  type SerializedInvoice,
+  type SerializedInvoiceDetailRouteData,
+} from './receivables-hydration'
 
 // Simulated latency for realistic UX
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -692,6 +701,31 @@ export async function getCustomers(
   page: number = 1,
   pageSize: number = 10
 ): Promise<PaginatedResponse<Customer>> {
+  if (shouldUseSupabaseDataSource()) {
+    const searchParams = new URLSearchParams()
+
+    if (search) {
+      searchParams.set('search', search)
+    }
+
+    status?.forEach(value => searchParams.append('status', value))
+
+    if (sort) {
+      searchParams.set('sortKey', sort.key)
+      searchParams.set('sortDirection', sort.direction)
+    }
+
+    searchParams.set('page', String(page))
+    searchParams.set('pageSize', String(pageSize))
+
+    const result = await fetchInternalApi<PaginatedResponse<SerializedCustomer>>(`/api/receivables/customers?${searchParams.toString()}`)
+
+    return {
+      ...result,
+      data: result.data.map(hydrateCustomer),
+    }
+  }
+
   await delay(SIMULATED_DELAY)
   
   let filtered = [...customers]
@@ -840,6 +874,18 @@ export async function updateVendor(id: string, data: Partial<Vendor>): Promise<{
 }
 
 export async function getCustomerById(id: string): Promise<Customer | null> {
+  if (shouldUseSupabaseDataSource()) {
+    try {
+      const customer = await fetchInternalApi<SerializedCustomer>(`/api/receivables/customers/${id}`)
+      return hydrateCustomer(customer)
+    } catch (error) {
+      if (error instanceof InternalApiError && error.status === 404) {
+        return null
+      }
+      throw error
+    }
+  }
+
   await delay(SIMULATED_DELAY)
   return customers.find(c => c.id === id) || null
 }
@@ -1652,11 +1698,35 @@ export async function getInvoices(
 }
 
 export async function getInvoiceById(id: string): Promise<Invoice | null> {
+  if (shouldUseSupabaseDataSource()) {
+    try {
+      const detail = await fetchInternalApi<SerializedInvoiceDetailRouteData>(`/api/receivables/invoices/${id}`)
+      return hydrateInvoiceDetailRouteData(detail).invoice
+    } catch (error) {
+      if (error instanceof InternalApiError && error.status === 404) {
+        return null
+      }
+      throw error
+    }
+  }
+
   await delay(SIMULATED_DELAY)
   return mockInvoices.find(i => i.id === id) || null
 }
 
 export async function createInvoice(invoice: Partial<Invoice>): Promise<{ success: boolean; invoice?: Invoice }> {
+  if (shouldUseSupabaseDataSource()) {
+    const result = await fetchInternalApi<{ success: boolean; invoice: SerializedInvoice }>('/api/receivables/invoices', {
+      method: 'POST',
+      body: JSON.stringify(invoice),
+    })
+
+    return {
+      success: result.success,
+      invoice: hydrateInvoice(result.invoice),
+    }
+  }
+
   await delay(SIMULATED_DELAY)
   
   const newInvoice: Invoice = {
@@ -1695,6 +1765,15 @@ export async function updateInvoice(id: string, updates: Partial<Invoice>): Prom
 }
 
 export async function sendInvoice(id: string): Promise<{ success: boolean }> {
+  if (shouldUseSupabaseDataSource()) {
+    const result = await fetchInternalApi<{ success: boolean; invoice: SerializedInvoice }>(`/api/receivables/invoices/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'send' }),
+    })
+
+    return { success: result.success }
+  }
+
   await delay(SIMULATED_DELAY)
   const invoice = mockInvoices.find(i => i.id === id)
   if (invoice && invoice.status === 'draft') {
@@ -1705,6 +1784,15 @@ export async function sendInvoice(id: string): Promise<{ success: boolean }> {
 }
 
 export async function voidInvoice(id: string): Promise<{ success: boolean }> {
+  if (shouldUseSupabaseDataSource()) {
+    const result = await fetchInternalApi<{ success: boolean; invoice: SerializedInvoice }>(`/api/receivables/invoices/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'void' }),
+    })
+
+    return { success: result.success }
+  }
+
   await delay(SIMULATED_DELAY)
   const invoice = mockInvoices.find(i => i.id === id)
   if (invoice && invoice.status !== 'paid') {

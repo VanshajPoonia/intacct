@@ -13,7 +13,7 @@ import type {
   WorkspaceTabItem,
 } from '@/lib/types'
 import { createApiKey, getApiKeys, revokeApiKey } from './legacy'
-import { apiRequestLogStore, developerAppStore, webhookEndpointStore } from './platform-store'
+import { apiRequestLogStore, developerAppStore, ensurePlatformStore, webhookEndpointStore } from './platform-store'
 import { buildColumn, buildFilterDefinition, finalizePlatformRows, matchesQueryFilter, matchesSearch, matchesScopedFilters } from './platform-workspace-support'
 import { delay } from './base'
 import { buildDetailField, buildOverviewRow, formatDateLabel, formatDateTimeLabel, getStatusTone } from './workspace-support'
@@ -97,6 +97,7 @@ export async function getApiDeveloperWorkspaceTabs(
   _filters: FinanceFilters,
   _roleId?: RoleId
 ): Promise<WorkspaceTabItem[]> {
+  await ensurePlatformStore()
   const apiKeys = await getApiKeys()
   return [
     { id: 'api_keys', label: 'API Keys', count: apiKeys.length },
@@ -110,6 +111,7 @@ export async function getApiDeveloperWorkspaceOverview(
   filters: FinanceFilters,
   _roleId?: RoleId
 ): Promise<PlatformOverviewData> {
+  await ensurePlatformStore()
   const apiKeys = await getApiKeys()
   const scopedLogs = apiRequestLogStore.filter(log => !filters.entityId || filters.entityId === 'e4' || log.entityId === filters.entityId)
 
@@ -167,6 +169,7 @@ export async function getApiDeveloperWorkspaceList(
   filters: FinanceFilters,
   query: PlatformWorkspaceQuery
 ): Promise<PlatformWorkspaceListResponse> {
+  await ensurePlatformStore()
   await delay()
 
   switch (sectionId) {
@@ -322,6 +325,7 @@ export async function getApiDeveloperWorkspaceDetail(
   sectionId: DeveloperPlatformSectionId,
   id: string
 ): Promise<WorkspaceDetailData | null> {
+  await ensurePlatformStore()
   switch (sectionId) {
     case 'api_keys': {
       const apiKeys = await getApiKeys()
@@ -428,6 +432,7 @@ export async function applyApiDeveloperWorkspaceAction(
   actionId: string,
   recordIds: string[]
 ): Promise<{ success: boolean; message?: string }> {
+  await ensurePlatformStore()
   if (actionId === 'new-api-key') {
     await createApiKey({
       name: `Generated Platform Key ${new Date().toLocaleDateString('en-US')}`,

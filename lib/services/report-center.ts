@@ -133,7 +133,6 @@ function buildDateRangeFromPreset(preset: DateRangePreset | null | undefined): D
         endDate: new Date(now.getFullYear() - 1, 11, 31),
         preset,
       }
-    case "ytd":
     case "this_year":
     default:
       return {

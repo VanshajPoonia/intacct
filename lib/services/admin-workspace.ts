@@ -1,9 +1,9 @@
-import { entities } from '@/lib/mock-data/organization'
 import type {
   AdminOverviewData,
   AdminWorkspaceSectionId,
   ApiKey,
   CustomFieldDefinition,
+  Entity,
   FinanceFilters,
   Notification,
   NotificationPolicy,
@@ -18,6 +18,7 @@ import type {
   WorkspaceDetailData,
   WorkspaceTabItem,
 } from '@/lib/types'
+import { getEntities } from './master-data'
 import {
   createApiKey,
   createUser,
@@ -36,12 +37,19 @@ import {
   updateWorkflowStatus,
 } from './legacy'
 import type { AuditLogEntry } from './legacy'
-import { customFieldStore, notificationPolicyStore } from './platform-store'
+import { customFieldStore, ensurePlatformStore, notificationPolicyStore } from './platform-store'
 import { buildColumn, buildFilterDefinition, finalizePlatformRows, matchesSearch, matchesScopedFilters } from './platform-workspace-support'
 import { delay } from './base'
 import { buildDetailField, buildOverviewRow, formatDateLabel, formatDateTimeLabel, getStatusTone } from './workspace-support'
 
-const entityMap = new Map(entities.map(entity => [entity.id, entity]))
+let entities: Entity[] = []
+let entityMap = new Map<string, Entity>()
+
+async function ensureAdminWorkspaceState() {
+  const [nextEntities] = await Promise.all([getEntities(), ensurePlatformStore()])
+  entities = nextEntities
+  entityMap = new Map(entities.map(entity => [entity.id, entity]))
+}
 
 const adminSectionLabels: Record<AdminWorkspaceSectionId, string> = {
   users: 'Users',
@@ -215,6 +223,7 @@ function buildNotificationRow(policy: NotificationPolicy): PlatformWorkspaceReco
 }
 
 async function getAdminSourceData(filters: FinanceFilters) {
+  await ensureAdminWorkspaceState()
   const [usersResponse, workflows, integrations, apiKeys, notifications, auditLogs] = await Promise.all([
     getUsers(undefined, undefined, undefined, { key: 'createdAt', direction: 'desc' }, 1, 200),
     getWorkflows(),
@@ -746,6 +755,7 @@ export async function getAdminWorkspaceList(
   filters: FinanceFilters,
   query: PlatformWorkspaceQuery
 ): Promise<PlatformWorkspaceListResponse> {
+  await ensureAdminWorkspaceState()
   await delay()
 
   switch (sectionId) {
@@ -770,6 +780,7 @@ export async function getAdminWorkspaceDetail(
   sectionId: AdminWorkspaceSectionId,
   id: string
 ): Promise<WorkspaceDetailData | null> {
+  await ensureAdminWorkspaceState()
   switch (sectionId) {
     case 'users': {
       const response = await getUsers(undefined, undefined, undefined, { key: 'createdAt', direction: 'desc' }, 1, 200)
@@ -1007,6 +1018,7 @@ export async function applyAdminWorkspaceAction(
     filters?: FinanceFilters
   } = {}
 ): Promise<{ success: boolean; message?: string }> {
+  await ensureAdminWorkspaceState()
   switch (sectionId) {
     case 'users':
       if (actionId === 'invite-user') {

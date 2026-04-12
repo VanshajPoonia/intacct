@@ -1,5 +1,5 @@
-import { entities } from '@/lib/mock-data/organization'
 import type {
+  Entity,
   FinanceFilters,
   PlatformOverviewData,
   PlatformWorkspaceListResponse,
@@ -9,14 +9,20 @@ import type {
   WorkspaceDetailData,
   WorkspaceTabItem,
 } from '@/lib/types'
-import { apiRequestLogStore, eventMonitoringRecordStore, integrationSyncRunStore, webhookEndpointStore } from './platform-store'
+import { getEntities } from './master-data'
+import { apiRequestLogStore, ensurePlatformStore, eventMonitoringRecordStore, integrationSyncRunStore, webhookEndpointStore } from './platform-store'
 import { buildColumn, buildFilterDefinition, finalizePlatformRows, matchesQueryFilter, matchesScopedFilters, matchesSearch } from './platform-workspace-support'
 import { delay } from './base'
 import { buildDetailField, buildOverviewRow, formatDateTimeLabel, getStatusTone } from './workspace-support'
 
 export type EventMonitoringSectionId = 'events' | 'sync_runs' | 'api_errors'
 
-const entityMap = new Map(entities.map(entity => [entity.id, entity]))
+let entityMap = new Map<string, Entity>()
+
+async function ensureEventMonitoringState() {
+  const [entities] = await Promise.all([getEntities(), ensurePlatformStore()])
+  entityMap = new Map(entities.map(entity => [entity.id, entity]))
+}
 
 function buildEventRow(event: typeof eventMonitoringRecordStore[number]): PlatformWorkspaceRecord {
   return {
@@ -78,6 +84,7 @@ export async function getEventMonitoringWorkspaceTabs(
   filters: FinanceFilters,
   _roleId?: RoleId
 ): Promise<WorkspaceTabItem[]> {
+  await ensureEventMonitoringState()
   const scopedEvents = eventMonitoringRecordStore.filter(event => !filters.entityId || filters.entityId === 'e4' || event.entityId === filters.entityId)
   const scopedRuns = integrationSyncRunStore.filter(run => !filters.entityId || filters.entityId === 'e4' || run.entityId === filters.entityId)
   const scopedApiErrors = apiRequestLogStore.filter(log => !log.success && (!filters.entityId || filters.entityId === 'e4' || log.entityId === filters.entityId))
@@ -93,6 +100,7 @@ export async function getEventMonitoringWorkspaceOverview(
   filters: FinanceFilters,
   roleId?: RoleId
 ): Promise<PlatformOverviewData> {
+  await ensureEventMonitoringState()
   const scopedEvents = eventMonitoringRecordStore.filter(event => !filters.entityId || filters.entityId === 'e4' || event.entityId === filters.entityId)
   const scopedApiErrors = apiRequestLogStore.filter(log => !log.success && (!filters.entityId || filters.entityId === 'e4' || log.entityId === filters.entityId))
 
@@ -147,6 +155,7 @@ export async function getEventMonitoringWorkspaceList(
   filters: FinanceFilters,
   query: PlatformWorkspaceQuery
 ): Promise<PlatformWorkspaceListResponse> {
+  await ensureEventMonitoringState()
   await delay()
 
   switch (sectionId) {
@@ -274,6 +283,7 @@ export async function getEventMonitoringWorkspaceDetail(
   sectionId: EventMonitoringSectionId,
   id: string
 ): Promise<WorkspaceDetailData | null> {
+  await ensureEventMonitoringState()
   if (sectionId === 'events') {
     const event = eventMonitoringRecordStore.find(item => item.id === id)
     if (!event) {
@@ -343,6 +353,7 @@ export async function applyEventMonitoringWorkspaceAction(
   actionId: string,
   recordIds: string[]
 ): Promise<{ success: boolean; message?: string }> {
+  await ensureEventMonitoringState()
   if (actionId === 'acknowledge-event') {
     eventMonitoringRecordStore.forEach(event => {
       if (recordIds.includes(event.id)) {

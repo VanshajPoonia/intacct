@@ -1,5 +1,5 @@
-import { entities } from '@/lib/mock-data/organization'
 import type {
+  Entity,
   FinanceFilters,
   PlatformOverviewData,
   PlatformWorkspaceListResponse,
@@ -13,12 +13,18 @@ import type {
   WorkspaceDetailData,
   WorkspaceTabItem,
 } from '@/lib/types'
-import { eventMonitoringRecordStore, ruleDefinitionStore, ruleDeploymentStore, ruleSimulationStore } from './platform-store'
+import { getEntities } from './master-data'
+import { ensurePlatformStore, eventMonitoringRecordStore, ruleDefinitionStore, ruleDeploymentStore, ruleSimulationStore } from './platform-store'
 import { buildColumn, buildFilterDefinition, finalizePlatformRows, matchesQueryFilter, matchesScopedFilters, matchesSearch } from './platform-workspace-support'
 import { delay } from './base'
 import { buildDetailField, buildOverviewRow, formatDateLabel, formatDateTimeLabel, getStatusTone } from './workspace-support'
 
-const entityMap = new Map(entities.map(entity => [entity.id, entity]))
+let entityMap = new Map<string, Entity>()
+
+async function ensureRuleEngineState() {
+  const [entities] = await Promise.all([getEntities(), ensurePlatformStore()])
+  entityMap = new Map(entities.map(entity => [entity.id, entity]))
+}
 
 function buildRuleRow(rule: RuleDefinition): PlatformWorkspaceRecord {
   return {
@@ -89,6 +95,7 @@ export async function getRuleEngineWorkspaceTabs(
   filters: FinanceFilters,
   _roleId?: RoleId
 ): Promise<WorkspaceTabItem[]> {
+  await ensureRuleEngineState()
   const scopedExceptions = eventMonitoringRecordStore.filter(event =>
     event.sourceType === 'rule' &&
     (!filters.entityId || filters.entityId === 'e4' || event.entityId === filters.entityId)
@@ -106,6 +113,7 @@ export async function getRuleEngineWorkspaceOverview(
   filters: FinanceFilters,
   roleId?: RoleId
 ): Promise<PlatformOverviewData> {
+  await ensureRuleEngineState()
   const scopedExceptions = eventMonitoringRecordStore.filter(event =>
     event.sourceType === 'rule' &&
     (!filters.entityId || filters.entityId === 'e4' || event.entityId === filters.entityId)
@@ -165,6 +173,7 @@ export async function getRuleEngineWorkspaceList(
   filters: FinanceFilters,
   query: PlatformWorkspaceQuery
 ): Promise<PlatformWorkspaceListResponse> {
+  await ensureRuleEngineState()
   await delay()
 
   switch (sectionId) {
@@ -341,6 +350,7 @@ export async function getRuleEngineWorkspaceDetail(
   sectionId: RuleEngineSectionId,
   id: string
 ): Promise<WorkspaceDetailData | null> {
+  await ensureRuleEngineState()
   switch (sectionId) {
     case 'rules': {
       const rule = ruleDefinitionStore.find(item => item.id === id)
@@ -438,6 +448,7 @@ export async function applyRuleEngineWorkspaceAction(
   actionId: string,
   recordIds: string[]
 ): Promise<{ success: boolean; message?: string }> {
+  await ensureRuleEngineState()
   if (actionId === 'new-rule') {
     ruleDefinitionStore.unshift({
       id: `rule-${Date.now()}`,

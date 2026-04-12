@@ -1,5 +1,5 @@
-import { entities } from '@/lib/mock-data/organization'
 import type {
+  Entity,
   FinanceFilters,
   IntegrationsWorkspaceSectionId,
   IntegrationDependency,
@@ -13,12 +13,18 @@ import type {
   WorkspaceTabItem,
 } from '@/lib/types'
 import { getIntegrations, reconnectIntegration, syncIntegration } from './legacy'
-import { eventMonitoringRecordStore, integrationDependencyStore, integrationSyncRunStore } from './platform-store'
+import { getEntities } from './master-data'
+import { ensurePlatformStore, eventMonitoringRecordStore, integrationDependencyStore, integrationSyncRunStore } from './platform-store'
 import { buildColumn, buildFilterDefinition, finalizePlatformRows, matchesQueryFilter, matchesScopedFilters, matchesSearch } from './platform-workspace-support'
 import { delay } from './base'
 import { buildDetailField, buildOverviewRow, formatDateLabel, formatDateTimeLabel, getStatusTone } from './workspace-support'
 
-const entityMap = new Map(entities.map(entity => [entity.id, entity]))
+let entityMap = new Map<string, Entity>()
+
+async function ensureIntegrationsWorkspaceState() {
+  const [entities] = await Promise.all([getEntities(), ensurePlatformStore()])
+  entityMap = new Map(entities.map(entity => [entity.id, entity]))
+}
 
 function buildConnectionRow(integration: Awaited<ReturnType<typeof getIntegrations>>[number]): PlatformWorkspaceRecord {
   return {
@@ -95,6 +101,7 @@ export async function getIntegrationsWorkspaceTabs(
   filters: FinanceFilters,
   _roleId?: RoleId
 ): Promise<WorkspaceTabItem[]> {
+  await ensureIntegrationsWorkspaceState()
   const [integrations] = await Promise.all([getIntegrations()])
   const scopedRuns = integrationSyncRunStore.filter(run => !filters.entityId || filters.entityId === 'e4' || run.entityId === filters.entityId)
   const scopedExceptions = eventMonitoringRecordStore.filter(event =>
@@ -114,6 +121,7 @@ export async function getIntegrationsWorkspaceOverview(
   filters: FinanceFilters,
   _roleId?: RoleId
 ): Promise<PlatformOverviewData> {
+  await ensureIntegrationsWorkspaceState()
   const [integrations] = await Promise.all([getIntegrations()])
   const scopedRuns = integrationSyncRunStore.filter(run => !filters.entityId || filters.entityId === 'e4' || run.entityId === filters.entityId)
   const scopedExceptions = eventMonitoringRecordStore.filter(event =>
@@ -175,6 +183,7 @@ export async function getIntegrationsWorkspaceList(
   filters: FinanceFilters,
   query: PlatformWorkspaceQuery
 ): Promise<PlatformWorkspaceListResponse> {
+  await ensureIntegrationsWorkspaceState()
   await delay()
 
   switch (sectionId) {
@@ -367,6 +376,7 @@ export async function getIntegrationsWorkspaceDetail(
   sectionId: IntegrationsWorkspaceSectionId,
   id: string
 ): Promise<WorkspaceDetailData | null> {
+  await ensureIntegrationsWorkspaceState()
   switch (sectionId) {
     case 'connections': {
       const integrations = await getIntegrations()
@@ -468,6 +478,7 @@ export async function applyIntegrationsWorkspaceAction(
   actionId: string,
   recordIds: string[]
 ): Promise<{ success: boolean; message?: string }> {
+  await ensureIntegrationsWorkspaceState()
   if (sectionId === 'connections' || actionId === 'sync-integration') {
     await Promise.all(recordIds.map(id => syncIntegration(id)))
     return { success: true, message: 'Integration sync queued.' }

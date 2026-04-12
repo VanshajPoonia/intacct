@@ -1,5 +1,5 @@
-import { entities } from '@/lib/mock-data/organization'
 import type {
+  Entity,
   ExportsSharingSectionId,
   FinanceFilters,
   PlatformOverviewData,
@@ -10,12 +10,18 @@ import type {
   WorkspaceDetailData,
   WorkspaceTabItem,
 } from '@/lib/types'
-import { deliveryTargetStore, exportJobStore, exportScheduleStore, shareLinkStore } from './platform-store'
+import { getEntities } from './master-data'
+import { deliveryTargetStore, ensurePlatformStore, exportJobStore, exportScheduleStore, shareLinkStore } from './platform-store'
 import { buildColumn, buildFilterDefinition, finalizePlatformRows, matchesQueryFilter, matchesScopedFilters, matchesSearch } from './platform-workspace-support'
 import { delay } from './base'
 import { buildDetailField, buildOverviewRow, formatDateLabel, formatDateTimeLabel, getStatusTone } from './workspace-support'
 
-const entityMap = new Map(entities.map(entity => [entity.id, entity]))
+let entityMap = new Map<string, Entity>()
+
+async function ensureExportsSharingState() {
+  const [entities] = await Promise.all([getEntities(), ensurePlatformStore()])
+  entityMap = new Map(entities.map(entity => [entity.id, entity]))
+}
 
 function buildExportJobRow(job: typeof exportJobStore[number]): PlatformWorkspaceRecord {
   return {
@@ -91,6 +97,7 @@ export async function getExportsSharingWorkspaceTabs(
   _filters: FinanceFilters,
   _roleId?: RoleId
 ): Promise<WorkspaceTabItem[]> {
+  await ensureExportsSharingState()
   return [
     { id: 'export_jobs', label: 'Export Jobs', count: exportJobStore.length },
     { id: 'schedules', label: 'Schedules', count: exportScheduleStore.length },
@@ -103,6 +110,7 @@ export async function getExportsSharingWorkspaceOverview(
   filters: FinanceFilters,
   roleId?: RoleId
 ): Promise<PlatformOverviewData> {
+  await ensureExportsSharingState()
   const scopedJobs = exportJobStore.filter(job => !filters.entityId || filters.entityId === 'e4' || job.entityId === filters.entityId)
 
   return {
@@ -159,6 +167,7 @@ export async function getExportsSharingWorkspaceList(
   filters: FinanceFilters,
   query: PlatformWorkspaceQuery
 ): Promise<PlatformWorkspaceListResponse> {
+  await ensureExportsSharingState()
   await delay()
 
   switch (sectionId) {
@@ -330,6 +339,7 @@ export async function getExportsSharingWorkspaceDetail(
   sectionId: ExportsSharingSectionId,
   id: string
 ): Promise<WorkspaceDetailData | null> {
+  await ensureExportsSharingState()
   switch (sectionId) {
     case 'export_jobs': {
       const job = exportJobStore.find(item => item.id === id)
@@ -420,6 +430,7 @@ export async function applyExportsSharingWorkspaceAction(
   actionId: string,
   recordIds: string[]
 ): Promise<{ success: boolean; message?: string }> {
+  await ensureExportsSharingState()
   if (actionId === 'queue-export-job') {
     exportJobStore.unshift({
       id: `job-${Date.now()}`,

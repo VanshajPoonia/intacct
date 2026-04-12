@@ -1,11 +1,13 @@
 // @ts-nocheck
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { AppShell } from "@/components/layout/app-shell"
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-provider"
 import { PageHeader } from "@/components/finance/page-header"
 import { MetricCard } from "@/components/finance/metric-card"
+import { StatusBadge } from "@/components/finance/status-badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -39,19 +41,13 @@ import {
   BarChart3
 } from "lucide-react"
 import { 
-  getAllocations, 
+  getAllocationsWorkspaceList,
   runAllocation,
   activateAllocation,
   deactivateAllocation
 } from "@/lib/services"
-import type { Allocation } from "@/lib/types"
+import type { Allocation, FinanceFilters } from "@/lib/types"
 import { formatDate } from "@/lib/utils"
-
-const statusColors: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  active: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  inactive: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-}
 
 const methodLabels: Record<string, { label: string; icon: React.ReactNode }> = {
   fixed: { label: "Fixed Amount", icon: <DollarSign className="h-3 w-3" /> },
@@ -67,22 +63,45 @@ const frequencyLabels: Record<string, string> = {
 }
 
 export default function AllocationsPage() {
-  const [allocations, setAllocations] = useState<Allocation[]>([])
+  const { activeEntity, dateRange } = useWorkspaceShell()
+  const [workspace, setWorkspace] = useState<Awaited<ReturnType<typeof getAllocationsWorkspaceList>> | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [activeTab, setActiveTab] = useState("all")
+  const shellFilters = useMemo<FinanceFilters | null>(() => {
+    if (!activeEntity || !dateRange) {
+      return null
+    }
 
-  const loadData = async () => {
+    return {
+      entityId: activeEntity.id,
+      dateRange,
+    }
+  }, [activeEntity, dateRange])
+
+  const loadData = useCallback(async () => {
+    if (!shellFilters) {
+      return
+    }
+
     setLoading(true)
-    const statusFilter = activeTab === "all" ? undefined : [activeTab]
-    const result = await getAllocations(statusFilter)
-    setAllocations(result)
+    const result = await getAllocationsWorkspaceList(shellFilters, {
+      status: activeTab,
+      search,
+      page: 1,
+      pageSize: 50,
+    })
+    setWorkspace(result)
     setLoading(false)
-  }
+  }, [activeTab, search, shellFilters])
 
   useEffect(() => {
+    if (!shellFilters) {
+      return
+    }
+
     loadData()
-  }, [activeTab])
+  }, [loadData, shellFilters])
 
   const handleRun = async (id: string) => {
     await runAllocation(id)
@@ -99,12 +118,9 @@ export default function AllocationsPage() {
     loadData()
   }
 
-  const metrics = {
-    total: allocations.length,
-    active: allocations.filter(a => a.status === 'active').length,
-    draft: allocations.filter(a => a.status === 'draft').length,
-    byPercentage: allocations.filter(a => a.method === 'percentage').length,
-  }
+  const allocations = workspace?.data ?? []
+  const metrics = workspace?.metrics ?? []
+  const tabs = workspace?.tabs ?? []
 
   return (
     <AppShell>
@@ -128,26 +144,20 @@ export default function AllocationsPage() {
 
         {/* Metrics */}
         <div className="grid gap-4 md:grid-cols-4">
-          <MetricCard
-            title="Total Rules"
-            value={metrics.total}
-            icon={<GitBranch className="h-4 w-4" />}
-          />
-          <MetricCard
-            title="Active"
-            value={metrics.active}
-            icon={<CheckCircle className="h-4 w-4" />}
-          />
-          <MetricCard
-            title="Draft"
-            value={metrics.draft}
-            icon={<FileText className="h-4 w-4" />}
-          />
-          <MetricCard
-            title="Percentage Based"
-            value={metrics.byPercentage}
-            icon={<Percent className="h-4 w-4" />}
-          />
+          {metrics.map((metric, index) => (
+            <MetricCard
+              key={metric.id}
+              title={metric.label}
+              value={metric.value}
+              icon={
+                index === 0 ? <GitBranch className="h-4 w-4" /> :
+                index === 1 ? <CheckCircle className="h-4 w-4" /> :
+                index === 2 ? <FileText className="h-4 w-4" /> :
+                <Percent className="h-4 w-4" />
+              }
+              trend={metric.tone === "positive" ? "up" : metric.tone === "warning" ? "attention" : undefined}
+            />
+          ))}
         </div>
 
         {/* Allocations Table */}
@@ -172,10 +182,12 @@ export default function AllocationsPage() {
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
               <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="active">Active</TabsTrigger>
-                <TabsTrigger value="draft">Draft</TabsTrigger>
-                <TabsTrigger value="inactive">Inactive</TabsTrigger>
+                {tabs.map(tab => (
+                  <TabsTrigger key={tab.id} value={tab.id}>
+                    {tab.label}
+                    {typeof tab.count === "number" ? ` (${tab.count})` : ""}
+                  </TabsTrigger>
+                ))}
               </TabsList>
             </Tabs>
 
@@ -244,9 +256,7 @@ export default function AllocationsPage() {
                         {allocation.lastRunDate ? formatDate(allocation.lastRunDate) : '-'}
                       </TableCell>
                       <TableCell>
-                        <Badge className={statusColors[allocation.status]} variant="secondary">
-                          {allocation.status}
-                        </Badge>
+                        <StatusBadge status={allocation.status} />
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>

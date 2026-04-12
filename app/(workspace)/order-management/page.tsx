@@ -1,15 +1,16 @@
 // @ts-nocheck
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { AppShell } from "@/components/layout/app-shell"
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-provider"
+import { StatusBadge } from "@/components/finance/status-badge"
 import { PageHeader } from "@/components/finance/page-header"
 import { MetricCard } from "@/components/finance/metric-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import {
   Table,
   TableBody,
@@ -38,43 +39,54 @@ import {
   CheckCircle
 } from "lucide-react"
 import { 
-  getSalesOrders, 
+  getOrderManagementWorkspace,
   confirmSalesOrder, 
   shipSalesOrder,
   invoiceSalesOrder 
 } from "@/lib/services"
-import type { SalesOrder } from "@/lib/types"
+import type { FinanceFilters, SalesOrder } from "@/lib/types"
 import { formatCurrency, formatDate } from "@/lib/utils"
 
-const statusColors: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  pending_approval: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  approved: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  confirmed: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-  partially_shipped: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-  shipped: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400",
-  invoiced: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  closed: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
-  cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-}
-
 export default function OrderManagementPage() {
-  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([])
+  const { activeEntity, dateRange } = useWorkspaceShell()
+  const [workspace, setWorkspace] = useState<Awaited<ReturnType<typeof getOrderManagementWorkspace>> | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [activeTab, setActiveTab] = useState("all")
+  const shellFilters = useMemo<FinanceFilters | null>(() => {
+    if (!activeEntity || !dateRange) {
+      return null
+    }
 
-  const loadData = async () => {
+    return {
+      entityId: activeEntity.id,
+      dateRange,
+    }
+  }, [activeEntity, dateRange])
+
+  const loadData = useCallback(async () => {
+    if (!shellFilters) {
+      return
+    }
+
     setLoading(true)
-    const statusFilterValues = activeTab === "all" ? undefined : [activeTab]
-    const result = await getSalesOrders(statusFilterValues, undefined, search || undefined)
-    setSalesOrders(result.data)
+    const result = await getOrderManagementWorkspace(shellFilters, {
+      status: activeTab,
+      search,
+      page: 1,
+      pageSize: 50,
+    })
+    setWorkspace(result)
     setLoading(false)
-  }
+  }, [activeTab, search, shellFilters])
 
   useEffect(() => {
+    if (!shellFilters) {
+      return
+    }
+
     loadData()
-  }, [activeTab, search])
+  }, [loadData, shellFilters])
 
   const handleConfirm = async (id: string) => {
     await confirmSalesOrder(id)
@@ -91,52 +103,50 @@ export default function OrderManagementPage() {
     loadData()
   }
 
-  const metrics = {
-    total: salesOrders.length,
-    confirmed: salesOrders.filter(so => so.status === 'confirmed').length,
-    shipped: salesOrders.filter(so => so.status === 'shipped').length,
-    totalValue: salesOrders.reduce((sum, so) => sum + so.total, 0),
-  }
+  const salesOrders = workspace?.data ?? []
+  const metrics = workspace?.metrics ?? []
+  const tabs = workspace?.tabs ?? []
+  const headerActions = workspace?.actions ?? []
 
   return (
     <AppShell>
       <div className="flex-1 space-y-6 p-6">
         <PageHeader
           title="Order Management"
-          description="Manage sales orders and fulfillment"
+          description={activeEntity ? `Manage sales orders and fulfillment for ${activeEntity.name}` : "Manage sales orders and fulfillment"}
           actions={
-            <Button asChild>
-              <Link href="/order-management/orders/new">
-                <Plus className="h-4 w-4 mr-2" />
-                New Sales Order
-              </Link>
-            </Button>
+            <div className="flex gap-2">
+              {headerActions.slice(1).map(action => (
+                <Button key={action.id} variant="outline" asChild>
+                  <Link href={action.href ?? "/order-management"}>{action.label}</Link>
+                </Button>
+              ))}
+              <Button asChild>
+                <Link href="/order-management/orders/new">
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Sales Order
+                </Link>
+              </Button>
+            </div>
           }
         />
 
         {/* Metrics */}
         <div className="grid gap-4 md:grid-cols-4">
-          <MetricCard
-            title="Total Orders"
-            value={metrics.total}
-            icon={<ClipboardList className="h-4 w-4" />}
-          />
-          <MetricCard
-            title="To Ship"
-            value={metrics.confirmed}
-            icon={<Package className="h-4 w-4" />}
-            trend={metrics.confirmed > 0 ? "attention" : undefined}
-          />
-          <MetricCard
-            title="Shipped"
-            value={metrics.shipped}
-            icon={<Truck className="h-4 w-4" />}
-          />
-          <MetricCard
-            title="Order Value"
-            value={formatCurrency(metrics.totalValue)}
-            icon={<Receipt className="h-4 w-4" />}
-          />
+          {metrics.map((metric, index) => (
+            <MetricCard
+              key={metric.id}
+              title={metric.label}
+              value={metric.value}
+              icon={
+                index === 0 ? <ClipboardList className="h-4 w-4" /> :
+                index === 1 ? <Package className="h-4 w-4" /> :
+                index === 2 ? <Truck className="h-4 w-4" /> :
+                <Receipt className="h-4 w-4" />
+              }
+              trend={metric.tone === "critical" || metric.tone === "warning" ? "attention" : metric.tone === "positive" ? "up" : undefined}
+            />
+          ))}
         </div>
 
         {/* Orders Table */}
@@ -158,11 +168,12 @@ export default function OrderManagementPage() {
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
               <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="draft">Draft</TabsTrigger>
-                <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
-                <TabsTrigger value="shipped">Shipped</TabsTrigger>
-                <TabsTrigger value="invoiced">Invoiced</TabsTrigger>
+                {tabs.map(tab => (
+                  <TabsTrigger key={tab.id} value={tab.id}>
+                    {tab.label}
+                    {typeof tab.count === "number" ? ` (${tab.count})` : ""}
+                  </TabsTrigger>
+                ))}
               </TabsList>
             </Tabs>
 
@@ -199,13 +210,15 @@ export default function OrderManagementPage() {
                           {so.number}
                         </Link>
                       </TableCell>
-                      <TableCell>{so.customerName}</TableCell>
+                      <TableCell>
+                        <Link href={`/accounts-receivable/customers/${so.customerId}`} className="text-muted-foreground transition-colors hover:text-foreground hover:underline">
+                          {so.customerName}
+                        </Link>
+                      </TableCell>
                       <TableCell>{formatDate(so.orderDate)}</TableCell>
                       <TableCell>{so.requestedDate ? formatDate(so.requestedDate) : '-'}</TableCell>
                       <TableCell>
-                        <Badge className={statusColors[so.status]} variant="secondary">
-                          {so.status.replace(/_/g, ' ')}
-                        </Badge>
+                        <StatusBadge status={so.status} />
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {formatCurrency(so.total)}

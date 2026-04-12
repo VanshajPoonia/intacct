@@ -1,15 +1,16 @@
 // @ts-nocheck
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { AppShell } from "@/components/layout/app-shell"
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-provider"
 import { PageHeader } from "@/components/finance/page-header"
 import { MetricCard } from "@/components/finance/metric-card"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { StatusBadge } from "@/components/finance/status-badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import {
   Table,
@@ -40,89 +41,100 @@ import {
   PauseCircle,
   CheckCircle2
 } from "lucide-react"
-import { getProjectDetails, updateProjectStatus } from "@/lib/services"
-import type { ProjectDetail } from "@/lib/types"
+import { getProjectsWorkspace, updateProjectStatus } from "@/lib/services"
+import type { FinanceFilters, ProjectDetail } from "@/lib/types"
 import { formatCurrency, formatDate } from "@/lib/utils"
 
-const statusColors: Record<string, string> = {
-  planning: "bg-muted text-muted-foreground",
-  active: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  on_hold: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  completed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-}
-
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<ProjectDetail[]>([])
+  const { activeEntity, dateRange } = useWorkspaceShell()
+  const [workspace, setWorkspace] = useState<Awaited<ReturnType<typeof getProjectsWorkspace>> | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [activeTab, setActiveTab] = useState("all")
+  const shellFilters = useMemo<FinanceFilters | null>(() => {
+    if (!activeEntity || !dateRange) {
+      return null
+    }
 
-  const loadData = async () => {
+    return {
+      entityId: activeEntity.id,
+      dateRange,
+    }
+  }, [activeEntity, dateRange])
+
+  const loadData = useCallback(async () => {
+    if (!shellFilters) {
+      return
+    }
+
     setLoading(true)
-    const statusFilterValues = activeTab === "all" ? undefined : [activeTab]
-    const result = await getProjectDetails(statusFilterValues, undefined, search || undefined)
-    setProjects(result.data)
+    const result = await getProjectsWorkspace(shellFilters, {
+      status: activeTab,
+      search,
+      page: 1,
+      pageSize: 50,
+    })
+    setWorkspace(result)
     setLoading(false)
-  }
+  }, [activeTab, search, shellFilters])
 
   useEffect(() => {
+    if (!shellFilters) {
+      return
+    }
+
     loadData()
-  }, [activeTab, search])
+  }, [loadData, shellFilters])
 
   const handleStatusChange = async (id: string, status: ProjectDetail['status']) => {
     await updateProjectStatus(id, status)
     loadData()
   }
 
-  const metrics = {
-    total: projects.length,
-    active: projects.filter(p => p.status === 'active').length,
-    totalBudget: projects.reduce((sum, p) => sum + p.budget, 0),
-    totalRevenue: projects.reduce((sum, p) => sum + p.revenue, 0),
-    avgMargin: projects.length > 0 
-      ? projects.reduce((sum, p) => sum + p.profitMargin, 0) / projects.length 
-      : 0,
-  }
+  const projects = workspace?.data ?? []
+  const metrics = workspace?.metrics ?? []
+  const tabs = workspace?.tabs ?? []
+  const headerActions = workspace?.actions ?? []
 
   return (
     <AppShell>
       <div className="flex-1 space-y-6 p-6">
         <PageHeader
           title="Projects"
-          description="Manage projects, budgets, and profitability"
+          description={activeEntity ? `Manage projects, budgets, and profitability for ${activeEntity.name}` : "Manage projects, budgets, and profitability"}
           actions={
-            <Button asChild>
-              <Link href="/projects/new">
-                <Plus className="h-4 w-4 mr-2" />
-                New Project
-              </Link>
-            </Button>
+            <div className="flex gap-2">
+              {headerActions.slice(1).map(action => (
+                <Button key={action.id} variant="outline" asChild>
+                  <Link href={action.href ?? "/projects"}>{action.label}</Link>
+                </Button>
+              ))}
+              <Button asChild>
+                <Link href="/projects/new">
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Project
+                </Link>
+              </Button>
+            </div>
           }
         />
 
         {/* Metrics */}
         <div className="grid gap-4 md:grid-cols-4">
-          <MetricCard
-            title="Total Projects"
-            value={metrics.total}
-            icon={<FolderKanban className="h-4 w-4" />}
-          />
-          <MetricCard
-            title="Active Projects"
-            value={metrics.active}
-            icon={<PlayCircle className="h-4 w-4" />}
-          />
-          <MetricCard
-            title="Total Revenue"
-            value={formatCurrency(metrics.totalRevenue)}
-            icon={<DollarSign className="h-4 w-4" />}
-          />
-          <MetricCard
-            title="Avg Profit Margin"
-            value={`${metrics.avgMargin.toFixed(1)}%`}
-            icon={<TrendingUp className="h-4 w-4" />}
-          />
+          {metrics.map((metric, index) => (
+            <MetricCard
+              key={metric.id}
+              title={metric.label}
+              value={metric.value}
+              icon={
+                index === 0 ? <FolderKanban className="h-4 w-4" /> :
+                index === 1 ? <DollarSign className="h-4 w-4" /> :
+                index === 2 ? <TrendingUp className="h-4 w-4" /> :
+                <Users className="h-4 w-4" />
+              }
+              trend={metric.tone === "positive" ? "up" : metric.tone === "critical" ? "down" : metric.tone === "warning" ? "attention" : undefined}
+            />
+          ))}
         </div>
 
         {/* Projects Table */}
@@ -144,11 +156,12 @@ export default function ProjectsPage() {
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
               <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="planning">Planning</TabsTrigger>
-                <TabsTrigger value="active">Active</TabsTrigger>
-                <TabsTrigger value="on_hold">On Hold</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
+                {tabs.map(tab => (
+                  <TabsTrigger key={tab.id} value={tab.id}>
+                    {tab.label}
+                    {typeof tab.count === "number" ? ` (${tab.count})` : ""}
+                  </TabsTrigger>
+                ))}
               </TabsList>
             </Tabs>
 
@@ -189,12 +202,18 @@ export default function ProjectsPage() {
                           <p className="text-xs text-muted-foreground">{project.code}</p>
                         </div>
                       </TableCell>
-                      <TableCell>{project.customerName || '-'}</TableCell>
+                      <TableCell>
+                        {project.customerId ? (
+                          <Link href={`/accounts-receivable/customers/${project.customerId}`} className="text-muted-foreground transition-colors hover:text-foreground hover:underline">
+                            {project.customerName}
+                          </Link>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
                       <TableCell>{project.managerName}</TableCell>
                       <TableCell>
-                        <Badge className={statusColors[project.status]} variant="secondary">
-                          {project.status.replace(/_/g, ' ')}
-                        </Badge>
+                        <StatusBadge status={project.status} />
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

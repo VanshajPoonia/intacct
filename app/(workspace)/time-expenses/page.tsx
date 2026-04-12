@@ -1,11 +1,13 @@
 // @ts-nocheck
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { AppShell } from "@/components/layout/app-shell"
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-provider"
 import { PageHeader } from "@/components/finance/page-header"
 import { MetricCard } from "@/components/finance/metric-card"
+import { StatusBadge } from "@/components/finance/status-badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -38,92 +40,85 @@ import {
   Briefcase
 } from "lucide-react"
 import { 
-  getTimeEntries, 
-  getExpenseEntries,
+  getExpenseWorkspace,
+  getTimeTrackingWorkspace,
   submitTimeEntry,
   approveTimeEntry,
   submitExpenseEntry,
   approveExpenseEntry
 } from "@/lib/services"
-import type { TimeEntry, ExpenseEntry } from "@/lib/types"
+import type { ExpenseEntry, FinanceFilters, TimeEntry } from "@/lib/types"
 import { formatCurrency, formatDate } from "@/lib/utils"
 
-const statusColors: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  submitted: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  approved: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  rejected: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  invoiced: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  reimbursed: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-}
-
 export default function TimeExpensesPage() {
-  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
-  const [expenseEntries, setExpenseEntries] = useState<ExpenseEntry[]>([])
+  const { activeEntity, dateRange } = useWorkspaceShell()
+  const [timeWorkspace, setTimeWorkspace] = useState<Awaited<ReturnType<typeof getTimeTrackingWorkspace>> | null>(null)
+  const [expenseWorkspace, setExpenseWorkspace] = useState<Awaited<ReturnType<typeof getExpenseWorkspace>> | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeModule, setActiveModule] = useState("time")
   const [search, setSearch] = useState("")
+  const shellFilters = useMemo<FinanceFilters | null>(() => {
+    if (!activeEntity || !dateRange) {
+      return null
+    }
 
-  const loadTimeEntries = async () => {
-    const result = await getTimeEntries()
-    setTimeEntries(result.data)
-  }
+    return {
+      entityId: activeEntity.id,
+      dateRange,
+    }
+  }, [activeEntity, dateRange])
 
-  const loadExpenseEntries = async () => {
-    const result = await getExpenseEntries()
-    setExpenseEntries(result.data)
-  }
+  const loadData = useCallback(async () => {
+    if (!shellFilters) {
+      return
+    }
 
-  const loadData = async () => {
     setLoading(true)
-    await Promise.all([loadTimeEntries(), loadExpenseEntries()])
+    const [timeData, expenseData] = await Promise.all([
+      getTimeTrackingWorkspace(shellFilters, { search, page: 1, pageSize: 50 }),
+      getExpenseWorkspace(shellFilters, { search, page: 1, pageSize: 50 }),
+    ])
+    setTimeWorkspace(timeData)
+    setExpenseWorkspace(expenseData)
     setLoading(false)
-  }
+  }, [search, shellFilters])
 
   useEffect(() => {
+    if (!shellFilters) {
+      return
+    }
+
     loadData()
-  }, [])
+  }, [loadData, shellFilters])
 
   const handleSubmitTime = async (id: string) => {
     await submitTimeEntry(id)
-    loadTimeEntries()
+    loadData()
   }
 
   const handleApproveTime = async (id: string) => {
     await approveTimeEntry(id)
-    loadTimeEntries()
+    loadData()
   }
 
   const handleSubmitExpense = async (id: string) => {
     await submitExpenseEntry(id)
-    loadExpenseEntries()
+    loadData()
   }
 
   const handleApproveExpense = async (id: string) => {
     await approveExpenseEntry(id)
-    loadExpenseEntries()
+    loadData()
   }
-
-  const timeMetrics = {
-    totalHours: timeEntries.reduce((sum, te) => sum + te.hours, 0),
-    billableHours: timeEntries.filter(te => te.billable).reduce((sum, te) => sum + te.hours, 0),
-    billableAmount: timeEntries.filter(te => te.billable).reduce((sum, te) => sum + te.amount, 0),
-    pendingApproval: timeEntries.filter(te => te.status === 'submitted').length,
-  }
-
-  const expenseMetrics = {
-    total: expenseEntries.reduce((sum, e) => sum + e.amount, 0),
-    billable: expenseEntries.filter(e => e.billable).reduce((sum, e) => sum + e.amount, 0),
-    pendingApproval: expenseEntries.filter(e => e.status === 'submitted').length,
-    pendingReimbursement: expenseEntries.filter(e => e.status === 'approved').length,
-  }
+  const timeEntries = timeWorkspace?.data ?? []
+  const expenseEntries = expenseWorkspace?.data ?? []
 
   return (
     <AppShell>
       <div className="flex-1 space-y-6 p-6">
         <PageHeader
           title="Time & Expenses"
-          description="Track time entries and expense reports"
+          description={activeEntity ? `Track time entries and expense reports for ${activeEntity.name}` : "Track time entries and expense reports"}
           actions={
             <div className="flex gap-2">
               <Button variant="outline" asChild>
@@ -157,27 +152,20 @@ export default function TimeExpensesPage() {
           <TabsContent value="time" className="space-y-6">
             {/* Time Metrics */}
             <div className="grid gap-4 md:grid-cols-4">
-              <MetricCard
-                title="Total Hours"
-                value={`${timeMetrics.totalHours}h`}
-                icon={<Timer className="h-4 w-4" />}
-              />
-              <MetricCard
-                title="Billable Hours"
-                value={`${timeMetrics.billableHours}h`}
-                icon={<Briefcase className="h-4 w-4" />}
-              />
-              <MetricCard
-                title="Billable Amount"
-                value={formatCurrency(timeMetrics.billableAmount)}
-                icon={<DollarSign className="h-4 w-4" />}
-              />
-              <MetricCard
-                title="Pending Approval"
-                value={timeMetrics.pendingApproval}
-                icon={<Clock className="h-4 w-4" />}
-                trend={timeMetrics.pendingApproval > 0 ? "attention" : undefined}
-              />
+              {(timeWorkspace?.metrics ?? []).map((metric, index) => (
+                <MetricCard
+                  key={metric.id}
+                  title={metric.label}
+                  value={metric.value}
+                  icon={
+                    index === 0 ? <Timer className="h-4 w-4" /> :
+                    index === 1 ? <Briefcase className="h-4 w-4" /> :
+                    index === 2 ? <DollarSign className="h-4 w-4" /> :
+                    <Clock className="h-4 w-4" />
+                  }
+                  trend={metric.tone === "positive" ? "up" : metric.tone === "warning" ? "attention" : undefined}
+                />
+              ))}
             </div>
 
             {/* Time Entries Table */}
@@ -187,7 +175,7 @@ export default function TimeExpensesPage() {
                   <CardTitle className="text-base font-medium">Time Entries</CardTitle>
                   <div className="relative w-64">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input placeholder="Search..." className="pl-9" />
+                    <Input placeholder="Search employees, projects, or notes..." className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} />
                   </div>
                 </div>
               </CardHeader>
@@ -224,7 +212,15 @@ export default function TimeExpensesPage() {
                         <TableRow key={entry.id}>
                           <TableCell>{formatDate(entry.date)}</TableCell>
                           <TableCell>{entry.employeeName}</TableCell>
-                          <TableCell>{entry.projectName || '-'}</TableCell>
+                          <TableCell>
+                            {entry.projectId ? (
+                              <Link href={`/projects/${entry.projectId}`} className="text-muted-foreground transition-colors hover:text-foreground hover:underline">
+                                {entry.projectName}
+                              </Link>
+                            ) : (
+                              '-'
+                            )}
+                          </TableCell>
                           <TableCell className="max-w-[200px] truncate">{entry.taskDescription}</TableCell>
                           <TableCell>{entry.hours}h</TableCell>
                           <TableCell>
@@ -235,9 +231,7 @@ export default function TimeExpensesPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Badge className={statusColors[entry.status]} variant="secondary">
-                              {entry.status}
-                            </Badge>
+                            <StatusBadge status={entry.status} />
                           </TableCell>
                           <TableCell className="text-right">{formatCurrency(entry.amount)}</TableCell>
                           <TableCell>
@@ -275,27 +269,20 @@ export default function TimeExpensesPage() {
           <TabsContent value="expenses" className="space-y-6">
             {/* Expense Metrics */}
             <div className="grid gap-4 md:grid-cols-4">
-              <MetricCard
-                title="Total Expenses"
-                value={formatCurrency(expenseMetrics.total)}
-                icon={<Receipt className="h-4 w-4" />}
-              />
-              <MetricCard
-                title="Billable"
-                value={formatCurrency(expenseMetrics.billable)}
-                icon={<DollarSign className="h-4 w-4" />}
-              />
-              <MetricCard
-                title="Pending Approval"
-                value={expenseMetrics.pendingApproval}
-                icon={<Clock className="h-4 w-4" />}
-                trend={expenseMetrics.pendingApproval > 0 ? "attention" : undefined}
-              />
-              <MetricCard
-                title="To Reimburse"
-                value={expenseMetrics.pendingReimbursement}
-                icon={<DollarSign className="h-4 w-4" />}
-              />
+              {(expenseWorkspace?.metrics ?? []).map((metric, index) => (
+                <MetricCard
+                  key={metric.id}
+                  title={metric.label}
+                  value={metric.value}
+                  icon={
+                    index === 0 ? <Receipt className="h-4 w-4" /> :
+                    index === 1 ? <DollarSign className="h-4 w-4" /> :
+                    index === 2 ? <Clock className="h-4 w-4" /> :
+                    <DollarSign className="h-4 w-4" />
+                  }
+                  trend={metric.tone === "positive" ? "up" : metric.tone === "warning" ? "attention" : undefined}
+                />
+              ))}
             </div>
 
             {/* Expense Entries Table */}
@@ -305,7 +292,7 @@ export default function TimeExpensesPage() {
                   <CardTitle className="text-base font-medium">Expense Reports</CardTitle>
                   <div className="relative w-64">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input placeholder="Search..." className="pl-9" />
+                    <Input placeholder="Search employees, categories, or projects..." className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} />
                   </div>
                 </div>
               </CardHeader>
@@ -344,7 +331,15 @@ export default function TimeExpensesPage() {
                           <TableCell>{expense.employeeName}</TableCell>
                           <TableCell>{expense.category}</TableCell>
                           <TableCell className="max-w-[200px] truncate">{expense.description}</TableCell>
-                          <TableCell>{expense.projectName || '-'}</TableCell>
+                          <TableCell>
+                            {expense.projectId ? (
+                              <Link href={`/projects/${expense.projectId}`} className="text-muted-foreground transition-colors hover:text-foreground hover:underline">
+                                {expense.projectName}
+                              </Link>
+                            ) : (
+                              '-'
+                            )}
+                          </TableCell>
                           <TableCell>
                             {expense.billable ? (
                               <Badge variant="secondary" className="bg-green-100 text-green-800">Yes</Badge>
@@ -353,9 +348,7 @@ export default function TimeExpensesPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Badge className={statusColors[expense.status]} variant="secondary">
-                              {expense.status}
-                            </Badge>
+                            <StatusBadge status={expense.status} />
                           </TableCell>
                           <TableCell className="text-right">{formatCurrency(expense.amount)}</TableCell>
                           <TableCell>

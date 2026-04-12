@@ -1,11 +1,13 @@
 // @ts-nocheck
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { AppShell } from "@/components/layout/app-shell"
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-provider"
 import { PageHeader } from "@/components/finance/page-header"
 import { MetricCard } from "@/components/finance/metric-card"
+import { StatusBadge } from "@/components/finance/status-badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -38,19 +40,13 @@ import {
   FileText
 } from "lucide-react"
 import { 
-  getRecurringJournals, 
+  getRecurringJournalsWorkspaceList, 
   runRecurringJournal,
   pauseRecurringJournal,
   resumeRecurringJournal
 } from "@/lib/services"
-import type { RecurringJournal } from "@/lib/types"
+import type { FinanceFilters, RecurringJournal } from "@/lib/types"
 import { formatDate, formatCurrency } from "@/lib/utils"
-
-const statusColors: Record<string, string> = {
-  active: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  paused: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  expired: "bg-muted text-muted-foreground",
-}
 
 const frequencyLabels: Record<string, string> = {
   daily: "Daily",
@@ -61,22 +57,45 @@ const frequencyLabels: Record<string, string> = {
 }
 
 export default function RecurringJournalsPage() {
-  const [journals, setJournals] = useState<RecurringJournal[]>([])
+  const { activeEntity, dateRange } = useWorkspaceShell()
+  const [workspace, setWorkspace] = useState<Awaited<ReturnType<typeof getRecurringJournalsWorkspaceList>> | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [activeTab, setActiveTab] = useState("all")
+  const shellFilters = useMemo<FinanceFilters | null>(() => {
+    if (!activeEntity || !dateRange) {
+      return null
+    }
 
-  const loadData = async () => {
+    return {
+      entityId: activeEntity.id,
+      dateRange,
+    }
+  }, [activeEntity, dateRange])
+
+  const loadData = useCallback(async () => {
+    if (!shellFilters) {
+      return
+    }
+
     setLoading(true)
-    const statusFilter = activeTab === "all" ? undefined : [activeTab]
-    const result = await getRecurringJournals(statusFilter, undefined, search || undefined)
-    setJournals(result)
+    const result = await getRecurringJournalsWorkspaceList(shellFilters, {
+      status: activeTab,
+      search,
+      page: 1,
+      pageSize: 50,
+    })
+    setWorkspace(result)
     setLoading(false)
-  }
+  }, [activeTab, search, shellFilters])
 
   useEffect(() => {
+    if (!shellFilters) {
+      return
+    }
+
     loadData()
-  }, [activeTab, search])
+  }, [loadData, shellFilters])
 
   const handleRun = async (id: string) => {
     await runRecurringJournal(id)
@@ -93,12 +112,9 @@ export default function RecurringJournalsPage() {
     loadData()
   }
 
-  const metrics = {
-    total: journals.length,
-    active: journals.filter(j => j.status === 'active').length,
-    paused: journals.filter(j => j.status === 'paused').length,
-    totalRuns: journals.reduce((sum, j) => sum + j.runCount, 0),
-  }
+  const journals = workspace?.data ?? []
+  const metrics = workspace?.metrics ?? []
+  const tabs = workspace?.tabs ?? []
 
   const getTotalAmount = (journal: RecurringJournal) => {
     return journal.templateLines.reduce((sum, line) => sum + line.debit, 0)
@@ -126,26 +142,20 @@ export default function RecurringJournalsPage() {
 
         {/* Metrics */}
         <div className="grid gap-4 md:grid-cols-4">
-          <MetricCard
-            title="Total Templates"
-            value={metrics.total}
-            icon={<RefreshCcw className="h-4 w-4" />}
-          />
-          <MetricCard
-            title="Active"
-            value={metrics.active}
-            icon={<PlayCircle className="h-4 w-4" />}
-          />
-          <MetricCard
-            title="Paused"
-            value={metrics.paused}
-            icon={<Pause className="h-4 w-4" />}
-          />
-          <MetricCard
-            title="Total Runs"
-            value={metrics.totalRuns}
-            icon={<Calendar className="h-4 w-4" />}
-          />
+          {metrics.map((metric, index) => (
+            <MetricCard
+              key={metric.id}
+              title={metric.label}
+              value={metric.value}
+              icon={
+                index === 0 ? <RefreshCcw className="h-4 w-4" /> :
+                index === 1 ? <PlayCircle className="h-4 w-4" /> :
+                index === 2 ? <Pause className="h-4 w-4" /> :
+                <Calendar className="h-4 w-4" />
+              }
+              trend={metric.tone === "positive" ? "up" : metric.tone === "warning" ? "attention" : undefined}
+            />
+          ))}
         </div>
 
         {/* Journals Table */}
@@ -167,9 +177,12 @@ export default function RecurringJournalsPage() {
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
               <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="active">Active</TabsTrigger>
-                <TabsTrigger value="paused">Paused</TabsTrigger>
+                {tabs.map(tab => (
+                  <TabsTrigger key={tab.id} value={tab.id}>
+                    {tab.label}
+                    {typeof tab.count === "number" ? ` (${tab.count})` : ""}
+                  </TabsTrigger>
+                ))}
               </TabsList>
             </Tabs>
 
@@ -217,9 +230,7 @@ export default function RecurringJournalsPage() {
                       <TableCell>{journal.lastRunDate ? formatDate(journal.lastRunDate) : '-'}</TableCell>
                       <TableCell>{journal.runCount}</TableCell>
                       <TableCell>
-                        <Badge className={statusColors[journal.status]} variant="secondary">
-                          {journal.status}
-                        </Badge>
+                        <StatusBadge status={journal.status} />
                       </TableCell>
                       <TableCell className="text-right">{formatCurrency(getTotalAmount(journal))}</TableCell>
                       <TableCell>

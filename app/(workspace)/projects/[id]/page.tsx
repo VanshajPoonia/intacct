@@ -1,14 +1,14 @@
 // @ts-nocheck
 "use client"
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect, use, useCallback } from "react"
 import Link from "next/link"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageHeader } from "@/components/finance/page-header"
 import { MetricCard } from "@/components/finance/metric-card"
+import { StatusBadge } from "@/components/finance/status-badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -40,14 +40,6 @@ import {
 import type { ProjectDetail, TimeEntry, ExpenseEntry } from "@/lib/types"
 import { formatCurrency, formatDate } from "@/lib/utils"
 
-const statusColors: Record<string, string> = {
-  planning: "bg-muted text-muted-foreground",
-  active: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  on_hold: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  completed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-}
-
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const [project, setProject] = useState<ProjectDetail | null>(null)
@@ -55,7 +47,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [expenses, setExpenses] = useState<ExpenseEntry[]>([])
   const [loading, setLoading] = useState(true)
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     const [projectData, timeData, expenseData] = await Promise.all([
       getProjectDetailById(id),
@@ -66,11 +58,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     setTimeEntries(timeData.data)
     setExpenses(expenseData.data)
     setLoading(false)
-  }
+  }, [id])
 
   useEffect(() => {
     loadData()
-  }, [id])
+  }, [loadData])
 
   const handleStatusChange = async (status: ProjectDetail['status']) => {
     await updateProjectStatus(id, status)
@@ -183,9 +175,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Project Details</CardTitle>
-                <Badge className={statusColors[project.status]} variant="secondary">
-                  {project.status.replace(/_/g, ' ')}
-                </Badge>
+                <StatusBadge status={project.status} />
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -195,7 +185,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     <Building2 className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="text-sm text-muted-foreground">Customer</p>
-                      <p className="font-medium">{project.customerName}</p>
+                      <Link href={`/accounts-receivable/customers/${project.customerId}`} className="font-medium hover:underline">
+                        {project.customerName}
+                      </Link>
                     </div>
                   </div>
                 )}
@@ -285,7 +277,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                       <TableCell className="max-w-[200px] truncate">{entry.taskDescription}</TableCell>
                       <TableCell className="text-right">{entry.hours}h</TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{entry.status}</Badge>
+                        <StatusBadge status={entry.status} />
                       </TableCell>
                     </TableRow>
                   ))}

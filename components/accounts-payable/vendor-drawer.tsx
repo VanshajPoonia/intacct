@@ -33,9 +33,9 @@ import {
   Archive,
   TrendingUp,
 } from "lucide-react"
-import type { Vendor, Bill } from "@/lib/types"
+import type { Bill, Payment, Vendor } from "@/lib/types"
 import type { DashboardFilters } from "@/lib/types"
-import { getBills } from "@/lib/services"
+import { getBills, getPayments } from "@/lib/services"
 
 interface VendorDrawerProps {
   vendor: Vendor | null
@@ -77,7 +77,9 @@ export function VendorDrawer({
   const [activeTab, setActiveTab] = useState("details")
   const [loading, setLoading] = useState(false)
   const [bills, setBills] = useState<Bill[]>([])
+  const [payments, setPayments] = useState<Payment[]>([])
   const [loadingBills, setLoadingBills] = useState(false)
+  const [loadingPayments, setLoadingPayments] = useState(false)
 
   // Fetch vendor bills when drawer opens
   const fetchVendorBills = useCallback(async () => {
@@ -104,13 +106,38 @@ export function VendorDrawer({
     }
   }, [vendor?.id])
 
+  const fetchVendorPayments = useCallback(async () => {
+    if (!vendor?.id) return
+
+    setLoadingPayments(true)
+    try {
+      const defaultFilters: DashboardFilters = {
+        entityId: "e4",
+        dateRange: {
+          startDate: new Date(2024, 0, 1),
+          endDate: new Date(),
+          preset: "this_year",
+        },
+        vendorId: vendor.id,
+      }
+
+      const result = await getPayments(defaultFilters, undefined, undefined, undefined, undefined, 1, 10)
+      setPayments(result.data)
+    } catch (error) {
+      console.error("Error fetching vendor payments:", error)
+    } finally {
+      setLoadingPayments(false)
+    }
+  }, [vendor?.id])
+
   useEffect(() => {
     if (open && vendor) {
       setLoading(true)
       setTimeout(() => setLoading(false), 200)
       fetchVendorBills()
+      fetchVendorPayments()
     }
-  }, [open, vendor, fetchVendorBills])
+  }, [open, vendor, fetchVendorBills, fetchVendorPayments])
 
   // Calculate bill stats
   const billStats = useMemo(() => {
@@ -346,10 +373,45 @@ export function VendorDrawer({
             </TabsContent>
 
             <TabsContent value="payments" className="p-6 m-0">
-              <div className="text-center py-8 text-muted-foreground">
-                <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>Payment history coming soon</p>
-              </div>
+              {loadingPayments ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : payments.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No payments for this vendor</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Payment #</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Method</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payments.map(payment => (
+                      <TableRow key={payment.id}>
+                        <TableCell className="font-medium">{payment.number}</TableCell>
+                        <TableCell>{format(new Date(payment.date), "MMM d, yyyy")}</TableCell>
+                        <TableCell className="capitalize">{payment.method.replace(/_/g, " ")}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className={billStatusColors[payment.status] ?? "bg-muted text-muted-foreground"}>
+                            {payment.status.replace(/_/g, " ")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(payment.amount)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </TabsContent>
           </ScrollArea>
         </Tabs>

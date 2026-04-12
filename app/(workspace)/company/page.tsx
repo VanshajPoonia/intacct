@@ -18,8 +18,8 @@ import {
   ChevronRight,
   TrendingUp,
 } from "lucide-react"
-import { getEntities, getDimensions } from "@/lib/services"
-import type { Entity, Dimension } from "@/lib/types"
+import { getDimensions, getEntities, getUsers } from "@/lib/services"
+import type { Dimension, Entity, User } from "@/lib/types"
 
 interface QuickStat {
   label: string
@@ -31,16 +31,19 @@ interface QuickStat {
 export default function CompanyPage() {
   const [entities, setEntities] = useState<Entity[]>([])
   const [dimensions, setDimensions] = useState<Dimension[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function fetchData() {
-      const [entitiesData, dimensionsData] = await Promise.all([
+      const [entitiesData, dimensionsData, usersData] = await Promise.all([
         getEntities(),
         getDimensions(),
+        getUsers(),
       ])
       setEntities(entitiesData)
       setDimensions(dimensionsData)
+      setUsers(usersData)
       setLoading(false)
     }
     fetchData()
@@ -50,7 +53,7 @@ export default function CompanyPage() {
     { label: "Entities", value: entities.filter(e => e.type !== 'consolidated').length, change: "+1 this quarter", trend: "up" },
     { label: "Departments", value: dimensions.filter(d => d.type === 'department').length },
     { label: "Locations", value: dimensions.filter(d => d.type === 'location').length },
-    { label: "Employees", value: 156, change: "+12 YTD", trend: "up" },
+    { label: "Employees", value: users.filter(user => user.status === "active").length, change: `${users.filter(user => user.status === "active").length} active users`, trend: "up" },
   ]
 
   const modules = [
@@ -83,7 +86,7 @@ export default function CompanyPage() {
       description: "Employee directory and HR information",
       icon: Users,
       href: "/company/employees",
-      stats: "156 employees",
+      stats: `${users.filter(user => user.status === "active").length} active users`,
       color: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
     },
     {
@@ -98,7 +101,7 @@ export default function CompanyPage() {
       title: "Fiscal Calendar",
       description: "Set up accounting periods and fiscal year settings",
       icon: Calendar,
-      href: "/company/calendar",
+      href: "/general-ledger/accounting-periods",
       stats: "FY 2026 active",
       color: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
     },
@@ -131,7 +134,7 @@ export default function CompanyPage() {
             </p>
           </div>
           <Button variant="outline" asChild>
-            <Link href="/admin/settings">
+            <Link href="/settings">
               <Settings className="h-4 w-4 mr-2" />
               Company Settings
             </Link>

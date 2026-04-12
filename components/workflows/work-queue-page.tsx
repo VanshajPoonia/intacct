@@ -1,6 +1,6 @@
 "use client"
 
-import { startTransition, useDeferredValue, useEffect, useMemo, useState } from "react"
+import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react"
 import { FilterX, Inbox, RefreshCcw, Settings2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useWorkspaceShell } from "@/components/layout/workspace-shell-provider"
@@ -158,8 +158,23 @@ export function WorkQueuePage() {
   const [isMutating, setIsMutating] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [didApplyDefaultView, setDidApplyDefaultView] = useState(false)
+  const activeEntityId = activeEntity?.id ?? null
+  const activeRoleId = activeRole?.id ?? null
+  const currentUserId = currentUser?.id ?? null
 
   const deferredSearch = useDeferredValue(localState.search)
+  const queueScope = useMemo(
+    () =>
+      activeEntityId && activeRoleId && currentUserId && dateRange
+        ? {
+            activeEntityId,
+            activeRoleId,
+            currentUserId,
+            dateRange,
+          }
+        : null,
+    [activeEntityId, activeRoleId, currentUserId, dateRange]
+  )
 
   const effectiveFilters = useMemo<WorkQueueFilters>(
     () => ({
@@ -187,10 +202,10 @@ export function WorkQueuePage() {
   useEffect(() => {
     setDidApplyDefaultView(false)
     setActiveViewId(null)
-  }, [activeRole?.id])
+  }, [activeRoleId])
 
   useEffect(() => {
-    if (!activeEntity || !activeRole || !currentUser) {
+    if (!queueScope) {
       return
     }
 
@@ -200,13 +215,13 @@ export function WorkQueuePage() {
     Promise.all([
       getWorkQueueFilterOptions(
         {
-          entityId: activeEntity.id,
-          dateRange: dateRange ?? undefined,
+          entityId: queueScope.activeEntityId,
+          dateRange: queueScope.dateRange,
           sectionId: localState.sectionId,
         },
-        currentUser.id
+        queueScope.currentUserId
       ),
-      getWorkQueueSavedViews(activeRole.id),
+      getWorkQueueSavedViews(queueScope.activeRoleId),
     ])
       .then(([options, views]) => {
         if (cancelled) {
@@ -230,7 +245,41 @@ export function WorkQueuePage() {
     return () => {
       cancelled = true
     }
-  }, [activeEntity?.id, activeRole?.id, currentUser?.id, dateRange, localState.sectionId])
+  }, [localState.sectionId, queueScope])
+
+  const applySavedView = useCallback(
+    (view: SavedView) => {
+      const filters = view.filters as Record<string, unknown>
+      const nextSectionId = isSectionId(filters.sectionId) ? filters.sectionId : defaultSectionId
+      const nextStatus = Array.isArray(filters.status) && isWorkQueueStatus(filters.status[0]) ? String(filters.status[0]) : "all"
+      const nextSearch = typeof filters.search === "string" ? filters.search : ""
+      const nextDepartmentId = typeof filters.departmentId === "string" ? filters.departmentId : "all"
+      const nextProjectId = typeof filters.projectId === "string" ? filters.projectId : "all"
+      const nextAssigneeId = typeof filters.assigneeId === "string" ? filters.assigneeId : "all"
+
+      setLocalState({
+        sectionId: nextSectionId,
+        search: nextSearch,
+        departmentId: nextDepartmentId,
+        projectId: nextProjectId,
+        status: nextStatus,
+        assigneeId: nextAssigneeId,
+      })
+      setSort(
+        view.sortBy
+          ? {
+              key: view.sortBy,
+              direction: view.sortDirection ?? "asc",
+            }
+          : summary?.sections.find(section => section.id === nextSectionId)?.defaultSort ?? defaultSort
+      )
+      setVisibleColumnIds((view.columns as WorkQueueColumnId[] | undefined) ?? [])
+      setPage(1)
+      setSelectedIds([])
+      setActiveViewId(view.id)
+    },
+    [summary]
+  )
 
   useEffect(() => {
     if (didApplyDefaultView || !savedViews.length) {
@@ -242,10 +291,10 @@ export function WorkQueuePage() {
       applySavedView(defaultView)
     }
     setDidApplyDefaultView(true)
-  }, [didApplyDefaultView, savedViews])
+  }, [applySavedView, didApplyDefaultView, savedViews])
 
   useEffect(() => {
-    if (!activeEntity || !currentUser || !dateRange) {
+    if (!queueScope) {
       return
     }
 
@@ -253,7 +302,7 @@ export function WorkQueuePage() {
     setIsLoading(true)
 
     Promise.all([
-      getWorkQueueSummary(effectiveFilters, currentUser.id),
+      getWorkQueueSummary(effectiveFilters, queueScope.currentUserId),
       getWorkQueueItems(
         effectiveFilters,
         {
@@ -261,7 +310,7 @@ export function WorkQueuePage() {
           pageSize,
           sort,
         },
-        currentUser.id
+        queueScope.currentUserId
       ),
     ])
       .then(([summaryResult, tableResult]) => {
@@ -286,38 +335,38 @@ export function WorkQueuePage() {
     return () => {
       cancelled = true
     }
-  }, [currentUser?.id, effectiveFilters, page, pageSize, reloadKey, sort, activeEntity?.id, dateRange])
+  }, [effectiveFilters, page, pageSize, queueScope, reloadKey, sort])
+
+  const activeTableSection = tableData?.activeSection ?? null
+  const activeSectionColumns = useMemo(() => activeTableSection?.columns ?? [], [activeTableSection])
 
   useEffect(() => {
-    if (!tableData?.activeSection) {
+    if (!activeTableSection) {
       return
     }
 
     setVisibleColumnIds(previous => {
-      const allowed = tableData.activeSection?.columns ?? []
+      const allowed = activeSectionColumns
       const preserved = previous.filter(columnId => allowed.includes(columnId))
       return preserved.length ? preserved : allowed
     })
-  }, [tableData?.activeSection?.id, tableData?.activeSection?.columns])
+  }, [activeSectionColumns, activeTableSection])
+
+  const tableRowIds = useMemo(() => tableData?.data.map(item => item.id) ?? [], [tableData?.data])
 
   useEffect(() => {
-    if (!tableData) {
-      return
-    }
-
-    const pageIds = tableData.data.map(item => item.id)
-    setSelectedIds(previous => previous.filter(id => pageIds.includes(id)))
-  }, [tableData?.data])
+    setSelectedIds(previous => previous.filter(id => tableRowIds.includes(id)))
+  }, [tableRowIds])
 
   useEffect(() => {
-    if (!drawerItemId || !currentUser) {
+    if (!drawerItemId || !currentUserId) {
       setDetail(null)
       return
     }
 
     let cancelled = false
 
-    getWorkQueueItemDetail(drawerItemId, currentUser.id).then(result => {
+    getWorkQueueItemDetail(drawerItemId, currentUserId).then(result => {
       if (!cancelled) {
         setDetail(result)
         if (!result) {
@@ -329,7 +378,7 @@ export function WorkQueuePage() {
     return () => {
       cancelled = true
     }
-  }, [drawerItemId, currentUser?.id, reloadKey])
+  }, [currentUserId, drawerItemId, reloadKey])
 
   if (!activeEntity || !activeRole || !currentUser || !dateRange) {
     return null
@@ -350,37 +399,6 @@ export function WorkQueuePage() {
     setPage(1)
     setSelectedIds([])
     setActiveViewId(null)
-  }
-
-  function applySavedView(view: SavedView) {
-    const filters = view.filters as Record<string, unknown>
-    const nextSectionId = isSectionId(filters.sectionId) ? filters.sectionId : defaultSectionId
-    const nextStatus = Array.isArray(filters.status) && isWorkQueueStatus(filters.status[0]) ? String(filters.status[0]) : "all"
-    const nextSearch = typeof filters.search === "string" ? filters.search : ""
-    const nextDepartmentId = typeof filters.departmentId === "string" ? filters.departmentId : "all"
-    const nextProjectId = typeof filters.projectId === "string" ? filters.projectId : "all"
-    const nextAssigneeId = typeof filters.assigneeId === "string" ? filters.assigneeId : "all"
-
-    setLocalState({
-      sectionId: nextSectionId,
-      search: nextSearch,
-      departmentId: nextDepartmentId,
-      projectId: nextProjectId,
-      status: nextStatus,
-      assigneeId: nextAssigneeId,
-    })
-    setSort(
-      view.sortBy
-        ? {
-            key: view.sortBy,
-            direction: view.sortDirection ?? "asc",
-          }
-        : summary?.sections.find(section => section.id === nextSectionId)?.defaultSort ?? defaultSort
-    )
-    setVisibleColumnIds((view.columns as WorkQueueColumnId[] | undefined) ?? [])
-    setPage(1)
-    setSelectedIds([])
-    setActiveViewId(view.id)
   }
 
   async function refreshViews(nextActiveId?: string | null) {

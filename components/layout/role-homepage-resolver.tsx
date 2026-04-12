@@ -1,6 +1,6 @@
 "use client"
 
-import { startTransition, useEffect, useState, type ReactNode } from "react"
+import { startTransition, useEffect, useMemo, useState, type ReactNode } from "react"
 import { Building2, CalendarDays, RefreshCcw, ShieldCheck } from "lucide-react"
 import { AccountantHomepage } from "@/components/layout/accountant-homepage"
 import {
@@ -41,20 +41,46 @@ function formatRefreshTime(value: Date) {
   }).format(value)
 }
 
+function getHomepageBadgeLabel(roleId: string) {
+  switch (roleId) {
+    case "accountant":
+      return "Queue-First Home"
+    case "ap_specialist":
+      return "AP Operations Home"
+    case "ar_specialist":
+      return "AR Operations Home"
+    case "controller":
+      return "Close Control Home"
+    case "cfo":
+      return "Executive Performance Home"
+    case "admin":
+      return "Governance Console"
+    default:
+      return "Role Workspace"
+  }
+}
+
 export function RoleHomepageResolver() {
   const { activeEntity, activeRole, dateRange } = useWorkspaceShell()
   const [homepageData, setHomepageData] = useState<RoleHomepageData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!activeRole || !activeEntity || !dateRange) {
-      return
+  const activeEntityId = activeEntity?.id ?? null
+  const activeRoleId = activeRole?.id ?? null
+  const homepageFilters = useMemo<FinanceFilters | null>(() => {
+    if (!activeEntityId || !dateRange) {
+      return null
     }
 
-    const filters: FinanceFilters = {
-      entityId: activeEntity.id,
+    return {
+      entityId: activeEntityId,
       dateRange,
+    }
+  }, [activeEntityId, dateRange])
+
+  useEffect(() => {
+    if (!activeRoleId || !homepageFilters) {
+      return
     }
 
     let cancelled = false
@@ -63,7 +89,7 @@ export function RoleHomepageResolver() {
     setError(null)
     setHomepageData(null)
 
-    getRoleHomepageData(activeRole.id, filters)
+    getRoleHomepageData(activeRoleId, homepageFilters)
       .then(result => {
         if (cancelled) {
           return
@@ -86,13 +112,7 @@ export function RoleHomepageResolver() {
     return () => {
       cancelled = true
     }
-  }, [
-    activeEntity?.id,
-    activeRole?.id,
-    dateRange?.endDate.getTime(),
-    dateRange?.preset,
-    dateRange?.startDate.getTime(),
-  ])
+  }, [activeRoleId, homepageFilters])
 
   if (!activeRole || !activeEntity || !dateRange) {
     return null
@@ -129,7 +149,7 @@ export function RoleHomepageResolver() {
               variant="outline"
               className="rounded-sm border-border bg-background text-[11px] uppercase tracking-[0.16em] text-muted-foreground"
             >
-              Shared Home
+              {getHomepageBadgeLabel(activeRole.id)}
             </Badge>
             {data ? (
               <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">

@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect, use, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageHeader } from "@/components/finance/page-header"
+import { StatusBadge } from "@/components/finance/status-badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import {
   Table,
@@ -35,34 +35,22 @@ import {
 import type { SalesOrder } from "@/lib/types"
 import { formatCurrency, formatDate } from "@/lib/utils"
 
-const statusColors: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  pending_approval: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  approved: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  confirmed: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-  partially_shipped: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-  shipped: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400",
-  invoiced: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  closed: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
-  cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-}
-
 export default function SalesOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
   const [so, setSO] = useState<SalesOrder | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     const result = await getSalesOrderById(id)
     setSO(result)
     setLoading(false)
-  }
+  }, [id])
 
   useEffect(() => {
     loadData()
-  }, [id])
+  }, [loadData])
 
   const handleConfirm = async () => {
     await confirmSalesOrder(id)
@@ -153,9 +141,7 @@ export default function SalesOrderDetailPage({ params }: { params: Promise<{ id:
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Order Details</CardTitle>
-                <Badge className={statusColors[so.status]} variant="secondary">
-                  {so.status.replace(/_/g, ' ')}
-                </Badge>
+                <StatusBadge status={so.status} />
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -164,7 +150,9 @@ export default function SalesOrderDetailPage({ params }: { params: Promise<{ id:
                   <Building2 className="h-5 w-5 text-muted-foreground mt-0.5" />
                   <div>
                     <p className="text-sm text-muted-foreground">Customer</p>
-                    <p className="font-medium">{so.customerName}</p>
+                    <Link href={`/accounts-receivable/customers/${so.customerId}`} className="font-medium hover:underline">
+                      {so.customerName}
+                    </Link>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">

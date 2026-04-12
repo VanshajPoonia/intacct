@@ -19,14 +19,18 @@ interface CommandPaletteProps {
   onOpenChange?: (open: boolean) => void
 }
 
+const noopOpenChange = () => {}
+
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const router = useRouter()
   const shell = useWorkspaceShellOptional()
   const [search, setSearch] = useState("")
+  const shellSetOpen = shell?.setCommandPaletteOpen
+  const shellGroups = shell?.commandGroups
 
   const isOpen = open ?? shell?.commandPaletteOpen ?? false
-  const setOpen = onOpenChange ?? shell?.setCommandPaletteOpen ?? (() => {})
-  const groups = shell?.commandGroups ?? []
+  const setOpen = useMemo(() => onOpenChange ?? shellSetOpen ?? noopOpenChange, [onOpenChange, shellSetOpen])
+  const groups = useMemo(() => shellGroups ?? [], [shellGroups])
 
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {

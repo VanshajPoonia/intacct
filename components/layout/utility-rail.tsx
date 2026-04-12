@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Badge } from "@/components/ui/badge"
@@ -12,19 +12,88 @@ import {
   X
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { notifications } from "@/lib/mock-data"
+import { useWorkspaceShellOptional } from "@/components/layout/workspace-shell-provider"
+import { getNotifications, getUnreadCount } from "@/lib/services"
+import type { Notification } from "@/lib/types"
 
 interface UtilityRailProps {
   className?: string
 }
 
 export function UtilityRail({ className }: UtilityRailProps) {
+  const shell = useWorkspaceShellOptional()
   const [activePanel, setActivePanel] = useState<string | null>(null)
-  const unreadNotifications = notifications.filter(n => !n.read).length
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [notificationsLoading, setNotificationsLoading] = useState(false)
+  const [notificationsError, setNotificationsError] = useState<string | null>(null)
+  const [unreadNotifications, setUnreadNotifications] = useState(shell?.counts.notifications ?? 0)
 
   const togglePanel = (panelId: string) => {
     setActivePanel(activePanel === panelId ? null : panelId)
   }
+
+  useEffect(() => {
+    if (typeof shell?.counts.notifications === "number") {
+      setUnreadNotifications(shell.counts.notifications)
+      return
+    }
+
+    let cancelled = false
+
+    async function loadUnreadCount() {
+      try {
+        const count = await getUnreadCount()
+        if (!cancelled) {
+          setUnreadNotifications(count)
+        }
+      } catch {
+        if (!cancelled) {
+          setUnreadNotifications(0)
+        }
+      }
+    }
+
+    void loadUnreadCount()
+
+    return () => {
+      cancelled = true
+    }
+  }, [shell?.counts.notifications])
+
+  useEffect(() => {
+    if (activePanel !== "notifications") {
+      return
+    }
+
+    let cancelled = false
+
+    async function loadNotifications() {
+      setNotificationsLoading(true)
+      setNotificationsError(null)
+
+      try {
+        const response = await getNotifications(false, undefined, 1, 12)
+        if (!cancelled) {
+          setNotifications(response.data)
+        }
+      } catch {
+        if (!cancelled) {
+          setNotifications([])
+          setNotificationsError("Unable to load notifications.")
+        }
+      } finally {
+        if (!cancelled) {
+          setNotificationsLoading(false)
+        }
+      }
+    }
+
+    void loadNotifications()
+
+    return () => {
+      cancelled = true
+    }
+  }, [activePanel])
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -120,18 +189,38 @@ export function UtilityRail({ className }: UtilityRailProps) {
             <div className="flex-1 overflow-y-auto p-4">
               {activePanel === 'notifications' && (
                 <div className="space-y-3">
-                  {notifications.map((notification) => (
-                    <div 
-                      key={notification.id}
-                      className={cn(
-                        "rounded-lg border border-border p-3",
-                        !notification.read && "bg-accent/50"
-                      )}
-                    >
-                      <p className="text-sm font-medium">{notification.title}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{notification.message}</p>
+                  {notificationsLoading ? (
+                    <div className="space-y-3">
+                      {[0, 1, 2].map(index => (
+                        <div key={index} className="rounded-lg border border-border p-3">
+                          <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+                          <div className="mt-2 h-3 w-full animate-pulse rounded bg-muted" />
+                          <div className="mt-1 h-3 w-4/5 animate-pulse rounded bg-muted" />
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  ) : notificationsError ? (
+                    <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                      {notificationsError}
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                      No notifications in this view.
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
+                      <div 
+                        key={notification.id}
+                        className={cn(
+                          "rounded-lg border border-border p-3",
+                          !notification.read && "bg-accent/50"
+                        )}
+                      >
+                        <p className="text-sm font-medium">{notification.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{notification.message}</p>
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
               {activePanel === 'messages' && (

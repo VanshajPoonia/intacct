@@ -14,10 +14,11 @@ import type {
   ShellStubPage,
   User,
 } from "@/lib/types"
-import { getUnreadCount, getTasks } from "./legacy"
-import { getCurrentUser, getRoleHomeConfig } from "./identity"
+import { fetchInternalApi } from "./internal-api"
+import { getCurrentUser, getPreferences, getRoleHomeConfig } from "./identity"
 import { getEntities } from "./master-data"
 import { getRuntimeDataset } from "./runtime-data"
+import { getWorkQueueSummary } from "./work-queue"
 
 let currentUser: User | null = null
 let roles: Role[] = []
@@ -285,40 +286,64 @@ export async function getShellContext(options?: {
   userId?: string
 }): Promise<ShellContextData> {
   await ensureShellState()
-  const [authUser, entities, availableRoles, unreadNotifications, taskResponse] = await Promise.all([
+  const [authUser, userPreferences, entities, availableRoles] = await Promise.all([
     getCurrentUser(),
+    getPreferences(),
     getEntities(),
     getAvailableRoles(),
-    getUnreadCount(),
-    getTasks(undefined, ['todo', 'in_progress'], undefined, undefined, undefined, 1, 25),
   ])
 
   const currentUserRecord = findCurrentUserRecord(options?.userId ?? authUser?.id)
-  const activeRole = getVisibleRole(options?.roleId ?? authUser?.role ?? currentUserRecord.role)
+  const mergedCurrentUser: User = {
+    ...currentUserRecord,
+    organizationId: authUser?.organizationId ?? currentUserRecord.organizationId,
+    organizationSlug: authUser?.organizationSlug ?? currentUserRecord.organizationSlug,
+    username: authUser?.username ?? currentUserRecord.username,
+    role: authUser?.role ?? currentUserRecord.role,
+    roleIds: authUser?.roleIds ?? currentUserRecord.roleIds,
+    entityIds: authUser?.entityIds ?? currentUserRecord.entityIds,
+    primaryEntityId: authUser?.primaryEntityId ?? currentUserRecord.primaryEntityId,
+    isGlobalAdmin: authUser?.isGlobalAdmin ?? currentUserRecord.isGlobalAdmin,
+    impersonation: authUser?.impersonation ?? currentUserRecord.impersonation,
+    preferences: userPreferences,
+  }
+  const activeRole = getVisibleRole(options?.roleId ?? userPreferences.defaultRole ?? authUser?.role ?? currentUserRecord.role)
   const roleHomeConfig = await getRoleHomeConfig(activeRole.id)
   const preferredEntityId =
     options?.entityId ??
-    currentUserRecord.preferences?.defaultEntity ??
-    currentUserRecord.primaryEntityId ??
-    currentUserRecord.entityIds[0] ??
+    userPreferences.defaultEntity ??
+    mergedCurrentUser.primaryEntityId ??
+    mergedCurrentUser.entityIds[0] ??
     entities[0]?.id
 
   const activeEntity =
     entities.find(entity => entity.id === preferredEntityId) ??
-    entities.find(entity => currentUserRecord.entityIds.includes(entity.id)) ??
+    entities.find(entity => mergedCurrentUser.entityIds.includes(entity.id)) ??
     entities[0]
 
+  const activeDateRange = getPresetRange(options?.datePreset ?? userPreferences.defaultDateRange ?? 'this_month')
+  const [notificationSummary, workQueueSummary] = await Promise.all([
+    fetchInternalApi<{ unreadCount: number }>("/api/notifications/summary"),
+    getWorkQueueSummary(
+      {
+        entityId: activeEntity?.id,
+        dateRange: activeDateRange,
+      },
+      authUser?.id
+    ),
+  ])
+
   return {
-    currentUser: currentUserRecord,
+    currentUser: mergedCurrentUser,
     availableRoles,
     activeRole,
     activeEntity,
     entities,
-    dateRange: getPresetRange(options?.datePreset ?? currentUserRecord.preferences?.defaultDateRange ?? 'this_month'),
+    dateRange: activeDateRange,
     roleHomeConfig,
     counts: {
-      notifications: unreadNotifications,
-      tasks: taskResponse.total,
+      notifications: notificationSummary.unreadCount,
+      tasks: workQueueSummary.totalCount,
     },
   }
 }

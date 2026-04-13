@@ -319,6 +319,77 @@ export async function getSupabaseReceivablesCustomerById(id: string): Promise<Cu
   return data ? mapCustomer(data) : null
 }
 
+export async function getSupabaseReceipts(
+  filters?: FinanceFilters,
+  search?: string,
+  statusFilter?: string[],
+  methodFilter?: string[],
+  sort?: SortConfig,
+  page: number = 1,
+  pageSize: number = 10
+): Promise<PaginatedResponse<Receipt>> {
+  const supabase = createSupabaseAdminClient()
+  const { data, error } = await supabase.from("receipts").select("*")
+
+  if (error) {
+    throw error
+  }
+
+  let filtered = (data ?? []).map(mapReceipt)
+
+  if (filters) {
+    filtered = filtered.filter(receipt => {
+      if (!matchesFinanceFilters(receipt, filters)) {
+        return false
+      }
+
+      return isInDateRange(receipt.date, filters.dateRange)
+    })
+  }
+
+  if (statusFilter?.length) {
+    filtered = filtered.filter(receipt => statusFilter.includes(receipt.status))
+  }
+
+  if (methodFilter?.length) {
+    filtered = filtered.filter(receipt => methodFilter.includes(receipt.method))
+  }
+
+  if (search) {
+    const normalizedSearch = search.toLowerCase()
+    filtered = filtered.filter(receipt =>
+      [
+        receipt.number,
+        receipt.customerName,
+        receipt.reference,
+        receipt.checkNumber,
+        receipt.memo,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedSearch)
+    )
+  }
+
+  filtered = sort
+    ? sortItems(filtered, sort)
+    : [...filtered].sort((left, right) => right.date.getTime() - left.date.getTime())
+
+  return paginate(filtered, page, pageSize)
+}
+
+export async function getSupabaseReceiptById(id: string): Promise<Receipt | null> {
+  const supabase = createSupabaseAdminClient()
+  const { data, error } = await supabase.from("receipts").select("*").eq("id", id).maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  return data ? mapReceipt(data) : null
+}
+
 export async function getSupabaseReceivablesInvoiceDocuments(id: string): Promise<Document[]> {
   const supabase = createSupabaseAdminClient()
   const { data, error } = await supabase

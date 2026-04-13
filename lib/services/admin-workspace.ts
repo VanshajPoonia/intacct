@@ -21,19 +21,15 @@ import type {
 import { getEntities } from './master-data'
 import {
   createApiKey,
-  createUser,
   createWorkflow,
-  deactivateUser,
   getApiKeys,
   getAuditLogs,
   getIntegrations,
   getNotifications,
-  getUsers,
   getWorkflows,
   reconnectIntegration,
   revokeApiKey,
   syncIntegration,
-  updateUser,
   updateWorkflowStatus,
 } from './legacy'
 import type { AuditLogEntry } from './legacy'
@@ -41,6 +37,7 @@ import { customFieldStore, ensurePlatformStore, notificationPolicyStore } from '
 import { buildColumn, buildFilterDefinition, finalizePlatformRows, matchesSearch, matchesScopedFilters } from './platform-workspace-support'
 import { delay } from './base'
 import { buildDetailField, buildOverviewRow, formatDateLabel, formatDateTimeLabel, getStatusTone } from './workspace-support'
+import { getUsers } from './users-access'
 
 let entities: Entity[] = []
 let entityMap = new Map<string, Entity>()
@@ -1021,27 +1018,7 @@ export async function applyAdminWorkspaceAction(
   await ensureAdminWorkspaceState()
   switch (sectionId) {
     case 'users':
-      if (actionId === 'invite-user') {
-        await createUser({
-          email: `user${Date.now()}@northstarfinance.com`,
-          firstName: 'Demo',
-          lastName: 'User',
-          role: 'accountant',
-          entityIds: context.filters?.entityId && context.filters.entityId !== 'e4' ? [context.filters.entityId] : ['e1', 'e2'],
-        })
-        return { success: true, message: 'Demo user invited.' }
-      }
-
-      if (actionId === 'activate-user') {
-        await Promise.all(recordIds.map(id => updateUser(id, { status: 'active' })))
-        return { success: true, message: 'Selected users activated.' }
-      }
-
-      if (actionId === 'deactivate-user') {
-        await Promise.all(recordIds.map(id => deactivateUser(id)))
-        return { success: true, message: 'Selected users deactivated.' }
-      }
-      break
+      return { success: false, message: 'Use the dedicated Users & Access page to manage user records.' }
     case 'workflows':
       if (actionId === 'new-workflow') {
         await createWorkflow({

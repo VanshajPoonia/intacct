@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -9,17 +9,22 @@ import { RecordDetailDrawer } from "@/components/finance/record-detail-drawer"
 import { CreateJournalEntryModal } from "@/components/general-ledger/create-journal-entry-modal"
 import { useWorkspaceShell } from "@/components/layout/workspace-shell-provider"
 import {
+  deleteSavedView,
   getDepartments,
   getJournalEntriesWorkspace,
   getJournalEntryWorkspaceDetail,
   getProjects,
+  getSavedViews,
   postJournalEntry,
   reverseJournalEntry,
+  saveView,
+  setDefaultView,
 } from "@/lib/services"
 import type {
   Department,
   JournalEntry,
   Project,
+  SavedView,
   SortConfig,
   WorkspaceDetailAction,
   WorkspaceDetailData,
@@ -51,10 +56,16 @@ function getStatusTone(status: string) {
 }
 
 export default function JournalEntriesPage() {
-  const { activeEntity, dateRange } = useWorkspaceShell()
+  const { activeEntity, activeRole, dateRange } = useWorkspaceShell()
   const [departments, setDepartments] = useState<Department[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [workspace, setWorkspace] = useState<Awaited<ReturnType<typeof getJournalEntriesWorkspace>> | null>(null)
+  const [savedViews, setSavedViews] = useState<SavedView[]>([])
+  const [activeViewId, setActiveViewId] = useState<string | null>(null)
+  const [didApplyDefaultView, setDidApplyDefaultView] = useState(false)
+  const [isViewsLoading, setIsViewsLoading] = useState(true)
+  const [isSavingView, setIsSavingView] = useState(false)
+  const [visibleColumnIds, setVisibleColumnIds] = useState<string[]>([])
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState("all")
   const [departmentId, setDepartmentId] = useState("all")
@@ -161,6 +172,46 @@ export default function JournalEntriesPage() {
     []
   )
 
+  const allColumnIds = useMemo(() => columns.map(column => column.id), [columns])
+  const columnOptions = useMemo(
+    () => columns.map(column => ({ id: column.id, label: column.label })),
+    [columns]
+  )
+
+  useEffect(() => {
+    setVisibleColumnIds([])
+  }, [allColumnIds])
+
+  useEffect(() => {
+    setActiveViewId(null)
+    setDidApplyDefaultView(false)
+  }, [activeRole?.id])
+
+  useEffect(() => {
+    let cancelled = false
+    setIsViewsLoading(true)
+
+    getSavedViews("general-ledger-journal-entries")
+      .then(views => {
+        if (cancelled) {
+          return
+        }
+
+        const filteredViews = views.filter(view => !view.roleScope?.length || (activeRole?.id && view.roleScope.includes(activeRole.id)))
+        setSavedViews(filteredViews)
+        setIsViewsLoading(false)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIsViewsLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeRole?.id, refreshKey])
+
   const filterDefinitions = useMemo<Array<WorkspaceFilterDefinition & { value: string; onChange: (value: string) => void }>>(
     () => [
       ...(workspace?.filters.map(filter => ({
@@ -169,6 +220,7 @@ export default function JournalEntriesPage() {
         onChange: (value: string) => {
           setStatus(value)
           setPage(1)
+          setActiveViewId(null)
         },
       })) ?? []),
       {
@@ -178,6 +230,7 @@ export default function JournalEntriesPage() {
         onChange: value => {
           setDepartmentId(value)
           setPage(1)
+          setActiveViewId(null)
         },
         options: [{ value: "all", label: "All Departments" }, ...departments.map(department => ({ value: department.id, label: department.name }))],
       },
@@ -188,6 +241,7 @@ export default function JournalEntriesPage() {
         onChange: value => {
           setProjectId(value)
           setPage(1)
+          setActiveViewId(null)
         },
         options: [{ value: "all", label: "All Projects" }, ...projects.map(project => ({ value: project.id, label: project.name }))],
       },
@@ -203,19 +257,98 @@ export default function JournalEntriesPage() {
     sortKey: sort.key,
     sortDirection: sort.direction,
     pageSize,
+    visibleColumnIds: visibleColumnIds.length ? visibleColumnIds : allColumnIds,
   }
 
-  function applySavedView(filters: Record<string, unknown>) {
+  const applySavedView = useCallback((view: SavedView) => {
+    const filters = view.filters as Record<string, unknown>
     setSearch(String(filters.search ?? ""))
     setStatus(String(filters.status ?? "all"))
     setDepartmentId(String(filters.departmentId ?? "all"))
     setProjectId(String(filters.projectId ?? "all"))
     setSort({
-      key: String(filters.sortKey ?? "date"),
-      direction: filters.sortDirection === "asc" ? "asc" : "desc",
+      key: view.sortBy ?? String(filters.sortKey ?? "date"),
+      direction: view.sortDirection === "asc" ? "asc" : "desc",
     })
+    const nextVisibleColumns =
+      Array.isArray(view.columns) && view.columns.length
+        ? view.columns
+        : Array.isArray(filters.visibleColumnIds)
+          ? filters.visibleColumnIds.filter((value): value is string => typeof value === "string")
+          : []
+
+    setVisibleColumnIds(nextVisibleColumns.length === allColumnIds.length ? [] : nextVisibleColumns)
     setPageSize(Number(filters.pageSize ?? 15))
     setPage(1)
+    setSelectedIds([])
+    setActiveViewId(view.id)
+  }, [allColumnIds])
+
+  useEffect(() => {
+    if (didApplyDefaultView || !savedViews.length) {
+      return
+    }
+
+    const defaultView = savedViews.find(view => view.isDefault)
+    if (defaultView) {
+      applySavedView(defaultView)
+    }
+
+    setDidApplyDefaultView(true)
+  }, [applySavedView, didApplyDefaultView, savedViews])
+
+  async function refreshViews(nextActiveViewId?: string | null) {
+    const views = await getSavedViews("general-ledger-journal-entries")
+    const filteredViews = views.filter(view => !view.roleScope?.length || (activeRole?.id && view.roleScope.includes(activeRole.id)))
+    setSavedViews(filteredViews)
+    setActiveViewId(nextActiveViewId ?? null)
+  }
+
+  async function handleSaveView(payload: { name: string; isDefault: boolean }) {
+    setIsSavingView(true)
+
+    try {
+      const nextVisibleColumnIds = visibleColumnIds.length ? visibleColumnIds : allColumnIds
+      const nextView = await saveView({
+        name: payload.name,
+        module: "general-ledger-journal-entries",
+        filters: {
+          ...currentFilters,
+          visibleColumnIds: nextVisibleColumnIds,
+        },
+        columns: nextVisibleColumnIds,
+        sortBy: sort.key,
+        sortDirection: sort.direction,
+        isDefault: payload.isDefault,
+        roleScope: activeRole?.id ? [activeRole.id] : undefined,
+      })
+
+      await refreshViews(nextView.id)
+    } finally {
+      setIsSavingView(false)
+    }
+  }
+
+  async function handleDeleteView(view: SavedView) {
+    await deleteSavedView(view.id)
+    await refreshViews(activeViewId === view.id ? null : activeViewId)
+  }
+
+  async function handleSetDefaultView(view: SavedView) {
+    await setDefaultView(view.id, view.module)
+    await refreshViews(view.id)
+  }
+
+  function toggleVisibleColumn(columnId: string, visible: boolean) {
+    setVisibleColumnIds(previous => {
+      const current = previous.length ? previous : allColumnIds
+      const next = visible
+        ? allColumnIds.filter(id => new Set([...current, columnId]).has(id))
+        : current.filter(id => id !== columnId)
+
+      return next.length === allColumnIds.length ? [] : next
+    })
+    setActiveViewId(null)
   }
 
   async function openDetail(entry: JournalEntry) {
@@ -273,6 +406,7 @@ export default function JournalEntriesPage() {
     <>
       <OperatorListWorkspace
         moduleKey="general-ledger-journal-entries"
+        moduleLabel="Journal Entries"
         eyebrow="Ledger Execution"
         title="Journal Entries"
         description="Review, post, and reverse journals with shell-driven entity and period context."
@@ -282,15 +416,25 @@ export default function JournalEntriesPage() {
           "new-entry": () => setCreateOpen(true),
           "import-journal": () => toast.info("Journal import is prepared for a later integration milestone."),
         }}
-        currentFilters={currentFilters}
         onApplySavedView={applySavedView}
+        savedViews={savedViews}
+        activeViewId={activeViewId}
+        viewsLoading={isViewsLoading}
+        viewsSaving={isSavingView}
+        onSaveView={handleSaveView}
+        onDeleteView={handleDeleteView}
+        onSetDefaultView={handleSetDefaultView}
         search={search}
         onSearchChange={value => {
           setSearch(value)
           setPage(1)
+          setActiveViewId(null)
         }}
         searchPlaceholder="Search journal number, description, or creator..."
         filters={filterDefinitions}
+        visibleColumnIds={visibleColumnIds}
+        onToggleColumn={toggleVisibleColumn}
+        columnOptions={columnOptions}
         bulkActions={[
           {
             id: "bulk-post",
@@ -318,12 +462,16 @@ export default function JournalEntriesPage() {
         totalPages={workspace.totalPages}
         emptyMessage={workspace.emptyMessage}
         onRowClick={openDetail}
-        onSortChange={setSort}
+        onSortChange={nextSort => {
+          setSort(nextSort)
+          setActiveViewId(null)
+        }}
         onSelectedIdsChange={setSelectedIds}
         onPageChange={setPage}
         onPageSizeChange={nextPageSize => {
           setPageSize(nextPageSize)
           setPage(1)
+          setActiveViewId(null)
         }}
         drawer={
           <RecordDetailDrawer

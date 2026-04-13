@@ -1,22 +1,34 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { OperatorListWorkspace } from "@/components/finance/operator-list-workspace"
 import { RecordDetailDrawer } from "@/components/finance/record-detail-drawer"
 import { CreateVendorModal } from "@/components/accounts-payable/create-vendor-modal"
+import { useWorkspaceShell } from "@/components/layout/workspace-shell-provider"
 import {
+  deleteSavedView,
+  getSavedViews,
   getVendorWorkspaceDetail,
   getVendorsWorkspace,
+  saveView,
+  setDefaultView,
   updateVendor,
 } from "@/lib/services"
-import type { Vendor, SortConfig, WorkspaceDetailAction, WorkspaceDetailData, WorkspaceFilterDefinition } from "@/lib/types"
+import type { SavedView, SortConfig, Vendor, WorkspaceDetailAction, WorkspaceDetailData, WorkspaceFilterDefinition } from "@/lib/types"
 import type { OperatorTableColumn } from "@/components/finance/operator-data-table"
 import { formatCurrency } from "@/lib/utils"
 
 export default function VendorsPage() {
+  const { activeRole } = useWorkspaceShell()
   const [workspace, setWorkspace] = useState<Awaited<ReturnType<typeof getVendorsWorkspace>> | null>(null)
+  const [savedViews, setSavedViews] = useState<SavedView[]>([])
+  const [activeViewId, setActiveViewId] = useState<string | null>(null)
+  const [didApplyDefaultView, setDidApplyDefaultView] = useState(false)
+  const [isViewsLoading, setIsViewsLoading] = useState(true)
+  const [isSavingView, setIsSavingView] = useState(false)
+  const [visibleColumnIds, setVisibleColumnIds] = useState<string[]>([])
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState("all")
   const [sort, setSort] = useState<SortConfig>({ key: "name", direction: "asc" })
@@ -37,7 +49,10 @@ export default function VendorsPage() {
       sort,
       page,
       pageSize,
-    }).then(setWorkspace)
+    }).then(data => {
+      setWorkspace(data)
+      setSelectedIds(previous => previous.filter(id => data.data.some(vendor => vendor.id === id)))
+    })
   }, [page, pageSize, refreshKey, search, sort, status])
 
   const columns = useMemo<OperatorTableColumn<Vendor>[]>(
@@ -82,6 +97,46 @@ export default function VendorsPage() {
     []
   )
 
+  const allColumnIds = useMemo(() => columns.map(column => column.id), [columns])
+  const columnOptions = useMemo(
+    () => columns.map(column => ({ id: column.id, label: column.label })),
+    [columns]
+  )
+
+  useEffect(() => {
+    setVisibleColumnIds([])
+  }, [allColumnIds])
+
+  useEffect(() => {
+    setActiveViewId(null)
+    setDidApplyDefaultView(false)
+  }, [activeRole?.id])
+
+  useEffect(() => {
+    let cancelled = false
+    setIsViewsLoading(true)
+
+    getSavedViews("accounts-payable-vendors")
+      .then(views => {
+        if (cancelled) {
+          return
+        }
+
+        const filteredViews = views.filter(view => !view.roleScope?.length || (activeRole?.id && view.roleScope.includes(activeRole.id)))
+        setSavedViews(filteredViews)
+        setIsViewsLoading(false)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIsViewsLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeRole?.id, refreshKey])
+
   const filters = useMemo<Array<WorkspaceFilterDefinition & { value: string; onChange: (value: string) => void }>>(
     () =>
       (workspace?.filters.map(filter => ({
@@ -90,6 +145,7 @@ export default function VendorsPage() {
         onChange: value => {
           setStatus(value)
           setPage(1)
+          setActiveViewId(null)
         },
       })) ?? []),
     [status, workspace?.filters]
@@ -101,17 +157,96 @@ export default function VendorsPage() {
     sortKey: sort.key,
     sortDirection: sort.direction,
     pageSize,
+    visibleColumnIds: visibleColumnIds.length ? visibleColumnIds : allColumnIds,
   }
 
-  function applySavedView(filters: Record<string, unknown>) {
+  const applySavedView = useCallback((view: SavedView) => {
+    const filters = view.filters as Record<string, unknown>
     setSearch(String(filters.search ?? ""))
     setStatus(String(filters.status ?? "all"))
     setSort({
-      key: String(filters.sortKey ?? "name"),
-      direction: filters.sortDirection === "desc" ? "desc" : "asc",
+      key: view.sortBy ?? String(filters.sortKey ?? "name"),
+      direction: view.sortDirection === "desc" ? "desc" : "asc",
     })
+    const nextVisibleColumns =
+      Array.isArray(view.columns) && view.columns.length
+        ? view.columns
+        : Array.isArray(filters.visibleColumnIds)
+          ? filters.visibleColumnIds.filter((value): value is string => typeof value === "string")
+          : []
+
+    setVisibleColumnIds(nextVisibleColumns.length === allColumnIds.length ? [] : nextVisibleColumns)
     setPageSize(Number(filters.pageSize ?? 15))
     setPage(1)
+    setSelectedIds([])
+    setActiveViewId(view.id)
+  }, [allColumnIds])
+
+  useEffect(() => {
+    if (didApplyDefaultView || !savedViews.length) {
+      return
+    }
+
+    const defaultView = savedViews.find(view => view.isDefault)
+    if (defaultView) {
+      applySavedView(defaultView)
+    }
+
+    setDidApplyDefaultView(true)
+  }, [applySavedView, didApplyDefaultView, savedViews])
+
+  async function refreshViews(nextActiveViewId?: string | null) {
+    const views = await getSavedViews("accounts-payable-vendors")
+    const filteredViews = views.filter(view => !view.roleScope?.length || (activeRole?.id && view.roleScope.includes(activeRole.id)))
+    setSavedViews(filteredViews)
+    setActiveViewId(nextActiveViewId ?? null)
+  }
+
+  async function handleSaveView(payload: { name: string; isDefault: boolean }) {
+    setIsSavingView(true)
+
+    try {
+      const nextVisibleColumnIds = visibleColumnIds.length ? visibleColumnIds : allColumnIds
+      const nextView = await saveView({
+        name: payload.name,
+        module: "accounts-payable-vendors",
+        filters: {
+          ...currentFilters,
+          visibleColumnIds: nextVisibleColumnIds,
+        },
+        columns: nextVisibleColumnIds,
+        sortBy: sort.key,
+        sortDirection: sort.direction,
+        isDefault: payload.isDefault,
+        roleScope: activeRole?.id ? [activeRole.id] : undefined,
+      })
+
+      await refreshViews(nextView.id)
+    } finally {
+      setIsSavingView(false)
+    }
+  }
+
+  async function handleDeleteView(view: SavedView) {
+    await deleteSavedView(view.id)
+    await refreshViews(activeViewId === view.id ? null : activeViewId)
+  }
+
+  async function handleSetDefaultView(view: SavedView) {
+    await setDefaultView(view.id, view.module)
+    await refreshViews(view.id)
+  }
+
+  function toggleVisibleColumn(columnId: string, visible: boolean) {
+    setVisibleColumnIds(previous => {
+      const current = previous.length ? previous : allColumnIds
+      const next = visible
+        ? allColumnIds.filter(id => new Set([...current, columnId]).has(id))
+        : current.filter(id => id !== columnId)
+
+      return next.length === allColumnIds.length ? [] : next
+    })
+    setActiveViewId(null)
   }
 
   async function openDetail(vendor: Vendor) {
@@ -148,6 +283,7 @@ export default function VendorsPage() {
     <>
       <OperatorListWorkspace
         moduleKey="accounts-payable-vendors"
+        moduleLabel="Vendors"
         eyebrow="Vendor Master"
         title="Vendors"
         description="Maintain vendor records, remittance setup, and liability exposure from one dense workspace."
@@ -160,15 +296,25 @@ export default function VendorsPage() {
           },
           "export-vendors": () => toast.info("Vendor export will connect to the export service in a later milestone."),
         }}
-        currentFilters={currentFilters}
         onApplySavedView={applySavedView}
+        savedViews={savedViews}
+        activeViewId={activeViewId}
+        viewsLoading={isViewsLoading}
+        viewsSaving={isSavingView}
+        onSaveView={handleSaveView}
+        onDeleteView={handleDeleteView}
+        onSetDefaultView={handleSetDefaultView}
         search={search}
         onSearchChange={value => {
           setSearch(value)
           setPage(1)
+          setActiveViewId(null)
         }}
         searchPlaceholder="Search vendor name, code, or email..."
         filters={filters}
+        visibleColumnIds={visibleColumnIds}
+        onToggleColumn={toggleVisibleColumn}
+        columnOptions={columnOptions}
         bulkActions={[
           {
             id: "activate-vendors",
@@ -196,12 +342,16 @@ export default function VendorsPage() {
         totalPages={workspace.totalPages}
         emptyMessage={workspace.emptyMessage}
         onRowClick={openDetail}
-        onSortChange={setSort}
+        onSortChange={nextSort => {
+          setSort(nextSort)
+          setActiveViewId(null)
+        }}
         onSelectedIdsChange={setSelectedIds}
         onPageChange={setPage}
         onPageSizeChange={nextPageSize => {
           setPageSize(nextPageSize)
           setPage(1)
+          setActiveViewId(null)
         }}
         drawer={
           <RecordDetailDrawer

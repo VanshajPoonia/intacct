@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { OperatorListWorkspace } from "@/components/finance/operator-list-workspace"
@@ -8,12 +8,16 @@ import { RecordDetailDrawer } from "@/components/finance/record-detail-drawer"
 import { AccountModal } from "@/components/general-ledger/account-modal"
 import { useWorkspaceShell } from "@/components/layout/workspace-shell-provider"
 import {
+  deleteSavedView,
   deleteAccount,
   getChartAccountWorkspaceDetail,
   getChartOfAccountsWorkspace,
+  getSavedViews,
+  saveView,
   saveAccount,
+  setDefaultView,
 } from "@/lib/services"
-import type { Account, SortConfig, WorkspaceDetailAction, WorkspaceDetailData, WorkspaceFilterDefinition } from "@/lib/types"
+import type { Account, SavedView, SortConfig, WorkspaceDetailAction, WorkspaceDetailData, WorkspaceFilterDefinition } from "@/lib/types"
 import type { OperatorTableColumn } from "@/components/finance/operator-data-table"
 import { formatCurrency } from "@/lib/utils"
 
@@ -26,11 +30,19 @@ const typeToneClasses: Record<Account["type"], string> = {
 }
 
 export default function ChartOfAccountsPage() {
-  const { activeEntity, dateRange } = useWorkspaceShell()
+  const { activeEntity, activeRole, dateRange } = useWorkspaceShell()
   const [workspace, setWorkspace] = useState<Awaited<ReturnType<typeof getChartOfAccountsWorkspace>> | null>(null)
+  const [savedViews, setSavedViews] = useState<SavedView[]>([])
+  const [activeViewId, setActiveViewId] = useState<string | null>(null)
+  const [didApplyDefaultView, setDidApplyDefaultView] = useState(false)
+  const [isViewsLoading, setIsViewsLoading] = useState(true)
+  const [isSavingView, setIsSavingView] = useState(false)
+  const [visibleColumnIds, setVisibleColumnIds] = useState<string[]>([])
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [sort, setSort] = useState<SortConfig>({ key: "number", direction: "asc" })
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(15)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [detail, setDetail] = useState<WorkspaceDetailData | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
@@ -53,9 +65,14 @@ export default function ChartOfAccountsPage() {
         search: search || undefined,
         types: typeFilter !== "all" ? [typeFilter] : undefined,
         sort,
+        page,
+        pageSize,
       }
-    ).then(setWorkspace)
-  }, [activeEntity, dateRange, refreshKey, search, sort, typeFilter])
+    ).then(data => {
+      setWorkspace(data)
+      setSelectedIds(previous => previous.filter(id => data.data.some(account => account.id === id)))
+    })
+  }, [activeEntity, dateRange, page, pageSize, refreshKey, search, sort, typeFilter])
 
   const columns = useMemo<OperatorTableColumn<Account>[]>(
     () => [
@@ -103,21 +120,76 @@ export default function ChartOfAccountsPage() {
     []
   )
 
+  const allColumnIds = useMemo(() => columns.map(column => column.id), [columns])
+  const columnOptions = useMemo(
+    () => columns.map(column => ({ id: column.id, label: column.label })),
+    [columns]
+  )
+
+  useEffect(() => {
+    setVisibleColumnIds([])
+  }, [allColumnIds])
+
+  useEffect(() => {
+    setActiveViewId(null)
+    setDidApplyDefaultView(false)
+  }, [activeRole?.id])
+
+  useEffect(() => {
+    let cancelled = false
+    setIsViewsLoading(true)
+
+    getSavedViews("general-ledger-chart-of-accounts")
+      .then(views => {
+        if (cancelled) {
+          return
+        }
+
+        const filteredViews = views.filter(view => !view.roleScope?.length || (activeRole?.id && view.roleScope.includes(activeRole.id)))
+        setSavedViews(filteredViews)
+        setIsViewsLoading(false)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIsViewsLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeRole?.id, refreshKey])
+
   const currentFilters = {
     search,
     typeFilter,
     sortKey: sort.key,
     sortDirection: sort.direction,
+    pageSize,
+    visibleColumnIds: visibleColumnIds.length ? visibleColumnIds : allColumnIds,
   }
 
-  function applySavedView(filters: Record<string, unknown>) {
+  const applySavedView = useCallback((view: SavedView) => {
+    const filters = view.filters as Record<string, unknown>
     setSearch(String(filters.search ?? ""))
     setTypeFilter(String(filters.typeFilter ?? "all"))
     setSort({
-      key: String(filters.sortKey ?? "number"),
-      direction: filters.sortDirection === "desc" ? "desc" : "asc",
+      key: view.sortBy ?? String(filters.sortKey ?? "number"),
+      direction: view.sortDirection === "desc" ? "desc" : "asc",
     })
-  }
+    const nextVisibleColumns =
+      Array.isArray(view.columns) && view.columns.length
+        ? view.columns
+        : Array.isArray(filters.visibleColumnIds)
+          ? filters.visibleColumnIds.filter((value): value is string => typeof value === "string")
+          : []
+
+    setVisibleColumnIds(nextVisibleColumns.length === allColumnIds.length ? [] : nextVisibleColumns)
+    setPageSize(Number(filters.pageSize ?? 15))
+    setPage(1)
+    setSelectedIds([])
+    setActiveViewId(view.id)
+  }, [allColumnIds])
 
   async function openDetail(account: Account) {
     setDetailOpen(true)
@@ -158,10 +230,81 @@ export default function ChartOfAccountsPage() {
       (workspace?.filters.map(filter => ({
         ...filter,
         value: typeFilter,
-        onChange: setTypeFilter,
+        onChange: value => {
+          setTypeFilter(value)
+          setPage(1)
+          setActiveViewId(null)
+        },
       })) ?? []),
     [typeFilter, workspace?.filters]
   )
+
+  useEffect(() => {
+    if (didApplyDefaultView || !savedViews.length) {
+      return
+    }
+
+    const defaultView = savedViews.find(view => view.isDefault)
+    if (defaultView) {
+      applySavedView(defaultView)
+    }
+
+    setDidApplyDefaultView(true)
+  }, [applySavedView, didApplyDefaultView, savedViews])
+
+  async function refreshViews(nextActiveViewId?: string | null) {
+    const views = await getSavedViews("general-ledger-chart-of-accounts")
+    const filteredViews = views.filter(view => !view.roleScope?.length || (activeRole?.id && view.roleScope.includes(activeRole.id)))
+    setSavedViews(filteredViews)
+    setActiveViewId(nextActiveViewId ?? null)
+  }
+
+  async function handleSaveView(payload: { name: string; isDefault: boolean }) {
+    setIsSavingView(true)
+
+    try {
+      const nextVisibleColumnIds = visibleColumnIds.length ? visibleColumnIds : allColumnIds
+      const nextView = await saveView({
+        name: payload.name,
+        module: "general-ledger-chart-of-accounts",
+        filters: {
+          ...currentFilters,
+          visibleColumnIds: nextVisibleColumnIds,
+        },
+        columns: nextVisibleColumnIds,
+        sortBy: sort.key,
+        sortDirection: sort.direction,
+        isDefault: payload.isDefault,
+        roleScope: activeRole?.id ? [activeRole.id] : undefined,
+      })
+
+      await refreshViews(nextView.id)
+    } finally {
+      setIsSavingView(false)
+    }
+  }
+
+  async function handleDeleteView(view: SavedView) {
+    await deleteSavedView(view.id)
+    await refreshViews(activeViewId === view.id ? null : activeViewId)
+  }
+
+  async function handleSetDefaultView(view: SavedView) {
+    await setDefaultView(view.id, view.module)
+    await refreshViews(view.id)
+  }
+
+  function toggleVisibleColumn(columnId: string, visible: boolean) {
+    setVisibleColumnIds(previous => {
+      const current = previous.length ? previous : allColumnIds
+      const next = visible
+        ? allColumnIds.filter(id => new Set([...current, columnId]).has(id))
+        : current.filter(id => id !== columnId)
+
+      return next.length === allColumnIds.length ? [] : next
+    })
+    setActiveViewId(null)
+  }
 
   if (!workspace) {
     return null
@@ -171,6 +314,7 @@ export default function ChartOfAccountsPage() {
     <>
       <OperatorListWorkspace
         moduleKey="general-ledger-chart-of-accounts"
+        moduleLabel="Chart Of Accounts"
         eyebrow="Ledger Structure"
         title="Chart of Accounts"
         description="Maintain account structure and review balances with service-driven ledger metadata."
@@ -183,27 +327,47 @@ export default function ChartOfAccountsPage() {
           },
           "export-accounts": () => toast.info("Account export will connect to the export service in a later milestone."),
         }}
-        currentFilters={currentFilters}
         onApplySavedView={applySavedView}
+        savedViews={savedViews}
+        activeViewId={activeViewId}
+        viewsLoading={isViewsLoading}
+        viewsSaving={isSavingView}
+        onSaveView={handleSaveView}
+        onDeleteView={handleDeleteView}
+        onSetDefaultView={handleSetDefaultView}
         search={search}
-        onSearchChange={setSearch}
+        onSearchChange={value => {
+          setSearch(value)
+          setPage(1)
+          setActiveViewId(null)
+        }}
         searchPlaceholder="Search account number, name, or category..."
         filters={filters}
+        visibleColumnIds={visibleColumnIds}
+        onToggleColumn={toggleVisibleColumn}
+        columnOptions={columnOptions}
         rows={workspace.data}
         columns={columns}
         rowId={account => account.id}
         sort={sort}
         selectedIds={selectedIds}
-        page={1}
-        pageSize={workspace.total}
+        page={workspace.page}
+        pageSize={workspace.pageSize}
         total={workspace.total}
-        totalPages={1}
+        totalPages={workspace.totalPages}
         emptyMessage={workspace.emptyMessage}
         onRowClick={openDetail}
-        onSortChange={setSort}
+        onSortChange={nextSort => {
+          setSort(nextSort)
+          setActiveViewId(null)
+        }}
         onSelectedIdsChange={setSelectedIds}
-        onPageChange={() => undefined}
-        onPageSizeChange={() => undefined}
+        onPageChange={setPage}
+        onPageSizeChange={nextPageSize => {
+          setPageSize(nextPageSize)
+          setPage(1)
+          setActiveViewId(null)
+        }}
         drawer={
           <RecordDetailDrawer
             detail={detail}

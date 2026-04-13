@@ -25,8 +25,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A target profile is required." }, { status: 400 })
   }
 
-  const cookieValue = await createImpersonationCookieValue(body.profileId)
   const admin = createAdminClient()
+  const { data: targetProfile, error: targetProfileError } = await admin
+    .from("profiles")
+    .select("id, status, is_global_admin")
+    .eq("id", body.profileId)
+    .maybeSingle()
+
+  if (targetProfileError) {
+    return NextResponse.json({ error: targetProfileError.message }, { status: 500 })
+  }
+
+  if (!targetProfile || targetProfile.status !== "active" || targetProfile.is_global_admin) {
+    return NextResponse.json({ error: "The selected user cannot be impersonated." }, { status: 400 })
+  }
+
+  const cookieValue = await createImpersonationCookieValue(body.profileId)
 
   await admin.from("audit_logs").upsert({
     id: `audit-impersonate-${actor.id}-${body.profileId}-${Date.now()}`,

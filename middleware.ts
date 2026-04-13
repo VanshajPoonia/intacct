@@ -51,6 +51,21 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("status")
+      .eq("auth_user_id", user.id)
+      .maybeSingle()
+
+    if ((!profile || profile.status !== "active") && !request.nextUrl.pathname.startsWith("/api/")) {
+      const loginUrl = request.nextUrl.clone()
+      loginUrl.pathname = "/login"
+      loginUrl.searchParams.set("next", request.nextUrl.pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+  }
+
   if (!user && !request.nextUrl.pathname.startsWith("/api/")) {
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = "/login"

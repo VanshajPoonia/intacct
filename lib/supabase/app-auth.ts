@@ -255,7 +255,7 @@ async function resolveActorUser() {
   }
 
   const profile = await getProfileByAuthUserId(user.id)
-  if (!profile) {
+  if (!profile || profile.status !== "active") {
     return null
   }
 
@@ -282,7 +282,7 @@ export async function getOptionalAuthenticatedAppUser(): Promise<AuthUser | null
   }
 
   const targetProfile = await getProfileById(impersonationPayload.targetProfileId)
-  if (!targetProfile) {
+  if (!targetProfile || targetProfile.status !== "active") {
     return actor
   }
 
@@ -327,4 +327,3 @@ export async function createImpersonationCookieValue(targetProfileId: string) {
 export function getImpersonationCookieName() {
   return IMPERSONATION_COOKIE
 }
-

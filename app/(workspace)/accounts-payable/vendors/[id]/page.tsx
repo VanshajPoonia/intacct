@@ -101,7 +101,7 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
     Promise.all([
       getVendorById(id),
       getBills(undefined, undefined, undefined, { key: "dueDate", direction: "desc" }, 1, 20),
-      getPayments(undefined, undefined, undefined, { key: "date", direction: "desc" }, 1, 20),
+      getPayments(undefined, undefined, undefined, undefined, { key: "date", direction: "desc" }, 1, 20),
     ])
       .then(([vendorData, billsData, paymentsData]) => {
         setVendor(vendorData)

@@ -8,8 +8,7 @@ import type {
   WorkspaceDetailData,
   WorkspaceListResponse,
 } from '@/lib/types'
-import { getInvoices } from './receivables'
-import { getCustomerById, getCustomers, getInvoiceById, getReceiptById, getReceipts } from './legacy'
+import { getCustomerById, getCustomers, getInvoiceById, getInvoices, getReceiptById, getReceipts } from './receivables'
 import { buildDetailField, buildOverviewRow, formatDateLabel, formatDateTimeLabel, formatMoney, getStatusTone } from './workspace-support'
 
 interface WorkspaceQuery {

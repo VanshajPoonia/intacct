@@ -101,7 +101,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
     Promise.all([
       getCustomerById(id),
       getInvoices(undefined, undefined, undefined, { key: "dueDate", direction: "desc" }, 1, 20),
-      getReceipts(undefined, undefined, { key: "date", direction: "desc" }, 1, 20),
+      getReceipts(undefined, undefined, undefined, undefined, { key: "date", direction: "desc" }, 1, 20),
     ])
       .then(([customerData, invoicesData, receiptsData]) => {
         setCustomer(customerData)

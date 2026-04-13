@@ -8,8 +8,7 @@ import type {
   WorkspaceDetailData,
   WorkspaceListResponse,
 } from '@/lib/types'
-import { getBills } from './payables'
-import { getBillById, getPaymentById, getPayments, getVendors, getVendorById } from './legacy'
+import { getBillById, getBills, getPaymentById, getPayments, getVendors, getVendorById } from './payables'
 import { buildDetailField, buildOverviewRow, formatDateLabel, formatDateTimeLabel, formatMoney, getStatusTone } from './workspace-support'
 
 interface WorkspaceQuery {

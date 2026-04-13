@@ -1,0 +1,75 @@
+import type { PinnedReport, RecentReport, SavedReport } from "@/lib/types"
+
+export const savedReports: SavedReport[] = [
+  {
+    id: "sr1",
+    name: "Monthly P&L - All Entities",
+    type: "income_statement",
+    description: "Monthly profitability and margin review across the consolidated company.",
+    category: "Financial Statements",
+    filters: { entityId: "e4", dateRange: { startDate: new Date("2024-01-01"), endDate: new Date("2024-12-31"), preset: "this_year" } },
+    columns: ["account", "current", "previous", "variance", "variance_pct"],
+    groupBy: "category",
+    sortBy: "account",
+    createdBy: "Sarah Chen",
+    createdAt: new Date("2024-01-15"),
+    lastRunAt: new Date("2024-03-14"),
+    isFavorite: true,
+  },
+  {
+    id: "sr2",
+    name: "Quarterly Balance Sheet",
+    type: "balance_sheet",
+    description: "Quarter-end asset, liability, and equity review for the primary entity.",
+    category: "Financial Statements",
+    filters: { entityId: "e1", dateRange: { startDate: new Date("2024-01-01"), endDate: new Date("2024-03-31"), preset: "this_quarter" } },
+    columns: ["account", "current", "previous"],
+    sortBy: "account",
+    createdBy: "Michael Johnson",
+    createdAt: new Date("2024-02-01"),
+    lastRunAt: new Date("2024-03-10"),
+    isFavorite: false,
+  },
+  {
+    id: "sr3",
+    name: "Department Budget Variance",
+    type: "budget_vs_actual",
+    description: "Department-level variance analysis for planning and close review.",
+    category: "Planning",
+    filters: { entityId: "e1" },
+    columns: ["department", "budget", "actual", "variance", "variance_pct"],
+    groupBy: "department",
+    sortBy: "variance",
+    createdBy: "Emily Davis",
+    createdAt: new Date("2024-02-15"),
+    lastRunAt: new Date("2024-03-12"),
+    isFavorite: true,
+  },
+  {
+    id: "sr4",
+    name: "Cash Flow Analysis",
+    type: "cash_flow",
+    description: "Quarterly operating, investing, and financing movement analysis.",
+    category: "Cash Management",
+    filters: { entityId: "e4", dateRange: { startDate: new Date("2024-01-01"), endDate: new Date("2024-03-31"), preset: "this_quarter" } },
+    columns: ["category", "amount", "previous"],
+    sortBy: "category",
+    createdBy: "Sarah Chen",
+    createdAt: new Date("2024-03-01"),
+    isFavorite: false,
+  },
+]
+
+export const recentReports: RecentReport[] = [
+  { id: "rr1", name: "Income Statement", type: "income_statement", href: "/reports/income-statement", viewedAt: new Date("2024-03-15T14:30:00") },
+  { id: "rr2", name: "Balance Sheet", type: "balance_sheet", href: "/reports/balance-sheet", viewedAt: new Date("2024-03-15T11:00:00") },
+  { id: "rr3", name: "Budget vs Actual", type: "budget_vs_actual", href: "/reports/budget-vs-actual", viewedAt: new Date("2024-03-14T16:45:00") },
+  { id: "rr4", name: "Trial Balance", type: "trial_balance", href: "/general-ledger/reports/trial-balance", viewedAt: new Date("2024-03-14T10:20:00") },
+  { id: "rr5", name: "Cash Flow Statement", type: "cash_flow", href: "/reports/cash-flow", viewedAt: new Date("2024-03-13T09:00:00") },
+]
+
+export const pinnedReports: PinnedReport[] = [
+  { id: "balance-sheet", name: "Balance Sheet", type: "balance_sheet", href: "/reports/balance-sheet", lastRunAt: new Date("2024-03-14"), isPinned: true },
+  { id: "income-statement", name: "Monthly P&L", type: "income_statement", href: "/reports/income-statement", lastRunAt: new Date("2024-03-15"), isPinned: true },
+  { id: "budget-vs-actual", name: "Budget Variance", type: "budget_vs_actual", href: "/reports/budget-vs-actual", lastRunAt: new Date("2024-03-13"), isPinned: true },
+]

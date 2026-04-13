@@ -17,6 +17,7 @@ import {
   getShellContext,
   getSidebarNav,
   getTopModuleNav,
+  updatePreferences,
 } from "@/lib/services"
 import type {
   DateRangeFilter,
@@ -32,6 +33,7 @@ import type {
   ShellModule,
   ShellSidebarSection,
   ShellUtilityCounts,
+  UserPreferences,
 } from "@/lib/types"
 
 interface WorkspaceShellContextValue {
@@ -63,18 +65,12 @@ interface WorkspaceShellContextValue {
   closeCommandPalette: () => void
 }
 
-const ROLE_STORAGE_KEY = "financeos.shell.role"
-const ENTITY_STORAGE_KEY = "financeos.shell.entity"
-const DATE_PRESET_STORAGE_KEY = "financeos.shell.date-preset"
-const SIDEBAR_STORAGE_KEY = "financeos.shell.sidebar-collapsed"
-
 const WorkspaceShellContext = createContext<WorkspaceShellContextValue | undefined>(undefined)
 
 export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const { user, isLoading: authLoading } = useAuth()
 
-  const [isHydrated, setIsHydrated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [shellContext, setShellContext] = useState<ShellContextData | null>(null)
   const [topModules, setTopModules] = useState<ShellModule[]>([])
@@ -85,67 +81,43 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
   const [roleOverride, setRoleOverride] = useState<RoleId | null>(null)
   const [entityOverride, setEntityOverride] = useState<string | null>(null)
   const [datePreset, setDatePresetState] = useState<DateRangePreset | null>(null)
-  const [sidebarCollapsed, setSidebarCollapsedState] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsedState] = useState<boolean | null>(null)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+  const [pendingPreferenceUpdates, setPendingPreferenceUpdates] = useState<Partial<UserPreferences> | null>(null)
 
   useEffect(() => {
-    const storedRole = window.localStorage.getItem(ROLE_STORAGE_KEY)
-    const storedEntity = window.localStorage.getItem(ENTITY_STORAGE_KEY)
-    const storedPreset = window.localStorage.getItem(DATE_PRESET_STORAGE_KEY)
-    const storedSidebar = window.localStorage.getItem(SIDEBAR_STORAGE_KEY)
-
-    setRoleOverride(storedRole ? (storedRole as RoleId) : null)
-    setEntityOverride(storedEntity || null)
-    setDatePresetState(storedPreset ? (storedPreset as DateRangePreset) : null)
-    setSidebarCollapsedState(storedSidebar === "true")
-    setIsHydrated(true)
-  }, [])
-
-  useEffect(() => {
-    if (!isHydrated) {
+    if (!pendingPreferenceUpdates) {
       return
     }
 
-    if (roleOverride) {
-      window.localStorage.setItem(ROLE_STORAGE_KEY, roleOverride)
-    } else {
-      window.localStorage.removeItem(ROLE_STORAGE_KEY)
+    const timeoutId = window.setTimeout(() => {
+      void updatePreferences(pendingPreferenceUpdates)
+        .then(result => {
+          setShellContext(previous =>
+            previous
+              ? {
+                  ...previous,
+                  currentUser: {
+                    ...previous.currentUser,
+                    preferences: result.preferences,
+                  },
+                }
+              : previous
+          )
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          setPendingPreferenceUpdates(null)
+        })
+    }, 250)
+
+    return () => {
+      window.clearTimeout(timeoutId)
     }
-  }, [isHydrated, roleOverride])
+  }, [pendingPreferenceUpdates])
 
   useEffect(() => {
-    if (!isHydrated) {
-      return
-    }
-
-    if (entityOverride) {
-      window.localStorage.setItem(ENTITY_STORAGE_KEY, entityOverride)
-    } else {
-      window.localStorage.removeItem(ENTITY_STORAGE_KEY)
-    }
-  }, [entityOverride, isHydrated])
-
-  useEffect(() => {
-    if (!isHydrated) {
-      return
-    }
-
-    if (datePreset) {
-      window.localStorage.setItem(DATE_PRESET_STORAGE_KEY, datePreset)
-    } else {
-      window.localStorage.removeItem(DATE_PRESET_STORAGE_KEY)
-    }
-  }, [datePreset, isHydrated])
-
-  useEffect(() => {
-    if (!isHydrated) {
-      return
-    }
-    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarCollapsed))
-  }, [isHydrated, sidebarCollapsed])
-
-  useEffect(() => {
-    if (!isHydrated || authLoading) {
+    if (authLoading) {
       return
     }
 
@@ -181,17 +153,7 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
       setDatePresets(presets)
       setIsLoading(false)
 
-      if (!entityOverride) {
-        setEntityOverride(context.activeEntity.id)
-      }
-
-      if (!datePreset && context.dateRange.preset) {
-        setDatePresetState(context.dateRange.preset)
-      }
-
-      if (window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === null) {
-        setSidebarCollapsedState(context.currentUser.preferences?.sidebarCollapsed ?? false)
-      }
+      setSidebarCollapsedState(previous => previous ?? context.currentUser.preferences?.sidebarCollapsed ?? false)
     }
 
     loadShell().catch(() => {
@@ -203,7 +165,24 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [authLoading, datePreset, entityOverride, isHydrated, pathname, roleOverride, user?.id, user?.role])
+  }, [authLoading, datePreset, entityOverride, pathname, roleOverride, user?.id, user?.role])
+
+  const mergePreferenceUpdates = (updates: Partial<UserPreferences>) => {
+    setPendingPreferenceUpdates(previous => ({
+      ...previous,
+      ...updates,
+      notifications:
+        updates.notifications || previous?.notifications
+          ? {
+              ...(previous?.notifications ?? {}),
+              ...(updates.notifications ?? {}),
+            }
+          : undefined,
+    }))
+  }
+
+  const resolvedSidebarCollapsed =
+    sidebarCollapsed ?? shellContext?.currentUser.preferences?.sidebarCollapsed ?? false
 
   const value = useMemo<WorkspaceShellContextValue>(
     () => ({
@@ -223,13 +202,29 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
       commandGroups,
       breadcrumbs,
       counts: shellContext?.counts ?? { notifications: 0, tasks: 0 },
-      sidebarCollapsed,
+      sidebarCollapsed: resolvedSidebarCollapsed,
       commandPaletteOpen,
-      setActiveRole: roleId => setRoleOverride(roleId),
-      setActiveEntity: entityId => setEntityOverride(entityId),
-      setDatePreset: preset => setDatePresetState(preset),
-      setSidebarCollapsed: collapsed => setSidebarCollapsedState(collapsed),
-      toggleSidebar: () => setSidebarCollapsedState(previous => !previous),
+      setActiveRole: roleId => {
+        setRoleOverride(roleId)
+        mergePreferenceUpdates({ defaultRole: roleId })
+      },
+      setActiveEntity: entityId => {
+        setEntityOverride(entityId)
+        mergePreferenceUpdates({ defaultEntity: entityId })
+      },
+      setDatePreset: preset => {
+        setDatePresetState(preset)
+        mergePreferenceUpdates({ defaultDateRange: preset })
+      },
+      setSidebarCollapsed: collapsed => {
+        setSidebarCollapsedState(collapsed)
+        mergePreferenceUpdates({ sidebarCollapsed: collapsed })
+      },
+      toggleSidebar: () => {
+        const nextCollapsed = !resolvedSidebarCollapsed
+        setSidebarCollapsedState(nextCollapsed)
+        mergePreferenceUpdates({ sidebarCollapsed: nextCollapsed })
+      },
       setCommandPaletteOpen: open => setCommandPaletteOpen(open),
       openCommandPalette: () => setCommandPaletteOpen(true),
       closeCommandPalette: () => setCommandPaletteOpen(false),
@@ -240,8 +235,8 @@ export function WorkspaceShellProvider({ children }: { children: ReactNode }) {
       commandPaletteOpen,
       datePresets,
       isLoading,
+      resolvedSidebarCollapsed,
       shellContext,
-      sidebarCollapsed,
       sidebarSections,
       topModules,
     ]

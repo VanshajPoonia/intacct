@@ -83,6 +83,26 @@ export interface NotificationPolicy {
   updatedAt: Date
 }
 
+export interface AuditLogChange {
+  field: string
+  oldValue?: string
+  newValue?: string
+}
+
+export interface AuditLogEntry {
+  id: string
+  timestamp: Date
+  action: string
+  entityType?: string
+  entityId?: string
+  entityNumber?: string
+  userId?: string
+  userName: string
+  changes?: AuditLogChange[]
+  ipAddress?: string
+  details?: Record<string, unknown>
+}
+
 export interface IntegrationSyncRun {
   id: string
   integrationId: string

@@ -113,6 +113,100 @@ Runs [scripts/sync-runtime-datasets.mjs](/Users/vanshajpoonia/Code/Intacct/scrip
 
 Runs [scripts/bootstrap-auth-users.mjs](/Users/vanshajpoonia/Code/Intacct/scripts/bootstrap-auth-users.mjs), which creates or syncs Supabase Auth users for the bootstrap admin and seeded workspace users.
 
+## Authentication And Access
+
+The app now uses an organization-aware login flow:
+
+- organization
+- username
+- password
+
+The login UI is implemented in [app/login/page.tsx](/Users/vanshajpoonia/Code/Intacct/app/login/page.tsx), and sessions are backed by Supabase cookies through the app auth routes in `app/api/auth/*`.
+
+### Users & Access Admin
+
+Admins can manage users inside the app at:
+
+- `/admin/users`
+
+Current live capabilities:
+
+- create users
+- edit identity and access
+- deactivate and reactivate users
+- reset passwords
+- inspect org and entity access
+- impersonate users as the global admin
+
+### Bootstrap Admin
+
+For bootstrap and development environments, the auth bootstrap script seeds a global admin:
+
+- organization: `admin`
+- username: `admin`
+- password: `kvadmin123`
+
+This account is intentionally seeded by the current auth bootstrap flow. It should be rotated, replaced, or tightly controlled outside bootstrap/demo environments.
+
+## Dynamic Functionality Currently Live
+
+- Users & Access management is Supabase-backed end to end.
+- Saved views persist through the `saved_views` table.
+- Shell state such as entity, role, date preset, and sidebar preferences persists through `user_preferences`.
+- Report Center metadata is relational and user-specific:
+  - saved reports
+  - pinned reports
+  - favorites
+  - recent report activity
+- AP / GL operator workspaces support DB-backed saved views and visible-column persistence.
+- Core AP / AR / GL / Cash workspace services have ongoing live-service cutovers landed so they no longer depend on direct mock imports for the paths already migrated.
+- Audit log and notifications summary APIs are live.
+- Receivables receipt endpoints are live alongside the existing customer and invoice routes.
+
+## Architecture Notes
+
+### Two active data layers
+
+This repo currently uses two Supabase-backed layers:
+
+1. Relational tables for mutation-heavy and user-specific data:
+
+- auth and user access
+- saved views
+- user preferences
+- notifications
+- report metadata
+- audit logs
+- receivables APIs
+
+2. `runtime_datasets` for several dynamic but less-normalized workspace domains:
+
+- shell structure/configuration
+- platform overviews
+- a number of adjacent workspace datasets that have already been moved off direct mock imports
+
+### Important Services And APIs
+
+Start here when contributing:
+
+- [lib/services](/Users/vanshajpoonia/Code/Intacct/lib/services): UI-facing service boundaries used by pages and components
+- [app/api](/Users/vanshajpoonia/Code/Intacct/app/api): internal API routes used by client components and server actions
+- [lib/supabase](/Users/vanshajpoonia/Code/Intacct/lib/supabase): Supabase auth, admin, and domain access helpers
+- [scripts](/Users/vanshajpoonia/Code/Intacct/scripts): bootstrap, sync, and maintenance scripts
+
+When adding new functionality, prefer extending the service layer or internal APIs instead of letting components access raw database clients directly.
+
+## Validation Commands
+
+Use the current standard checks before shipping changes:
+
+```bash
+npm run build
+npm run lint
+```
+
+For Supabase-related cutover work, also run the smallest relevant sync/bootstrap command instead of re-running the entire setup flow unnecessarily.
+
 ## Deployment Environment Notes
 
 Preferred production env names:
@@ -127,3 +221,7 @@ The current production app URL is configured as:
 - `https://accura.kreativvantage.com`
 
 Treat that as deployment configuration only, not as proof that every product area is already fully cut over to the final production architecture.
+
+## Notes
+
+This repository originated from a v0 scaffold, but the README now documents the actual contributor workflow and current Supabase-backed architecture instead of the default scaffold messaging.

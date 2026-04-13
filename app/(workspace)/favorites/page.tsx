@@ -13,6 +13,7 @@ import {
   getSavedViews, 
   getVendors, 
   getCustomers,
+  getRecentReports,
   toggleReportFavorite
 } from "@/lib/services"
 import type { SavedReport, SavedView, Vendor, Customer } from "@/lib/types"
@@ -47,11 +48,12 @@ export default function FavoritesPage() {
     async function loadFavorites() {
       setLoading(true)
       
-      const [reports, views, vendors, customers] = await Promise.all([
+      const [reports, views, vendors, customers, recentReports] = await Promise.all([
         getSavedReports(),
         getSavedViews(),
         getVendors(),
         getCustomers(),
+        getRecentReports(),
       ])
 
       // Get favorited reports
@@ -63,8 +65,8 @@ export default function FavoritesPage() {
           title: r.name,
           description: r.description,
           href: `/reports/${r.id}`,
-          lastAccessed: r.lastRun ? new Date(r.lastRun) : undefined,
-          category: r.category,
+          lastAccessed: r.lastRunAt,
+          category: r.category ?? r.type.replace(/_/g, " "),
         }))
 
       // Get default/favorite views
@@ -101,16 +103,15 @@ export default function FavoritesPage() {
 
       setFavorites([...favoritedReports, ...favoritedViews, ...favVendors, ...favCustomers])
 
-      // Simulate recently viewed
       const recent: FavoriteItem[] = [
-        ...reports.slice(0, 2).map((r: SavedReport) => ({
-          id: r.id,
+        ...recentReports.map((report) => ({
+          id: report.id,
           type: "report" as const,
-          title: r.name,
-          description: r.description,
-          href: `/reports/${r.id}`,
-          lastAccessed: new Date(Date.now() - Math.random() * 86400000 * 7),
-          category: r.category,
+          title: report.name,
+          description: report.type.replace(/_/g, " "),
+          href: report.href,
+          lastAccessed: report.viewedAt,
+          category: report.type.replace(/_/g, " "),
         })),
         ...vendors.slice(0, 2).map((v: Vendor) => ({
           id: v.id,

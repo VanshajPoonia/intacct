@@ -165,6 +165,7 @@ export default function ReportBuilderPage() {
     
     await saveReport({
       name: newReportName,
+      description: newReportDescription || undefined,
       type: newReportType as SavedReport['type'],
       filters: {
         entityId: newReportEntity,
@@ -177,6 +178,7 @@ export default function ReportBuilderPage() {
       columns: newReportColumns,
       groupBy: newReportGroupBy,
       sortBy: newReportSortBy,
+      category: REPORT_TYPES.find(type => type.value === newReportType)?.label,
     })
     
     setCreateModalOpen(false)

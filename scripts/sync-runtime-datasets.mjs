@@ -62,6 +62,7 @@ const datasetModules = {
   fixed_assets: "./lib/mock-data/fixed-assets.ts",
   contracts_revenue: "./lib/mock-data/contracts-revenue.ts",
   platform: "./lib/mock-data/platform.ts",
+  platform_overviews: "./lib/mock-data/platform-overviews.ts",
 }
 
 async function loadModule(path) {
@@ -195,6 +196,7 @@ async function syncProfilesAndMemberships() {
     .map(user => ({
       profile_id: user.id,
       theme: user.preferences.theme,
+      default_role_id: user.preferences.defaultRole ?? user.role,
       default_entity_id: user.preferences.defaultEntity ?? user.primaryEntityId ?? null,
       default_date_range: user.preferences.defaultDateRange,
       sidebar_collapsed: user.preferences.sidebarCollapsed,
@@ -283,11 +285,107 @@ async function syncNotificationsAndActivity() {
   }
 }
 
+function serializeReportFilters(filters) {
+  return serializeForDatabase(filters ?? {})
+}
+
+function inferBuiltInReportKey(href) {
+  const segments = href.split("/").filter(Boolean)
+  return `builtin:${segments[segments.length - 1]}`
+}
+
+async function syncReportMetadata() {
+  const [{ users, currentUser }, reportCenterModule] = await Promise.all([
+    import(new URL("../lib/mock-data/identity.ts", import.meta.url)),
+    import(new URL("../lib/mock-data/report-center.ts", import.meta.url)),
+  ])
+
+  const profileIdByDisplayName = new Map(
+    users.map(user => [user.displayName ?? `${user.firstName} ${user.lastName}`.trim(), user.id])
+  )
+
+  const savedReportRows = (reportCenterModule.savedReports ?? []).map(report => {
+    const ownerId = profileIdByDisplayName.get(report.createdBy) ?? currentUser.id
+    return {
+      id: report.id,
+      profile_id: ownerId,
+      organization_id: "org-northstar",
+      name: report.name,
+      description: report.description ?? null,
+      category: report.category ?? null,
+      type: report.type,
+      filters: serializeReportFilters(report.filters),
+      columns: serializeForDatabase(report.columns ?? []),
+      group_by: report.groupBy ?? null,
+      sort_by: report.sortBy ?? null,
+      created_by: ownerId,
+      created_by_name: report.createdBy,
+      is_favorite: Boolean(report.isFavorite),
+      last_run_at: report.lastRunAt ? new Date(report.lastRunAt).toISOString() : null,
+      created_at: report.createdAt ? new Date(report.createdAt).toISOString() : new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+  })
+
+  if (savedReportRows.length) {
+    const { error: savedReportError } = await supabase.from("saved_reports").upsert(savedReportRows, { onConflict: "id" })
+    if (savedReportError) {
+      throw savedReportError
+    }
+  }
+
+  const pinnedReportRows = (reportCenterModule.pinnedReports ?? []).map(report => ({
+    id: `rp-${report.id}`,
+    profile_id: currentUser.id,
+    organization_id: "org-northstar",
+    report_id: null,
+    report_key: `builtin:${report.id}`,
+    name: report.name,
+    type: report.type,
+    href: report.href,
+    source: "builtin",
+    last_run_at: report.lastRunAt ? new Date(report.lastRunAt).toISOString() : null,
+    is_pinned: Boolean(report.isPinned),
+    created_at: new Date().toISOString(),
+  }))
+
+  if (pinnedReportRows.length) {
+    const { error: pinError } = await supabase.from("report_pins").upsert(pinnedReportRows, { onConflict: "profile_id,report_key" })
+    if (pinError) {
+      throw pinError
+    }
+  }
+
+  const reportActivityRows = (reportCenterModule.recentReports ?? []).map(report => ({
+    id: `ra-${report.id}`,
+    profile_id: currentUser.id,
+    organization_id: "org-northstar",
+    report_id: null,
+    report_key: inferBuiltInReportKey(report.href),
+    name: report.name,
+    type: report.type,
+    href: report.href,
+    activity_type: "view",
+    actor_name: currentUser.displayName ?? `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+    duration_ms: 2100,
+    metadata: serializeForDatabase(report),
+    created_at: report.viewedAt ? new Date(report.viewedAt).toISOString() : new Date().toISOString(),
+  }))
+
+  if (reportActivityRows.length) {
+    const { error: reportActivityError } = await supabase.from("report_activity").upsert(reportActivityRows, { onConflict: "id" })
+    if (reportActivityError) {
+      throw reportActivityError
+    }
+  }
+}
+
 async function main() {
   await syncDatasets()
   await syncProfilesAndMemberships()
   await syncNotificationsAndActivity()
-  console.log("Supabase runtime datasets, profiles, memberships, preferences, and notifications synced.")
+  await syncReportMetadata()
+  console.log("Supabase runtime datasets, profiles, memberships, preferences, notifications, and report metadata synced.")
 }
 
 main().catch(error => {

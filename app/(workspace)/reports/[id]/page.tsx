@@ -106,7 +106,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
       <div className="p-6">
         <Alert variant="destructive">
           <AlertTitle>Report not found</AlertTitle>
-          <AlertDescription>The saved report you requested could not be loaded from the demo dataset.</AlertDescription>
+          <AlertDescription>The saved report you requested could not be loaded from the database.</AlertDescription>
         </Alert>
       </div>
     )

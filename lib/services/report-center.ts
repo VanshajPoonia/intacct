@@ -1,81 +1,32 @@
-import type { DateRangeFilter, DateRangePreset, FinanceFilters } from "@/lib/types"
+import type {
+  DateRangeFilter,
+  DateRangePreset,
+  FinanceFilters,
+  ReportComparisonRow,
+  ReportDetailData,
+  ReportSummaryMetric,
+  ReportsCenterData,
+  ReportsCenterEntry,
+  SavedReport,
+} from "@/lib/types"
 import { getEntities } from "./master-data"
-import { getPinnedReports, getRecentReports, getSavedReports, type SavedReport } from "./legacy"
+import { getBuiltInReportSections } from "./report-catalog"
+import {
+  getPinnedReports,
+  getRecentReports,
+  getReportRunHistory,
+  getSavedReportById,
+  getSavedReports,
+  recordReportActivity,
+} from "./report-metadata"
 import { getBalanceSheet, getBudgetVsActual, getCashFlow, getPnL, getTrialBalance } from "./reporting"
-
-export interface ReportsCenterEntry {
-  id: string
-  name: string
-  href: string
-  description: string
-  starred?: boolean
-  source: "builtin" | "saved"
-}
-
-export interface ReportsCenterSection {
-  id: "financial" | "general-ledger" | "accounts-payable" | "accounts-receivable" | "cash-management" | "planning"
-  title: string
-  description: string
-  reports: ReportsCenterEntry[]
-}
-
-export interface ReportsCenterData {
-  sections: ReportsCenterSection[]
-  savedReports: SavedReport[]
-  recentReports: Awaited<ReturnType<typeof getRecentReports>>
-  pinnedReports: Awaited<ReturnType<typeof getPinnedReports>>
-  favoriteEntries: ReportsCenterEntry[]
-}
-
-export interface ReportSummaryMetric {
-  id: string
-  label: string
-  value: string
-  detail: string
-  tone: "neutral" | "positive" | "warning" | "critical"
-}
-
-export interface ReportComparisonRow {
-  category: string
-  current: number
-  previous: number
-  budget: number
-  variance: number
-}
-
-export interface ReportRunHistoryItem {
-  id: string
-  date: Date
-  user: string
-  duration: string
-}
-
-export interface ReportDetailData {
-  report: SavedReport
-  summaryMetrics: ReportSummaryMetric[]
-  comparisonRows: ReportComparisonRow[]
-  chartRows: Array<{ name: string; current: number; previous: number; budget: number }>
-  pieRows: Array<{ name: string; value: number }>
-  runHistory: ReportRunHistoryItem[]
-  availableEntities: Array<{ id: string; name: string }>
-}
-
-function createBuiltinEntry(
-  id: string,
-  name: string,
-  href: string,
-  description: string,
-  starred: boolean = false
-): ReportsCenterEntry {
-  return { id, name, href, description, starred, source: "builtin" }
-}
 
 function toSavedReportEntry(report: SavedReport): ReportsCenterEntry {
   return {
     id: report.id,
     name: report.name,
     href: `/reports/${report.id}`,
-    description: report.groupBy ? `Grouped by ${report.groupBy}` : "Saved report configuration",
+    description: report.description ?? (report.groupBy ? `Grouped by ${report.groupBy}` : "Saved report configuration"),
     starred: report.isFavorite,
     source: "saved",
   }
@@ -166,15 +117,6 @@ function createRow(category: string, current: number, previous: number, budget: 
   }
 }
 
-function buildRunHistory(report: SavedReport): ReportRunHistoryItem[] {
-  const lastRun = report.lastRunAt ?? new Date()
-  return [
-    { id: `${report.id}-run-1`, date: lastRun, user: report.createdBy, duration: "2.1s" },
-    { id: `${report.id}-run-2`, date: new Date(lastRun.getTime() - 24 * 60 * 60 * 1000), user: "Michael Johnson", duration: "1.9s" },
-    { id: `${report.id}-run-3`, date: new Date(lastRun.getTime() - 48 * 60 * 60 * 1000), user: report.createdBy, duration: "2.4s" },
-  ]
-}
-
 function buildDetailMetrics(
   report: SavedReport,
   rows: ReportComparisonRow[]
@@ -222,21 +164,20 @@ async function buildRowsForReport(report: SavedReport, filters: FinanceFilters):
     case "balance_sheet": {
       const balanceSheet = await getBalanceSheet(filters)
       return [
-        createRow("Current Assets", balanceSheet.assets.currentAssets.total, balanceSheet.assets.currentAssets.total * 0.95, balanceSheet.assets.currentAssets.total * 1.02),
-        createRow("Non-current Assets", balanceSheet.assets.nonCurrentAssets.total, balanceSheet.assets.nonCurrentAssets.total * 0.94, balanceSheet.assets.nonCurrentAssets.total * 1.01),
-        createRow("Current Liabilities", balanceSheet.liabilities.currentLiabilities.total, balanceSheet.liabilities.currentLiabilities.total * 0.96, balanceSheet.liabilities.currentLiabilities.total * 0.99),
-        createRow("Non-current Liabilities", balanceSheet.liabilities.nonCurrentLiabilities.total, balanceSheet.liabilities.nonCurrentLiabilities.total * 0.97, balanceSheet.liabilities.nonCurrentLiabilities.total * 0.98),
-        createRow("Equity", balanceSheet.equity.total, balanceSheet.equity.total * 0.95, balanceSheet.equity.total * 1.02),
+        createRow("Current Assets", balanceSheet.assets.currentAssets.total, balanceSheet.assets.currentAssets.total * 0.94, balanceSheet.assets.currentAssets.total * 1.02),
+        createRow("Non-current Assets", balanceSheet.assets.nonCurrentAssets.total, balanceSheet.assets.nonCurrentAssets.total * 0.98, balanceSheet.assets.nonCurrentAssets.total * 1.01),
+        createRow("Current Liabilities", balanceSheet.liabilities.currentLiabilities.total, balanceSheet.liabilities.currentLiabilities.total * 0.97, balanceSheet.liabilities.currentLiabilities.total * 1.01),
+        createRow("Non-current Liabilities", balanceSheet.liabilities.nonCurrentLiabilities.total, balanceSheet.liabilities.nonCurrentLiabilities.total * 0.95, balanceSheet.liabilities.nonCurrentLiabilities.total * 0.99),
+        createRow("Equity", balanceSheet.equity.total, balanceSheet.equity.total * 1.03, balanceSheet.equity.total * 1.01),
       ]
     }
     case "cash_flow": {
       const cashFlow = await getCashFlow(filters)
       return [
-        createRow("Operating Activities", cashFlow.operatingActivities.total, cashFlow.operatingActivities.total * 0.93, cashFlow.operatingActivities.total * 1.05),
-        createRow("Investing Activities", cashFlow.investingActivities.total, cashFlow.investingActivities.total * 0.91, cashFlow.investingActivities.total * 0.98),
-        createRow("Financing Activities", cashFlow.financingActivities.total, cashFlow.financingActivities.total * 0.94, cashFlow.financingActivities.total * 1.01),
-        createRow("Net Change in Cash", cashFlow.netChangeInCash, cashFlow.netChangeInCash * 0.95, cashFlow.netChangeInCash * 1.02),
-        createRow("Beginning Cash", cashFlow.beginningCash, cashFlow.beginningCash * 0.97, cashFlow.beginningCash),
+        createRow("Operating Activities", cashFlow.operatingActivities.total, cashFlow.operatingActivities.total * 0.91, cashFlow.operatingActivities.total * 1.04),
+        createRow("Investing Activities", cashFlow.investingActivities.total, cashFlow.investingActivities.total * 1.12, cashFlow.investingActivities.total * 0.98),
+        createRow("Financing Activities", cashFlow.financingActivities.total, cashFlow.financingActivities.total * 0.95, cashFlow.financingActivities.total * 1.01),
+        createRow("Net Change In Cash", cashFlow.netChangeInCash, cashFlow.previousNetChangeInCash, cashFlow.netChangeInCash * 1.02),
         createRow("Ending Cash", cashFlow.endingCash, cashFlow.endingCash * 0.96, cashFlow.endingCash * 1.03),
       ]
     }
@@ -282,70 +223,7 @@ export async function getReportsCenterData(): Promise<ReportsCenterData> {
     getPinnedReports(),
   ])
 
-  const sections: ReportsCenterSection[] = [
-    {
-      id: "financial",
-      title: "Financial Statements",
-      description: "Core statement reporting and executive readouts",
-      reports: [
-        createBuiltinEntry("balance-sheet", "Balance Sheet", "/reports/balance-sheet", "Assets, liabilities, and equity by entity", true),
-        createBuiltinEntry("income-statement", "Income Statement", "/reports/income-statement", "Revenue, expenses, and margin performance", true),
-        createBuiltinEntry("cash-flow", "Cash Flow Statement", "/reports/cash-flow", "Operating, investing, and financing movement"),
-        createBuiltinEntry("budget-vs-actual", "Budget vs Actual", "/reports/budget-vs-actual", "Variance review for planning and close", true),
-      ],
-    },
-    {
-      id: "general-ledger",
-      title: "General Ledger",
-      description: "Period validation and account-level review",
-      reports: [
-        createBuiltinEntry("trial-balance", "Trial Balance", "/general-ledger/reports/trial-balance", "Validate account balances before close", true),
-        createBuiltinEntry("journal-workspace", "Journal Workspace", "/general-ledger/journal-entries", "Drill into journal activity and posting states"),
-        createBuiltinEntry("chart-workspace", "Chart of Accounts", "/general-ledger/chart-of-accounts", "Inspect account setup and drill-downs"),
-      ],
-    },
-    {
-      id: "accounts-payable",
-      title: "Accounts Payable",
-      description: "Vendor liability and payment readiness views",
-      reports: [
-        createBuiltinEntry("ap-aging", "AP Aging", "/accounts-payable/aging", "Outstanding vendor obligations by aging bucket", true),
-        createBuiltinEntry("payment-queue", "Payment Queue", "/accounts-payable/payments", "Scheduled, pending, and released payments"),
-        createBuiltinEntry("vendor-master", "Vendor Master Review", "/accounts-payable/vendors", "Vendor balance and master data exceptions"),
-      ],
-    },
-    {
-      id: "accounts-receivable",
-      title: "Accounts Receivable",
-      description: "Collections, customer balance, and receipt application",
-      reports: [
-        createBuiltinEntry("ar-aging", "AR Aging", "/accounts-receivable/aging", "Outstanding receivables by aging bucket", true),
-        createBuiltinEntry("collections", "Collections Queue", "/accounts-receivable/collections", "Collections priority and follow-up tasks"),
-        createBuiltinEntry("receipts", "Receipts Application", "/accounts-receivable/receipts", "Receipt matching and unapplied cash review"),
-      ],
-    },
-    {
-      id: "cash-management",
-      title: "Cash Management",
-      description: "Liquidity, bank activity, and reconciliation",
-      reports: [
-        createBuiltinEntry("cash-overview", "Cash Position", "/cash-management", "Bank balances and current liquidity"),
-        createBuiltinEntry("bank-transactions", "Bank Transactions", "/cash-management/transactions", "Cash movement and matching candidates"),
-        createBuiltinEntry("reconciliation", "Reconciliation Workspace", "/cash-management/reconciliation", "Exception review for unreconciled activity"),
-      ],
-    },
-    {
-      id: "planning",
-      title: "Budgets & Forecasting",
-      description: "Planning, forecast, and variance review",
-      reports: [
-        createBuiltinEntry("planning-hub", "Planning Workspace", "/budgets-forecasting", "Budget versions, scenarios, and submission queue"),
-        createBuiltinEntry("variance-review", "Variance Review", "/reports/budget-vs-actual", "Current plan variance across dimensions"),
-        createBuiltinEntry("dashboard-customization", "Dashboard Library", "/dashboards", "Executive and operator dashboard outputs"),
-      ],
-    },
-  ]
-
+  const sections = getBuiltInReportSections()
   const savedEntries = savedReports.map(toSavedReportEntry)
   const favoriteEntries = uniqueEntries([
     ...sections.flatMap(section => section.reports.filter(report => report.starred)),
@@ -365,12 +243,19 @@ export async function getReportDetailData(
   id: string,
   options?: { entityId?: string; datePreset?: DateRangePreset }
 ): Promise<ReportDetailData | null> {
-  const [savedReports, entities] = await Promise.all([getSavedReports(), getEntities()])
-  const report = savedReports.find(item => item.id === id)
-
+  const [report, entities] = await Promise.all([getSavedReportById(id), getEntities()])
   if (!report) {
     return null
   }
+
+  await recordReportActivity({
+    reportId: report.id,
+    reportKey: `saved:${report.id}`,
+    name: report.name,
+    type: report.type,
+    href: `/reports/${report.id}`,
+    activityType: "view",
+  })
 
   const filters = mergeReportFilters(report, options?.entityId, options?.datePreset)
   const comparisonRows = await buildRowsForReport(report, filters)
@@ -385,6 +270,7 @@ export async function getReportDetailData(
     .map(row => ({ name: row.category, value: Math.abs(row.current) }))
     .filter(row => row.value > 0)
     .slice(0, 5)
+  const runHistory = await getReportRunHistory(report.id)
 
   return {
     report,
@@ -392,7 +278,7 @@ export async function getReportDetailData(
     comparisonRows,
     chartRows,
     pieRows,
-    runHistory: buildRunHistory(report),
+    runHistory,
     availableEntities: entities.map(entity => ({ id: entity.id, name: entity.name })),
   }
 }

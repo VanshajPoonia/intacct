@@ -1,8 +1,8 @@
 "use client"
 
-import { Search } from "lucide-react"
+import { Search, Settings2 } from "lucide-react"
 import { Breadcrumbs } from "@/components/navigation/breadcrumbs"
-import { SavedViews } from "@/components/saved-views"
+import { WorkspaceSavedViews } from "@/components/finance/workspace-saved-views"
 import {
   DenseSectionHeader,
   WorkspaceBreadcrumbRow,
@@ -11,6 +11,14 @@ import {
 } from "@/components/layout/workspace-primitives"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -20,21 +28,26 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { ReactNode } from "react"
-import type { SortConfig, WorkspaceAction, WorkspaceFilterDefinition, WorkspaceMetricCard } from "@/lib/types"
+import type {
+  SavedView,
+  SortConfig,
+  WorkspaceAction,
+  WorkspaceFilterDefinition,
+  WorkspaceMetricCard,
+} from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { getShellIcon } from "@/lib/utils/shell-icons"
 import { OperatorDataTable, type OperatorTableColumn } from "./operator-data-table"
 
 interface OperatorListWorkspaceProps<Row> {
   moduleKey: string
+  moduleLabel: string
   eyebrow?: string
   title: string
   description: string
   metrics: WorkspaceMetricCard[]
   actions?: WorkspaceAction[]
   actionHandlers?: Partial<Record<string, () => void>>
-  currentFilters: Record<string, unknown>
-  onApplySavedView: (filters: Record<string, unknown>) => void
   search: string
   onSearchChange: (value: string) => void
   searchPlaceholder?: string
@@ -42,6 +55,17 @@ interface OperatorListWorkspaceProps<Row> {
     value: string
     onChange: (value: string) => void
   }>
+  savedViews: SavedView[]
+  activeViewId: string | null
+  viewsLoading?: boolean
+  viewsSaving?: boolean
+  onApplySavedView: (view: SavedView) => void
+  onSaveView: (payload: { name: string; isDefault: boolean }) => void
+  onDeleteView: (view: SavedView) => void
+  onSetDefaultView: (view: SavedView) => void
+  visibleColumnIds?: string[]
+  onToggleColumn?: (columnId: string, visible: boolean) => void
+  columnOptions?: Array<{ id: string; label: string }>
   bulkActions?: Array<{
     id: string
     label: string
@@ -77,19 +101,28 @@ const toneClasses = {
 } as const
 
 export function OperatorListWorkspace<Row>({
-  moduleKey,
+  moduleLabel,
   eyebrow,
   title,
   description,
   metrics,
   actions = [],
   actionHandlers,
-  currentFilters,
-  onApplySavedView,
   search,
   onSearchChange,
   searchPlaceholder = "Search records...",
   filters = [],
+  savedViews,
+  activeViewId,
+  viewsLoading = false,
+  viewsSaving = false,
+  onApplySavedView,
+  onSaveView,
+  onDeleteView,
+  onSetDefaultView,
+  visibleColumnIds = [],
+  onToggleColumn,
+  columnOptions = [],
   bulkActions = [],
   rows,
   columns,
@@ -109,13 +142,34 @@ export function OperatorListWorkspace<Row>({
   onPageChange,
   onPageSizeChange,
 }: OperatorListWorkspaceProps<Row>) {
+  const effectiveVisibleColumnIds = visibleColumnIds.length ? visibleColumnIds : columns.map(column => column.id)
+  const filteredColumns = visibleColumnIds.length
+    ? columns.filter(column => effectiveVisibleColumnIds.includes(column.id))
+    : columns
+  const resolvedColumnOptions = columnOptions.length
+    ? columnOptions
+    : columns.map(column => ({
+        id: column.id,
+        label: column.label,
+      }))
+
   return (
     <WorkspaceContentContainer className="gap-5">
       <WorkspacePageToolbar>
         <WorkspaceBreadcrumbRow>
           <Breadcrumbs />
           <div className="flex items-center gap-2">
-            <SavedViews module={moduleKey} currentFilters={currentFilters} onApplyView={onApplySavedView} />
+            <WorkspaceSavedViews
+              moduleLabel={moduleLabel}
+              views={savedViews}
+              activeViewId={activeViewId}
+              isLoading={viewsLoading}
+              isSaving={viewsSaving}
+              onApplyView={onApplySavedView}
+              onSaveView={onSaveView}
+              onDeleteView={onDeleteView}
+              onSetDefaultView={onSetDefaultView}
+            />
           </div>
         </WorkspaceBreadcrumbRow>
       </WorkspacePageToolbar>
@@ -206,6 +260,29 @@ export function OperatorListWorkspace<Row>({
                 </SelectContent>
               </Select>
             ))}
+            {resolvedColumnOptions.length && onToggleColumn ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="rounded-sm">
+                    <Settings2 className="mr-2 h-4 w-4" />
+                    Columns
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Visible Columns</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {resolvedColumnOptions.map(option => (
+                    <DropdownMenuCheckboxItem
+                      key={option.id}
+                      checked={effectiveVisibleColumnIds.includes(option.id)}
+                      onCheckedChange={value => onToggleColumn(option.id, Boolean(value))}
+                    >
+                      {option.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
           </div>
         </div>
 
@@ -233,7 +310,7 @@ export function OperatorListWorkspace<Row>({
 
         <OperatorDataTable
           rows={rows}
-          columns={columns}
+          columns={filteredColumns}
           rowId={rowId}
           sort={sort}
           selectedIds={selectedIds}

@@ -1,17 +1,16 @@
-import type { PaginatedResponse } from '../types'
-import type { AuditLogEntry } from './legacy'
+import type { AuditLogEntry, PaginatedResponse } from '../types'
 
 export type PaginatedAuditLogs = PaginatedResponse<AuditLogEntry>
 
 export { formatCurrency, formatDate } from '../utils'
 
 export type {
-  AuditLogEntry,
   CorporateCardSummary,
   ShortTermObligations,
 } from './legacy'
 
 export type {
+  AuditLogEntry,
   BudgetActualData,
   CashFlowData,
   Department,
@@ -35,14 +34,34 @@ export {
 } from './identity'
 
 export {
+  getAccountById,
+  getBankAccountById,
+  getBankAccounts,
   getChartOfAccounts,
   getEntities,
+  getJournalEntryById,
   getJournalEntries,
   getTransactions,
+  getTransactionById,
 } from './master-data'
 
-export { getBills } from './payables'
-export { getInvoices } from './receivables'
+export {
+  getBillById,
+  getBills,
+  getPaymentById,
+  getPayments,
+  getVendorById,
+  getVendors,
+} from './payables'
+
+export {
+  getCustomerById,
+  getCustomers,
+  getInvoiceById,
+  getInvoices,
+  getReceiptById,
+  getReceipts,
+} from './receivables'
 
 export {
   getBalanceSheet,
@@ -87,10 +106,15 @@ export {
 } from './report-metadata'
 
 export {
+  getCashPosition,
   getCloseStatus,
   getCloseTasks,
   getReconciliationData,
+  getReconciliationItems,
+  getReconciliationSummary,
 } from './close'
+
+export { getAuditLogs } from './audit'
 
 export {
   applyBulkWorkQueueAction,
@@ -387,22 +411,14 @@ export {
   getAIInsights,
   getAllocationById,
   getAllocations,
-  getAccountById,
   getApiKeys,
   getApprovalItems,
   getAPAging,
   getARAging,
-  getAuditLogs,
-  getBankAccountById,
-  getBankAccounts,
-  getCashPosition,
   getCashWeekly,
-  getBillById,
   getContractExpensesByRep,
   getCorporateCardSummary,
   getCorporateCardTransactions,
-  getCustomerById,
-  getCustomers,
   getDepartmentExpenses,
   getDepartments,
   getDimensions,
@@ -410,23 +426,15 @@ export {
   getEntityPerformance,
   getExpenseEntries,
   getIntegrations,
-  getInvoiceById,
-  getJournalEntryById,
   getLocations,
   getNotifications,
-  getPaymentById,
-  getPayments,
   getProjectDetailById,
   getProjectDetails,
   getProjects,
   getPurchaseOrderById,
   getPurchaseOrders,
-  getReceiptById,
-  getReceipts,
   getRecurringJournalById,
   getRecurringJournals,
-  getReconciliationItems,
-  getReconciliationSummary,
   getRevenueByChannel,
   getRevenueTrend,
   getSalesOrderById,
@@ -434,11 +442,8 @@ export {
   getShortTermObligations,
   getTasks,
   getTimeEntries,
-  getTransactionById,
   getTransfers,
   getUnreadCount,
-  getVendorById,
-  getVendors,
   getWorkflows,
   invoiceSalesOrder,
   lockPeriod,

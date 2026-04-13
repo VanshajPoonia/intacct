@@ -269,3 +269,101 @@ export interface SavedView {
   createdAt: Date
   updatedAt?: Date
 }
+
+export type SavedReportType =
+  | 'balance_sheet'
+  | 'income_statement'
+  | 'cash_flow'
+  | 'budget_vs_actual'
+  | 'trial_balance'
+  | 'custom'
+
+export interface SavedReport {
+  id: string
+  name: string
+  type: SavedReportType
+  description?: string
+  category?: string
+  filters: Partial<DashboardFilters>
+  columns: string[]
+  groupBy?: string
+  sortBy?: string
+  createdBy: string
+  createdAt: Date
+  lastRunAt?: Date
+  isFavorite: boolean
+}
+
+export interface RecentReport {
+  id: string
+  name: string
+  type: string
+  href: string
+  viewedAt: Date
+}
+
+export interface PinnedReport {
+  id: string
+  name: string
+  type: string
+  href: string
+  lastRunAt?: Date
+  isPinned: boolean
+}
+
+export interface ReportsCenterEntry {
+  id: string
+  name: string
+  href: string
+  description: string
+  starred?: boolean
+  source: 'builtin' | 'saved'
+}
+
+export interface ReportsCenterSection {
+  id: 'financial' | 'general-ledger' | 'accounts-payable' | 'accounts-receivable' | 'cash-management' | 'planning'
+  title: string
+  description: string
+  reports: ReportsCenterEntry[]
+}
+
+export interface ReportsCenterData {
+  sections: ReportsCenterSection[]
+  savedReports: SavedReport[]
+  recentReports: RecentReport[]
+  pinnedReports: PinnedReport[]
+  favoriteEntries: ReportsCenterEntry[]
+}
+
+export interface ReportSummaryMetric {
+  id: string
+  label: string
+  value: string
+  detail: string
+  tone: 'neutral' | 'positive' | 'warning' | 'critical'
+}
+
+export interface ReportComparisonRow {
+  category: string
+  current: number
+  previous: number
+  budget: number
+  variance: number
+}
+
+export interface ReportRunHistoryItem {
+  id: string
+  date: Date
+  user: string
+  duration: string
+}
+
+export interface ReportDetailData {
+  report: SavedReport
+  summaryMetrics: ReportSummaryMetric[]
+  comparisonRows: ReportComparisonRow[]
+  chartRows: Array<{ name: string; current: number; previous: number; budget: number }>
+  pieRows: Array<{ name: string; value: number }>
+  runHistory: ReportRunHistoryItem[]
+  availableEntities: Array<{ id: string; name: string }>
+}

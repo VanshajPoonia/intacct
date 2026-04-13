@@ -1,5 +1,6 @@
 import type {
   Account,
+  BankAccount,
   Department,
   Dimension,
   Employee,
@@ -22,6 +23,7 @@ let projects: Project[] = []
 let employees: Employee[] = []
 let dimensions: Dimension[] = []
 let accounts: Account[] = []
+let bankAccounts: BankAccount[] = []
 let transactions: Transaction[] = []
 let journalEntries: JournalEntry[] = []
 
@@ -35,7 +37,12 @@ async function ensureMasterDataState() {
       employees: Employee[]
       dimensions: Dimension[]
     }>("organization"),
-    getRuntimeDataset<{ accounts: Account[]; transactions: Transaction[]; journalEntries: JournalEntry[] }>("accounting"),
+    getRuntimeDataset<{
+      accounts: Account[]
+      bankAccounts: BankAccount[]
+      transactions: Transaction[]
+      journalEntries: JournalEntry[]
+    }>("accounting"),
   ])
 
   entities = organization.entities
@@ -45,6 +52,7 @@ async function ensureMasterDataState() {
   employees = organization.employees
   dimensions = organization.dimensions
   accounts = accounting.accounts
+  bankAccounts = accounting.bankAccounts
   transactions = accounting.transactions
   journalEntries = accounting.journalEntries
 }
@@ -210,4 +218,34 @@ export async function getChartOfAccounts(
   }
 
   return sort ? sortItems(filtered, sort) : filtered
+}
+
+export async function getBankAccounts(): Promise<BankAccount[]> {
+  await ensureMasterDataState()
+  await delay()
+  return [...bankAccounts]
+}
+
+export async function getBankAccountById(id: string): Promise<BankAccount | null> {
+  await ensureMasterDataState()
+  await delay()
+  return bankAccounts.find(account => account.id === id) ?? null
+}
+
+export async function getJournalEntryById(id: string): Promise<JournalEntry | null> {
+  await ensureMasterDataState()
+  await delay()
+  return journalEntries.find(entry => entry.id === id) ?? null
+}
+
+export async function getAccountById(id: string): Promise<Account | null> {
+  await ensureMasterDataState()
+  await delay()
+  return accounts.find(account => account.id === id) ?? null
+}
+
+export async function getTransactionById(id: string): Promise<Transaction | null> {
+  await ensureMasterDataState()
+  await delay()
+  return transactions.find(transaction => transaction.id === id) ?? null
 }

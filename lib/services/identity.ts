@@ -101,6 +101,7 @@ export async function getPreferences(): Promise<UserPreferences> {
   if (!session.preferences) {
     return {
       theme: "system",
+      defaultRole: undefined,
       defaultEntity: "e4",
       defaultDateRange: "this_month",
       sidebarCollapsed: false,

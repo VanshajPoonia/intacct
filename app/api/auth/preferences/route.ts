@@ -40,6 +40,7 @@ export async function PATCH(request: NextRequest) {
     {
       profile_id: user.id,
       theme: nextPreferences.theme,
+      default_role_id: nextPreferences.defaultRole ?? null,
       default_entity_id: nextPreferences.defaultEntity,
       default_date_range: nextPreferences.defaultDateRange,
       sidebar_collapsed: nextPreferences.sidebarCollapsed,

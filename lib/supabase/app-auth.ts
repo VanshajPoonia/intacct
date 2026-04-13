@@ -33,6 +33,7 @@ type OrganizationRow = {
 
 type PreferenceRow = {
   theme: UserPreferences["theme"]
+  default_role_id: string | null
   default_entity_id: string | null
   default_date_range: UserPreferences["defaultDateRange"]
   sidebar_collapsed: boolean
@@ -190,7 +191,7 @@ export async function getUserPreferences(profileId: string, fallbackEntityId?: s
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from("user_preferences")
-    .select("theme, default_entity_id, default_date_range, sidebar_collapsed, notifications")
+    .select("theme, default_role_id, default_entity_id, default_date_range, sidebar_collapsed, notifications")
     .eq("profile_id", profileId)
     .maybeSingle<PreferenceRow>()
 
@@ -200,6 +201,7 @@ export async function getUserPreferences(profileId: string, fallbackEntityId?: s
 
   return {
     theme: data?.theme ?? "system",
+    defaultRole: (data?.default_role_id as UserPreferences["defaultRole"]) ?? undefined,
     defaultEntity: data?.default_entity_id ?? fallbackEntityId ?? "e4",
     defaultDateRange: data?.default_date_range ?? "this_month",
     sidebarCollapsed: data?.sidebar_collapsed ?? false,

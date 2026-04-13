@@ -1,5 +1,5 @@
-import { AdminWorkspacePage } from "@/components/admin/platform-module-pages"
+import { UsersAccessPage } from "@/components/admin/users-access-page"
 
 export default function UsersPage() {
-  return <AdminWorkspacePage sectionId="users" />
+  return <UsersAccessPage />
 }

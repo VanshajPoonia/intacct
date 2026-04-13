@@ -1,4 +1,4 @@
-import type { RoleId } from './identity'
+import type { Permission, RoleId } from './identity'
 import type { SortConfig } from './common'
 import type {
   ModuleOverviewData,
@@ -236,6 +236,105 @@ export interface EventMonitoringRecord {
   occurredAt: Date
   message: string
   resolutionHint?: string
+}
+
+export interface UserAccessOrganization {
+  id: string
+  name: string
+  slug: string
+}
+
+export interface UserAccessEntityOption {
+  id: string
+  name: string
+  code: string
+  type: 'primary' | 'subsidiary' | 'consolidated'
+  status: 'active' | 'inactive'
+  organizationId: string
+  organizationName: string
+  parentEntityId?: string
+}
+
+export interface UserAccessRoleOption {
+  id: RoleId
+  name: string
+  description: string
+  accentLabel: string
+  permissions: Array<{
+    id: Permission
+    label: string
+  }>
+}
+
+export interface UserAccessRecord {
+  id: string
+  organizationId: string
+  organizationName: string
+  organizationSlug: string
+  username: string
+  email: string
+  firstName: string
+  lastName: string
+  displayName: string
+  title?: string
+  role: RoleId
+  roleIds: RoleId[]
+  status: 'active' | 'inactive' | 'pending'
+  entityIds: string[]
+  entityNames: string[]
+  primaryEntityId?: string
+  primaryEntityName?: string
+  lastLoginAt?: Date
+  createdAt: Date
+  avatar?: string
+  isGlobalAdmin: boolean
+}
+
+export interface UserAccessActivityItem {
+  id: string
+  type: 'audit' | 'activity'
+  title: string
+  description?: string
+  createdAt: Date
+}
+
+export interface UserAccessDetail extends UserAccessRecord {
+  roleName: string
+  roleDescription: string
+  permissions: Array<{
+    id: Permission
+    label: string
+  }>
+  entities: UserAccessEntityOption[]
+  organization: UserAccessOrganization
+  recentActivity: UserAccessActivityItem[]
+}
+
+export interface UserAccessFormInput {
+  organizationId: string
+  username: string
+  email: string
+  firstName: string
+  lastName: string
+  title?: string
+  roleId: RoleId
+  entityIds: string[]
+  primaryEntityId?: string
+  status: 'active' | 'inactive' | 'pending'
+  password?: string
+}
+
+export interface UserAccessOptions {
+  currentUser: {
+    id: string
+    organizationId: string
+    organizationSlug: string
+    isGlobalAdmin: boolean
+    canManageUsers: boolean
+  }
+  organizations: UserAccessOrganization[]
+  entities: UserAccessEntityOption[]
+  roles: UserAccessRoleOption[]
 }
 
 export type AdminWorkspaceSectionId =

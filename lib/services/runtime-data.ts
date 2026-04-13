@@ -15,6 +15,7 @@ export type RuntimeDatasetDomain =
   | "fixed_assets"
   | "contracts_revenue"
   | "platform"
+  | "platform_overviews"
 
 type RuntimeDatasetResponse<T> = {
   domain: RuntimeDatasetDomain

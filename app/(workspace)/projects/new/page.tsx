@@ -53,8 +53,8 @@ export default function NewProjectPage() {
       if (!cancelled) {
         setEntities(entityData)
         setCustomers(customerResponse.data)
-        setUsers(usersData.filter(user => user.status === "active"))
-        setManagerId(usersData.find(user => user.status === "active")?.id ?? "")
+        setUsers(usersData.data.filter(user => user.status === "active"))
+        setManagerId(usersData.data.find(user => user.status === "active")?.id ?? "")
         setLoading(false)
       }
     }

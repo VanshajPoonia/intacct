@@ -43,7 +43,7 @@ export default function CompanyPage() {
       ])
       setEntities(entitiesData)
       setDimensions(dimensionsData)
-      setUsers(usersData)
+      setUsers(usersData.data)
       setLoading(false)
     }
     fetchData()

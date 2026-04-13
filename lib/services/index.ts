@@ -310,6 +310,22 @@ export {
 } from './contracts-revenue-workspace'
 
 export {
+  createUser,
+  createUserAccessUser,
+  deactivateUser,
+  getUserAccessOptions,
+  getUserAccessRecords,
+  getUserById,
+  getUsers,
+  impersonateUser,
+  reactivateUser,
+  resetUserPassword,
+  stopUserImpersonation,
+  updateUser,
+  updateUserAccessUser,
+} from './users-access'
+
+export {
   departments,
   employees,
   locations,
@@ -345,11 +361,9 @@ export {
   createTask,
   createTimeEntry,
   createTransfer,
-  createUser,
   createVendor,
   createWorkflow,
   deactivateAllocation,
-  deactivateUser,
   deleteAccount,
   deleteReport,
   disconnectIntegration,
@@ -412,7 +426,6 @@ export {
   getTransactionById,
   getTransfers,
   getUnreadCount,
-  getUsers,
   getVendorById,
   getVendors,
   getWorkflows,
@@ -455,7 +468,6 @@ export {
   updateInvoice,
   updateProjectStatus,
   updateTaskStatus,
-  updateUser,
   updateVendor,
   updateWorkflowStatus,
   voidBill,

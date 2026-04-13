@@ -34,6 +34,12 @@ export async function fetchInternalApi<T>(path: string, init?: RequestInit): Pro
   })
 
   if (!response.ok) {
+    const contentType = response.headers.get("content-type") ?? ""
+    if (contentType.includes("application/json")) {
+      const payload = (await response.json()) as { error?: string }
+      throw new InternalApiError(payload.error || `Request failed with status ${response.status}`, response.status)
+    }
+
     const errorText = await response.text()
     throw new InternalApiError(errorText || `Request failed with status ${response.status}`, response.status)
   }

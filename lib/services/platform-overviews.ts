@@ -1,5 +1,6 @@
 import type {
   AIInsight,
+  ApprovalItem,
   DashboardMetric,
   FinanceFilters,
   ModuleOverviewData,
@@ -8,9 +9,19 @@ import type {
 } from '@/lib/types'
 import { getCloseStatus, getCloseTasks } from './close'
 import { getDashboardMetrics, getBudgetVsActual, getConsolidatedFinancials, getPnL } from './reporting'
-import { getApprovalItems, getAIInsights, getWorkflows } from './legacy'
+import { getRuntimeDataset } from './runtime-data'
 import { getWorkQueueSummary } from './work-queue'
 import { buildOverviewRow, formatDateLabel, formatMoney, getStatusTone } from './workspace-support'
+
+type PlatformOverviewDataset = {
+  approvalItems: ApprovalItem[]
+  aiInsights: AIInsight[]
+  workflows: Workflow[]
+}
+
+async function getPlatformOverviewDataset() {
+  return getRuntimeDataset<PlatformOverviewDataset>("platform_overviews")
+}
 
 function formatDashboardMetric(metric: DashboardMetric) {
   if (metric.format === 'currency') {
@@ -186,7 +197,12 @@ export async function getAIWorkspaceOverview(
   filters: FinanceFilters,
   roleId?: RoleId
 ): Promise<ModuleOverviewData> {
-  const insights = sortInsightsBySeverity(await getAIInsights(filters))
+  const dataset = await getPlatformOverviewDataset()
+  const scopedInsights =
+    filters.entityId && filters.entityId !== 'e4'
+      ? dataset.aiInsights.slice(0, 3)
+      : dataset.aiInsights
+  const insights = sortInsightsBySeverity(scopedInsights)
   const criticalInsights = insights.filter(insight => insight.severity === 'critical')
   const warningInsights = insights.filter(insight => insight.severity === 'warning')
 
@@ -243,14 +259,16 @@ export async function getWorkflowsAutomationOverview(
   filters: FinanceFilters,
   roleId?: RoleId
 ): Promise<ModuleOverviewData> {
-  const [workflows, approvals, closeTasks, closeStatus] = await Promise.all([
-    getWorkflows(),
-    getApprovalItems(filters, 'pending', 1, 50),
+  const [dataset, closeTasks, closeStatus] = await Promise.all([
+    getPlatformOverviewDataset(),
     getCloseTasks(filters),
     getCloseStatus(filters),
   ])
 
-  const attentionWorkflows = sortWorkflowsForAttention(workflows)
+  const approvals = dataset.approvalItems.filter(item =>
+    !filters.entityId || filters.entityId === 'e4' ? true : item.entityId === filters.entityId
+  )
+  const attentionWorkflows = sortWorkflowsForAttention(dataset.workflows)
   const blockedCloseTasks = closeTasks.filter(task => task.status === 'blocked')
 
   return {
@@ -259,9 +277,9 @@ export async function getWorkflowsAutomationOverview(
     subtitle: 'Track workflow routing, approval load, and automation readiness from one service-driven workspace entry point.',
     badge: roleId === 'admin' ? 'Platform Controls' : 'Finance Controls',
     metrics: [
-      { id: 'wf-total', label: 'Workflows', value: String(workflows.length), detail: 'Active and draft automations', tone: 'neutral' },
-      { id: 'wf-active', label: 'Active', value: String(workflows.filter(workflow => workflow.status === 'active').length), detail: 'Running production workflows', tone: 'positive' },
-      { id: 'wf-approvals', label: 'Pending Approvals', value: String(approvals.total), detail: 'Documents waiting on workflow actions', tone: approvals.total ? 'warning' : 'positive' },
+      { id: 'wf-total', label: 'Workflows', value: String(dataset.workflows.length), detail: 'Active and draft automations', tone: 'neutral' },
+      { id: 'wf-active', label: 'Active', value: String(dataset.workflows.filter(workflow => workflow.status === 'active').length), detail: 'Running production workflows', tone: 'positive' },
+      { id: 'wf-approvals', label: 'Pending Approvals', value: String(approvals.length), detail: 'Documents waiting on workflow actions', tone: approvals.length ? 'warning' : 'positive' },
       { id: 'wf-close-blocked', label: 'Blocked Close Tasks', value: String(closeStatus.blockedTasks), detail: `${blockedCloseTasks.length} tasks currently blocked`, tone: closeStatus.blockedTasks ? 'critical' : 'positive' },
     ],
     actions: [
@@ -288,7 +306,7 @@ export async function getWorkflowsAutomationOverview(
         id: 'wf-approval-load',
         title: 'Approval Workload',
         description: 'Operational approval flow still waiting on workflow completion.',
-        rows: approvals.data.slice(0, 4).map(item =>
+        rows: approvals.slice(0, 4).map(item =>
           buildOverviewRow(item.id, `${item.documentNumber} · ${item.description}`, {
             value: item.type.replace(/_/g, ' '),
             href: '/approvals',

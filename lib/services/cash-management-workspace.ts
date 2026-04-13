@@ -8,10 +8,9 @@ import type {
   WorkspaceDetailData,
   WorkspaceListResponse,
 } from '@/lib/types'
-import { getReconciliationData } from './close'
+import { getCashPosition, getReconciliationData, getReconciliationItems } from './close'
 import { matchesFinanceFilters, paginate, sortItems } from './base'
-import { getEntities, getTransactions } from './master-data'
-import { getBankAccountById, getBankAccounts, getCashPosition, getReconciliationItems, getTransactionById } from './legacy'
+import { getBankAccountById, getBankAccounts, getEntities, getTransactions, getTransactionById } from './master-data'
 import { buildDetailField, buildOverviewRow, formatDateLabel, formatDateTimeLabel, formatMoney, getStatusTone } from './workspace-support'
 
 interface WorkspaceQuery {

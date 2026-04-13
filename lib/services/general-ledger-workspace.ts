@@ -7,10 +7,11 @@ import type {
   WorkspaceDetailData,
   WorkspaceListResponse,
 } from '@/lib/types'
+import { paginate } from './base'
+import { getAuditLogs } from './audit'
 import { getCloseStatus } from './close'
-import { getChartOfAccounts, getEntities, getJournalEntries } from './master-data'
+import { getAccountById, getChartOfAccounts, getEntities, getJournalEntries, getJournalEntryById } from './master-data'
 import { getTrialBalance } from './reporting'
-import { getAccountById, getAuditLogs, getJournalEntryById } from './legacy'
 import { buildDetailField, buildOverviewRow, formatDateLabel, formatDateTimeLabel, formatMoney, getStatusTone } from './workspace-support'
 
 interface WorkspaceQuery {
@@ -228,43 +229,40 @@ export async function getChartOfAccountsWorkspace(
   filters: FinanceFilters,
   query: WorkspaceQuery
 ): Promise<WorkspaceListResponse<Account>> {
-  const result = await getChartOfAccounts(
+  const filteredAccounts = await getChartOfAccounts(
     query.search,
     query.types,
     query.sort ?? { key: 'number', direction: 'asc' },
     filters
   )
 
-  const activeAccounts = result.filter(account => account.status === 'active')
+  const paginated = paginate(filteredAccounts, query.page ?? 1, query.pageSize ?? 15)
+  const activeAccounts = filteredAccounts.filter(account => account.status === 'active')
 
   return {
-    data: result,
-    total: result.length,
-    page: 1,
-    pageSize: result.length,
-    totalPages: 1,
+    ...paginated,
     metrics: [
-      { id: 'accounts-total', label: 'Visible Accounts', value: String(result.length), detail: `${activeAccounts.length} active`, tone: 'neutral' },
+      { id: 'accounts-total', label: 'Visible Accounts', value: String(filteredAccounts.length), detail: `${activeAccounts.length} active`, tone: 'neutral' },
       {
         id: 'accounts-assets',
         label: 'Asset Accounts',
-        value: String(result.filter(account => account.type === 'asset').length),
+        value: String(filteredAccounts.filter(account => account.type === 'asset').length),
         detail: 'Cash, receivables, and fixed assets',
         tone: 'accent',
       },
       {
         id: 'accounts-revenue',
         label: 'Revenue Accounts',
-        value: String(result.filter(account => account.type === 'revenue').length),
+        value: String(filteredAccounts.filter(account => account.type === 'revenue').length),
         detail: 'Recognized income structure',
         tone: 'positive',
       },
       {
         id: 'accounts-inactive',
         label: 'Inactive Accounts',
-        value: String(result.filter(account => account.status === 'inactive').length),
+        value: String(filteredAccounts.filter(account => account.status === 'inactive').length),
         detail: 'Retained for audit history',
-        tone: result.some(account => account.status === 'inactive') ? 'warning' : 'neutral',
+        tone: filteredAccounts.some(account => account.status === 'inactive') ? 'warning' : 'neutral',
       },
     ],
     actions: [

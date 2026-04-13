@@ -8,8 +8,6 @@ export { formatCurrency, formatDate } from '../utils'
 export type {
   AuditLogEntry,
   CorporateCardSummary,
-  RecentReport,
-  SavedReport,
   ShortTermObligations,
 } from './legacy'
 
@@ -17,6 +15,9 @@ export type {
   BudgetActualData,
   CashFlowData,
   Department,
+  PinnedReport,
+  RecentReport,
+  SavedReport,
   TrialBalanceRow,
 } from '../types'
 
@@ -59,17 +60,31 @@ export {
 export type {
   ReportComparisonRow,
   ReportDetailData,
+  ReportFilter,
   ReportRunHistoryItem,
   ReportsCenterData,
   ReportsCenterEntry,
   ReportsCenterSection,
   ReportSummaryMetric,
-} from './report-center'
+} from '../types'
 
 export {
   getReportDetailData,
   getReportsCenterData,
 } from './report-center'
+
+export {
+  deleteReport,
+  getPinnedReports,
+  getRecentReports,
+  getSavedReportById,
+  getSavedReports,
+  getReportRunHistory,
+  recordReportActivity,
+  saveReport,
+  toggleReportFavorite,
+  toggleReportPin,
+} from './report-metadata'
 
 export {
   getCloseStatus,
@@ -365,7 +380,6 @@ export {
   createWorkflow,
   deactivateAllocation,
   deleteAccount,
-  deleteReport,
   disconnectIntegration,
   getAccounts,
   getAccountingPeriods,
@@ -402,7 +416,6 @@ export {
   getNotifications,
   getPaymentById,
   getPayments,
-  getPinnedReports,
   getProjectDetailById,
   getProjectDetails,
   getProjects,
@@ -410,7 +423,6 @@ export {
   getPurchaseOrders,
   getReceiptById,
   getReceipts,
-  getRecentReports,
   getRecurringJournalById,
   getRecurringJournals,
   getReconciliationItems,
@@ -419,7 +431,6 @@ export {
   getRevenueTrend,
   getSalesOrderById,
   getSalesOrders,
-  getSavedReports,
   getShortTermObligations,
   getTasks,
   getTimeEntries,
@@ -451,7 +462,6 @@ export {
   runRecurringJournal,
   saveAccount,
   saveJournalEntry,
-  saveReport,
   sendInvoice,
   sendPurchaseOrder,
   shipSalesOrder,
@@ -459,8 +469,6 @@ export {
   submitExpenseEntry,
   submitTimeEntry,
   syncIntegration,
-  toggleReportFavorite,
-  toggleReportPin,
   unlockPeriod,
   updateBill,
   updateCustomer,

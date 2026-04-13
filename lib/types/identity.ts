@@ -65,6 +65,7 @@ export interface RoleHomeConfig {
 
 export interface UserPreferences {
   theme: 'light' | 'dark' | 'system'
+  defaultRole?: RoleId
   defaultEntity: string
   defaultDateRange: DateRangePreset
   sidebarCollapsed: boolean

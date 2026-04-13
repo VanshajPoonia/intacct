@@ -41,9 +41,9 @@ import {
   getAuditLogs,
   getIntegrations,
   getTasks,
-  getUsers,
   getWorkflows,
 } from './legacy'
+import { getUsers } from './users-access'
 
 let payableDocuments: any[] = []
 let customers: any[] = []
